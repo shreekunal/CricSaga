@@ -1,5 +1,6 @@
 package com.cricsaga.app.ui.scorecard
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -13,10 +14,12 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.cricsaga.app.R
 import com.cricsaga.app.domain.model.BatsmanScore
 import com.cricsaga.app.domain.model.BowlerFigures
 import com.cricsaga.app.domain.model.InningsScoreState
@@ -293,6 +296,12 @@ fun WhatsAppMatchPosterTab(
                 .fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            Image(
+                painter = painterResource(id = R.drawable.cricsaga_logo),
+                contentDescription = "CricSaga Logo",
+                modifier = Modifier.size(42.dp)
+            )
+            Spacer(modifier = Modifier.height(6.dp))
             Text(
                 text = "CRICSAGA",
                 color = CrimsonPrimaryDark,

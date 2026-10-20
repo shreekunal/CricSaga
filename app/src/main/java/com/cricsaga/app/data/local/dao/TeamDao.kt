@@ -11,16 +11,16 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface TeamDao {
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertTeam(team: TeamEntity)
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertTeams(teams: List<TeamEntity>)
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertTeamMember(member: TeamMemberEntity)
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertTeamMembers(members: List<TeamMemberEntity>)
 
     @Query("SELECT * FROM teams WHERE teamId = :teamId")

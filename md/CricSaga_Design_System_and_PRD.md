@@ -197,12 +197,19 @@ erDiagram
 
 ---
 
-## 4. Free vs. Premium (₹99/Month) Feature Boundaries
+## 4. Free vs. Premium (3 Pricing Plans) Feature Boundaries
 
 * **Pro Activation:** Users can activate/redeem Pro membership using **Redeem Codes** directly provided to them, cutting 3rd-party payment gateway fees in initial days.
+* **Three Plan Types:**
+  1. **₹99 for 3 Months** (Seasonal League Pass)
+  2. **₹199 for 1 Year** (Annual Pass - Most Popular)
+  3. **₹2,000 for Lifetime** (VIP Founder Pass)
+* **Free User Policy:**
+  - Full access to all essential scoring, live match radar, discover directory, and match tracking.
+  - **Minimal Ads:** Non-intrusive banner ads only (local sports sponsors, turfs). Strictly **NO** annoying interstitial popups before balls, **NO** unskippable video ads, and **NO** betting/gambling app ads (unlike CricHeroes' heavy barrage of betting sponsors).
 * **Architecture Cleanliness:** Historical scorecard migration/extraction from CricHeroes is decoupled into a **separate companion app / utility**, keeping this core scoring APK 100% lightweight and clean.
 
-| Feature | **Free Tier** | **Premium Tier (₹99/mo or Redeem Code)** |
+| Feature | **Free Tier (Minimal Ads)** | **Pro Tier (₹99 / 3mo, ₹199 / 1yr, ₹2000 / Life)** |
 | :--- | :---: | :---: |
 | **User Registration & Profile** | Full | Full |
 | **Team Creation & Rosters** | Unlimited | Unlimited |
@@ -215,7 +222,8 @@ erDiagram
 | **Manhattan & Worm Graphs** | Locked | **Unlocked** |
 | **PDF Scorecard Export** | Watermarked | **Clean Pro PDF Export** |
 | **WhatsApp Match Highlight Poster Maker** | Locked | **Unlocked** |
-| **Ad-Free Experience** | Guaranteed 100% Ad-Free | Guaranteed 100% Ad-Free |
+| **Ad Experience** | Minimal non-intrusive banners | **100% Ad-Free Forever** |
+| **Founder Pro Badge** | None | **Gold Pro Member Badge** |
 
 ---
 

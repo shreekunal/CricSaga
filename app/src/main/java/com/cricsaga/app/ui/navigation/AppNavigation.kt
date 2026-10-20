@@ -1,11 +1,14 @@
 package com.cricsaga.app.ui.navigation
 
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.*
 import com.cricsaga.app.data.local.ProManager
@@ -14,7 +17,10 @@ import com.cricsaga.app.domain.model.BallType
 import com.cricsaga.app.domain.model.ExtraType
 import com.cricsaga.app.domain.model.PlayingRole
 import com.cricsaga.app.domain.model.TossDecision
+import com.cricsaga.app.ui.discover.DiscoverScreen
+import com.cricsaga.app.ui.home.HomeScreen
 import com.cricsaga.app.ui.matches.MatchListScreen
+import com.cricsaga.app.ui.profile.PlayerProfileScreen
 import com.cricsaga.app.ui.redeem.RedeemCodeScreen
 import com.cricsaga.app.ui.scorecard.FullScorecardScreen
 import com.cricsaga.app.ui.scoring.ScoringScreen
@@ -24,6 +30,7 @@ import com.cricsaga.app.ui.scoring.dialog.DismissalBottomSheet
 import com.cricsaga.app.ui.setup.MatchSetupScreen
 import com.cricsaga.app.ui.setup.OpenersSelectionScreen
 import com.cricsaga.app.ui.teams.TeamsListScreen
+import com.cricsaga.app.ui.tournaments.TournamentListScreen
 import com.cricsaga.app.ui.theme.*
 import kotlinx.coroutines.launch
 
@@ -36,8 +43,16 @@ fun AppNavigation(
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
     val coroutineScope = rememberCoroutineScope()
+    val subscriptionState by proManager.subscriptionState.collectAsState()
 
-    val bottomBarScreens = listOf(Screen.Matches, Screen.Teams, Screen.Redeem)
+    // 5 Primary Bottom Navigation Bar Tabs
+    val bottomBarScreens = listOf(
+        Screen.Home,
+        Screen.Matches,
+        Screen.Discover,
+        Screen.Tournaments,
+        Screen.Profile
+    )
     val showBottomBar = currentRoute in bottomBarScreens.map { it.route }
 
     // Transient Match Setup State across screens
@@ -76,14 +91,21 @@ fun AppNavigation(
                             },
                             icon = {
                                 screen.icon?.let {
-                                    Icon(it, contentDescription = screen.title, tint = if (isSelected) CrimsonPrimaryDark else MutedGrey)
+                                    Icon(
+                                        it,
+                                        contentDescription = screen.title,
+                                        tint = if (isSelected) CrimsonPrimaryDark else MutedGrey,
+                                        modifier = Modifier.size(22.dp)
+                                    )
                                 }
                             },
                             label = {
                                 Text(
                                     text = screen.title,
                                     color = if (isSelected) Color.White else MutedGrey,
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                    fontSize = 10.sp,
+                                    maxLines = 1
                                 )
                             },
                             colors = NavigationBarItemDefaults.colors(
@@ -97,10 +119,26 @@ fun AppNavigation(
     ) { paddingValues ->
         NavHost(
             navController = navController,
-            startDestination = Screen.Matches.route,
+            startDestination = Screen.Home.route,
             modifier = Modifier.padding(paddingValues)
         ) {
-            // Tab 1: Matches List
+            // Tab 1: Home Screen
+            composable(Screen.Home.route) {
+                val matches by scoringViewModel.allMatches.collectAsState()
+                HomeScreen(
+                    isPro = subscriptionState.isActive,
+                    matches = matches,
+                    onStartMatchClick = { navController.navigate(Screen.MatchSetup.route) },
+                    onManageTeamsClick = { navController.navigate(Screen.Teams.route) },
+                    onExploreTournamentsClick = { navController.navigate(Screen.Tournaments.route) },
+                    onProBadgeClick = { navController.navigate(Screen.Redeem.route) },
+                    onMatchClick = { matchId ->
+                        navController.navigate(Screen.LiveScoring.route)
+                    }
+                )
+            }
+
+            // Tab 2: Matches Hub
             composable(Screen.Matches.route) {
                 val matches by scoringViewModel.allMatches.collectAsState()
                 MatchListScreen(
@@ -112,7 +150,35 @@ fun AppNavigation(
                 )
             }
 
-            // Tab 2: Teams & Players List
+            // Tab 3: Discover Grassroots Cricket Hub
+            composable(Screen.Discover.route) {
+                DiscoverScreen(
+                    isPro = subscriptionState.isActive,
+                    onContactWhatsApp = { phone, message ->
+                        // Intent or action to connect with captain/organizer
+                    }
+                )
+            }
+
+            // Tab 4: Tournaments & Points Table Center
+            composable(Screen.Tournaments.route) {
+                TournamentListScreen(
+                    isPro = subscriptionState.isActive,
+                    onCreateTournamentClick = {
+                        // Open create tournament flow
+                    }
+                )
+            }
+
+            // Tab 5: My Career Player Profile
+            composable(Screen.Profile.route) {
+                PlayerProfileScreen(
+                    proManager = proManager,
+                    onRedeemCodeClick = { navController.navigate(Screen.Redeem.route) }
+                )
+            }
+
+            // Flow: Teams & Players Squad Manager
             composable(Screen.Teams.route) {
                 val teams by scoringViewModel.allTeams.collectAsState()
                 TeamsListScreen(
@@ -130,7 +196,7 @@ fun AppNavigation(
                 )
             }
 
-            // Tab 3: Pro Redeem Code
+            // Flow: Pro Redeem Code & Pricing Screen
             composable(Screen.Redeem.route) {
                 RedeemCodeScreen(proManager = proManager)
             }
@@ -206,7 +272,7 @@ fun AppNavigation(
                             bowlingSquad = currentBowlingSquad
                         )
                         navController.navigate(Screen.LiveScoring.route) {
-                            popUpTo(Screen.Matches.route)
+                            popUpTo(Screen.Home.route)
                         }
                     }
                 )

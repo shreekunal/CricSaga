@@ -178,6 +178,28 @@ class MatchRepository(private val database: CricSagaDatabase) {
         val p5 = UserEntity("user_hardik", "9876543214", "Hardik Pandya", playingRole = PlayingRole.ALL_ROUNDER, battingStyle = BattingStyle.RIGHT_HAND)
         val p6 = UserEntity("user_shami", "9876543215", "Mohammed Shami", playingRole = PlayingRole.BOWLER, bowlingStyle = BowlingStyle.RIGHT_ARM_FAST)
 
+        val existingMatch = matchDao.getMatchById(matchId)
+        val existingTeamA = teamDao.getTeamById(teamAId)
+        val existingTeamB = teamDao.getTeamById(teamBId)
+
+        if (existingMatch != null && existingTeamA != null && existingTeamB != null) {
+            val striker = userDao.getUserById(p1.userId) ?: p1
+            val nonStriker = userDao.getUserById(p2.userId) ?: p2
+            val bowler = userDao.getUserById(p3.userId) ?: p3
+            val incomingBatsman = userDao.getUserById(p4.userId) ?: p4
+
+            return@withContext SeededMatchData(
+                matchId = matchId,
+                inningsId = inningsId,
+                teamAName = existingTeamA.teamName,
+                teamBName = existingTeamB.teamName,
+                striker = striker,
+                nonStriker = nonStriker,
+                bowler = bowler,
+                incomingBatsman = incomingBatsman
+            )
+        }
+
         userDao.insertUsers(listOf(p1, p2, p3, p4, p5, p6))
 
         val teamA = TeamEntity(teamAId, "Warriors", "WAR", "Mumbai", captainId = p1.userId)
@@ -195,34 +217,31 @@ class MatchRepository(private val database: CricSagaDatabase) {
             TeamMemberEntity(teamBId, p6.userId, 11)
         ))
 
-        val existingMatch = matchDao.getMatchById(matchId)
-        if (existingMatch == null) {
-            val match = MatchEntity(
-                matchId = matchId,
-                matchTitle = "Warriors vs Tigers",
-                teamAId = teamAId,
-                teamBId = teamBId,
-                totalOvers = 20,
-                ballType = BallType.TENNIS_LIGHT,
-                tossWinnerTeamId = teamAId,
-                tossDecision = TossDecision.BAT,
-                matchStatus = MatchStatus.LIVE
-            )
-            matchDao.insertMatch(match)
+        val match = MatchEntity(
+            matchId = matchId,
+            matchTitle = "Warriors vs Tigers",
+            teamAId = teamAId,
+            teamBId = teamBId,
+            totalOvers = 20,
+            ballType = BallType.TENNIS_LIGHT,
+            tossWinnerTeamId = teamAId,
+            tossDecision = TossDecision.BAT,
+            matchStatus = MatchStatus.LIVE
+        )
+        matchDao.insertMatch(match)
 
-            val innings = InningsEntity(
-                inningsId = inningsId,
-                matchId = matchId,
-                inningsNumber = 1,
-                battingTeamId = teamAId,
-                bowlingTeamId = teamBId,
-                totalRuns = 0,
-                totalWickets = 0,
-                totalLegalDeliveries = 0,
-                targetRuns = null
-            )
-            inningsDao.insertInnings(innings)
-        }
+        val innings = InningsEntity(
+            inningsId = inningsId,
+            matchId = matchId,
+            inningsNumber = 1,
+            battingTeamId = teamAId,
+            bowlingTeamId = teamBId,
+            totalRuns = 0,
+            totalWickets = 0,
+            totalLegalDeliveries = 0,
+            targetRuns = null
+        )
+        inningsDao.insertInnings(innings)
 
         SeededMatchData(
             matchId = matchId,

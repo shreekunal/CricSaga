@@ -10,7 +10,7 @@
 | :--- | :--- | :--- | :--- |
 | **Brand Colors** | Forest Green (`#0F5132`), White, Lime Green (`#76BA1B`), Grey borders (`#E0E0E0`). | **OLED Deep Charcoal (`#121212`)**, Slate Cards (`#1E1E1E`), **Vibrant Crimson (`#E53935`)**, Amber (`#FFB300`), Grass Green (`#4CAF50`). | **Sunlight Readability:** Green/white washes out under bright 40°C cricket pitch sunlight. High-contrast OLED Charcoal + Red/Amber remains razor sharp. |
 | **Scoring Button Color Coding** | Uniform grey or light green buttons with small text labels. | **Semantic Color Tokens:**<br>• `4` = Cricket Amber (`#FFB300`)<br>• `6` = Maximum Green (`#4CAF50`)<br>• `OUT` = Crimson Alert (`#FF5252`)<br>• Extras = Umpire Blue (`#42A5F5`) | **Zero Cognitive Load:** Scorers make split-second decisions on the ground; color-coding prevents accidental taps. |
-| **Ad Clutter** | **Heavy banner ads, interstitial popups, and betting app ads** (My11Circle, Stake) on almost every screen. | **100% Ad-Free Guarantee Forever.** Zero popups, zero video interruptions. | Scorers and players hate ads that burn phone battery and cause match delays. |
+| **Ad Experience & Monetization** | **Heavy aggressive ads, unskippable video popups, and betting app ads** (My11Circle, Stake, 1xBet) interrupting scoring. Expensive recurring subscriptions. | **Minimal, Non-Intrusive Ads on Free Tier** (clean inline banners, zero video popups, strictly zero betting ads).<br>**3 Flexible Pro Plans:**<br>• ₹99 for 3 months<br>• ₹199 for 1 year<br>• ₹2,000 for Lifetime<br>• Pro removes 100% of ads. | Scorers and players hate aggressive ads that burn battery and delay matches. CricSaga gives unbeatable value and clean UX. |
 | **Typography Scale** | Standard Roboto, often small numeric font sizes (`18sp-22sp` for score). | High-legibility Grotesque sans-serif with **extra-bold score headers (`34sp-38sp`)** and high-contrast numbers. | Instant glancing from the pitch sidelines. |
 | **Card Geometry** | Standard material cards with 8dp radius and light elevation shadows. | **Flat elevated surfaces (`#1E1E1E`, `#282828`) with 12dp rounded corners** and crisp 1px borders (`#333333`). | Modern, clean aesthetic matching contemporary sports apps. |
 
@@ -126,9 +126,14 @@ flowchart TD
   - **Grounds & Turfs Directory:** Search local box cricket turfs and grounds with pitch type, floodlights, and direct booking.
 
 ### Screen 9: Pro Membership & Settings
-* **CricHeroes:** Pushes Google Play recurring billing with 15–30% platform cuts and credit card requirements.
+* **CricHeroes:** Pushes Google Play recurring billing with 15–30% platform cuts, credit card requirements, and aggressive ad upsells.
 * **CricSaga Design:**
-  - **Direct Redeem Code System:** Enter `CRIC-PRO-2026` or direct codes provided to players/captains via UPI/cash with **₹0 platform commission**.
+  - **Three Flexible Value Plans:**
+    1. **₹99 for 3 Months** (Seasonal League pass)
+    2. **₹199 for 1 Year** (Annual pass - unbeatable value)
+    3. **₹2,000 for Lifetime** (VIP Founder status)
+  - **Minimal Ads on Free Tier:** Only clean inline sponsor banners; no video popups, no betting ads.
+  - **Direct Redeem Code System:** Enter `CRIC-PRO-2026` or promo codes distributed via direct UPI/cash with **₹0 platform commission**.
   - Instant Gold Pro Member badge.
   - App settings: Dark Mode / Light Mode toggle, haptic feedback toggle, About CricSaga.
 
@@ -136,7 +141,7 @@ flowchart TD
 
 ## 4. The Verdict: We Match 100% and Offer More
 
-By delivering all 9 core screens across the 5 primary tabs (`Home`, `Matches`, `Discover`, `Tournaments`, `Profile`), CricSaga will achieve:
+By delivering all 9 core screens across the 5 primary tabs (`Home`, `Matches`, `Discover`, `Tournaments`, `Profile`), CricSaga achieves:
 1. **100% Feature Parity** with CricHeroes's best features.
-2. **Superior Performance:** Native Kotlin + Compose + SQLite WAL running smoothly on low-end budget phones.
-3. **Superior User Experience:** Zero ads, direct WhatsApp matchmaking, instant status posters, and direct redeem codes.
+2. **Superior Performance:** Native Kotlin + Jetpack Compose + Room SQLite WAL running smoothly on low-end budget phones.
+3. **Respect for Players:** Minimal ads for free users (no betting ads, no popups), unbeatable 3-tier Pro pricing (₹99/3mo, ₹199/1yr, ₹2000/life), direct WhatsApp matchmaking, and unwatermarked posters.

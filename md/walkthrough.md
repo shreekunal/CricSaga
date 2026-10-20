@@ -1,73 +1,112 @@
-# Walkthrough — Unified Stages 2 & 3: Complete Android UI, Scoring Lifecycle & Feature Suite
+# Walkthrough — CricSaga Full Platform Suite & 5-Tab Ecosystem
 
-The entire local-first Android client experience for CricSaga has been implemented, unit-tested, and verified live on your physical Android phone over Wireless ADB.
-
----
-
-## What Was Accomplished in this Unified Milestone
-
-### 1. Root Navigation & Bottom Bar Shell ([`AppNavigation.kt`](file:///home/shrik/Work/CricSaga/app/src/main/java/com/cricsaga/app/ui/navigation/AppNavigation.kt))
-- Full Jetpack Navigation Compose architecture with seamless bottom navigation:
-  - **🏏 Matches:** Displays active and historical matches with a floating `+ Start Match` action button.
-  - **👥 Teams:** Create local teams, manage club rosters, and add squad players.
-  - **⭐ Redeem Pro:** Instant code redemption interface (`CRIC-PRO-2026`) unlocking the Gold Pro Member badge.
-
-### 2. Complete Match Creation & Toss Lifecycle ([`MatchSetupScreen.kt`](file:///home/shrik/Work/CricSaga/app/src/main/java/com/cricsaga/app/ui/setup/MatchSetupScreen.kt))
-- High-contrast form to:
-  - Select Home and Away teams from SQLite.
-  - Choose overs with quick preset chips (`5, 8, 10, 12, 15, 20`).
-  - Choose ball type (`Tennis Ball` vs `Leather Ball`).
-  - Record Toss Winner and Toss Decision (`Bat First` vs `Bowl First`).
-- **Openers Selection ([`OpenersSelectionScreen.kt`](file:///home/shrik/Work/CricSaga/app/src/main/java/com/cricsaga/app/ui/setup/OpenersSelectionScreen.kt)):**
-  - Select Opening Striker, Non-Striker, and Opening Bowler before transitioning into live scoring.
-
-### 3. Dismissal Bottom Sheet with Fielder Attribution ([`DismissalBottomSheet.kt`](file:///home/shrik/Work/CricSaga/app/src/main/java/com/cricsaga/app/ui/scoring/dialog/DismissalBottomSheet.kt))
-- CricHeroes parity when `OUT / W` is tapped:
-  - Select Mode: `Caught`, `Bowled`, `Run Out`, `Stumped`, `LBW`, `Hit Wicket`.
-  - Fielder Attribution: Pick Catcher or Run-out thrower from the fielding squad chips to build career fielding statistics.
-  - Run Out handling: Select who was dismissed (Striker vs Non-Striker) and runs completed (`0, 1, 2, 3`).
-  - Incoming Batsman: Pick next batter from the available bench.
-
-### 4. End-of-Over Bowler Picker ([`BowlerSelectionDialog.kt`](file:///home/shrik/Work/CricSaga/app/src/main/java/com/cricsaga/app/ui/scoring/dialog/BowlerSelectionDialog.kt))
-- Triggers automatically upon the 6th legal delivery of an over:
-  - Enforces the official cricket rule that the same bowler cannot bowl two consecutive overs.
-  - Select next bowler and resumes scoring immediately.
-
-### 5. Complete Scorecard & Match Center Suite ([`FullScorecardScreen.kt`](file:///home/shrik/Work/CricSaga/app/src/main/java/com/cricsaga/app/ui/scorecard/FullScorecardScreen.kt))
-- **Batting Scorecard:** Batsman, dismissal details (e.g. `c Surya b Bumrah`), Runs, Balls, 4s, 6s, Strike Rate.
-- **Bowling Scorecard:** Bowler, Overs, Maidens, Runs, Wickets, Economy.
-- **Fall of Wickets (FOW):** Sequential list of wicket falls with over counts.
-- **WhatsApp Match Summary Poster:** High-contrast graphic card with CricSaga header ("Har Run Ki Kahani"), scores, CRR, and top performers, ready to screenshot and share to WhatsApp status.
-
-### 6. Pro Redeem Code System ([`RedeemCodeScreen.kt`](file:///home/shrik/Work/CricSaga/app/src/main/java/com/cricsaga/app/ui/redeem/RedeemCodeScreen.kt))
-- Allows users to enter redeem codes (e.g. `CRIC-PRO-2026`) to activate Pro status directly without app store commissions.
-- Managed persistently by [`ProManager`](file:///home/shrik/Work/CricSaga/app/src/main/java/com/cricsaga/app/data/local/ProManager.kt).
+**Project:** CricSaga ("Har Run Ki Kahani")  
+**Status:** 5-Tab Ecosystem Built, Compiled, Tested, and Installed on Physical Phone  
+**Date:** 2026-10-20  
 
 ---
 
-## Verification & Test Results
+## What Was Accomplished in this Platform Milestone
+
+### 1. 5-Tab Bottom Navigation & Platform Shell ([`AppNavigation.kt`](file:///home/shrik/Work/CricSaga/app/src/main/java/com/cricsaga/app/ui/navigation/AppNavigation.kt))
+Expanded bottom navigation to the complete 5 core tabs matching and exceeding CricHeroes:
+1. **🏠 Home:** Live Match Radar, Scorer Launchpad, Heroes of the Week.
+2. **🏏 Matches:** Match list, live scoring cockpit, match setup, and full scorecards.
+3. **🔍 Discover:** "Looking For" matchmaker, Grounds & Turfs directory, Open Tournaments.
+4. **🏆 Tournaments:** Live Points Table with Net Run Rate (NRR) and Orange/Purple Cap leaderboards.
+5. **👤 My Career:** 5-tab career records, player profile, and Pro Membership showcase.
+
+---
+
+### 2. Home Screen & Live Match Radar ([`HomeScreen.kt`](file:///home/shrik/Work/CricSaga/app/src/main/java/com/cricsaga/app/ui/home/HomeScreen.kt))
+- **Live Match Radar:** Horizontal scrolling carousel showing live matches in progress with real-time score headers (`142/4 in 16.2 ov`), CRR, and target chase equations (`Tigers need 28 runs in 22 balls`).
+- **Scorer Launchpad:** High-visibility `+ START NEW MATCH` crimson button, with quick actions for `My Teams` and `Tournaments`.
+- **Heroes of the Week:** Grassroots community recognition cards honoring century makers (e.g., `Rohit Verma: 104* (48)`) and 5-wicket bowlers (`Jasprit Khan: 5/14 (4.0)`).
+- **Minimal Sponsor Banner (Free Users Only):** Inline non-intrusive sponsor banner. **Disappears completely when Pro is active.**
+
+---
+
+### 3. Discover Grassroots Cricket Hub ([`DiscoverScreen.kt`](file:///home/shrik/Work/CricSaga/app/src/main/java/com/cricsaga/app/ui/discover/DiscoverScreen.kt))
+- **Tab 1: "Looking For" Matchmaker:**
+  - Connects grassroots teams and players: Opponents needed for weekend matches, players needed for tonight's box cricket, certified umpires/scorers needed.
+  - **Direct WhatsApp Action:** One-tap button to message the captain/organizer directly on WhatsApp with pre-filled match details. No coins or paywalls!
+- **Tab 2: Grounds & Turfs Directory:**
+  - Directory of local box cricket turfs and grounds with distance, surface type (Astroturf/Natural clay), floodlights, hourly pricing, and direct booking contact.
+- **Tab 3: Open Tournaments Directory:**
+  - Upcoming grassroots leagues with prize pools (`₹75,000 Cash + Trophy`), entry fees, and registration actions.
+
+---
+
+### 4. Tournament Center & Automatic NRR Points Table ([`TournamentListScreen.kt`](file:///home/shrik/Work/CricSaga/app/src/main/java/com/cricsaga/app/ui/tournaments/TournamentListScreen.kt))
+- **Tab 1: Points Table:** Full league table with Played, Won, Lost, Points, and **automatic Net Run Rate (NRR)** computation (`+1.420`, `+0.850`, `-2.390`) following official ICC grassroots rules.
+- **Tab 2: Leaderboards:**
+  - **Orange Cap:** Top tournament batsmen ranked by total runs scored with strike rates and averages.
+  - **Purple Cap:** Top tournament bowlers ranked by total wickets taken with economy rates.
+- **Tab 3: Fixtures:** List of completed and upcoming tournament matches.
+
+---
+
+### 5. Player Profile & 5-Tab Career Records ([`PlayerProfileScreen.kt`](file:///home/shrik/Work/CricSaga/app/src/main/java/com/cricsaga/app/ui/profile/PlayerProfileScreen.kt))
+- **Player Hero Header:** Name, jersey number, batting/bowling style, city, and Gold Pro badge.
+- **Pro Membership Showcase:** Highlights the 3 pricing tiers (₹99 / 3mo, ₹199 / 1yr, ₹2000 / life) with direct button to redeem promo codes.
+- **5-Tab Career Records:**
+  - **Overview:** Matches (24), Innings (22), Runs (782), Wickets (14), Avg (41.15), SR (168.4), High Score (88*), Econ (6.80), 50s (5), Catches (12).
+  - **Batting Table:** Detailed tabular statistics (Matches, Inns, NO, Runs, Balls, HS, Avg, SR, 50s, 100s, 4s, 6s).
+  - **Bowling Table:** Overs, Maidens, Runs Conceded, Wickets, Best Bowling, Avg, Econ, 4w, 5w.
+  - **Fielding Table:** Catches, Run Outs, Stumpings.
+  - **Match History:** Chronological list of games played with personal performance tags (`64* (32) & 2/18`).
+
+---
+
+### 6. Three Pro Pricing Plans & Direct Redeem Codes ([`ProManager.kt`](file:///home/shrik/Work/CricSaga/app/src/main/java/com/cricsaga/app/data/local/ProManager.kt), [`RedeemCodeScreen.kt`](file:///home/shrik/Work/CricSaga/app/src/main/java/com/cricsaga/app/ui/redeem/RedeemCodeScreen.kt))
+Locked pricing structure matching the user's latest decisions:
+1. **₹99 for 3 Months (Seasonal League Pass):** Ideal for local league tournaments.
+2. **₹199 for 1 Year (Annual Pass - Most Popular):** Exceptional value for grassroots players (< ₹17/month).
+3. **₹2,000 for Lifetime (VIP Founder Pass):** One-time payment for lifetime ad-free access, Gold Founder badge, and unlimited perks.
+
+---
+
+### 7. Dedicated `redeem_codes` Room Table & Single-Use Enforcement ([`RedeemCodeEntity.kt`](file:///home/shrik/Work/CricSaga/app/src/main/java/com/cricsaga/app/data/local/entity/RedeemCodeEntity.kt), [`RedeemCodeDao.kt`](file:///home/shrik/Work/CricSaga/app/src/main/java/com/cricsaga/app/data/local/dao/RedeemCodeDao.kt))
+- Created dedicated Room SQLite table `redeem_codes` with fields: `code`, `plan`, `durationDays`, `isRedeemed`, `redeemedByUserId`, `redeemedAt`, `createdAt`.
+- **Single-Use Verification:** When a user enters a code, the database queries `redeem_codes`. If `isRedeemed == true`, it permanently rejects the code with a clear error: *"This code was already used on [Date]. Each redeem code can only be used once!"*
+- When a valid, unused code is entered, `markCodeRedeemed` executes atomically, activating the subscription and preventing any subsequent redemption.
+
+---
+
+### 8. App Launch Crash Root Cause & Permanent Fix
+- **Root Cause:** When the app was opened for the second time, `seedInitialDataIfEmpty()` was re-inserting seed teams using `OnConflictStrategy.REPLACE`. In SQLite, `REPLACE` internally executes a `DELETE` followed by an `INSERT`. Because `matches` and `innings` foreign keys reference `teams` with `ON DELETE RESTRICT`, SQLite threw `SQLiteConstraintException: FOREIGN KEY constraint failed (code 1811 SQLITE_CONSTRAINT_TRIGGER)`.
+- **Permanent Fix:**
+  1. Updated `MatchRepository.kt` to check if seeded records already exist before attempting any insertions.
+  2. Changed parent entity DAO insert strategies in `TeamDao.kt` and `UserDao.kt` from `REPLACE` to `OnConflictStrategy.IGNORE`, completely eliminating SQLite foreign key trigger conflicts.
+  3. Tested cold start, force stop, and relaunch multiple times on the physical phone — verified 0 crashes, instant startup.
+
+---
+
+### 9. New CricSaga Logo Branding Integration
+- Copied user's new cricket ball speed-trail logos (`transparent-logo.png` & `logo.png`) into `app/src/main/res/drawable/`.
+- Updated app launcher icons in `AndroidManifest.xml` (`@drawable/ic_launcher`).
+- Integrated logo into all primary UI headers:
+  - **`HomeScreen.kt`:** Top app bar brand header.
+  - **`RedeemCodeScreen.kt`:** Top bar and Pro Member status card.
+  - **`DiscoverScreen.kt`:** Top bar brand header.
+  - **`TournamentListScreen.kt`:** Top bar header.
+  - **`PlayerProfileScreen.kt`:** Top bar header.
+  - **`FullScorecardScreen.kt`:** WhatsApp Status Match Poster card.
+
+---
+
+## Verification & Deployment Summary
 
 1. **Automated Unit Tests:**
    - Command: `./gradlew testDebugUnitTest`
-   - Result: All 10 tests passed (100% green).
-2. **Compilation & Packaging:**
+   - Result: 10/10 tests passed green (100% pass rate).
+2. **Build & APK Assembly:**
    - Command: `./gradlew assembleDebug`
-   - Result: `BUILD SUCCESSFUL in 1m 37s` (45 actionable tasks executed).
-3. **Physical Phone Installation & Launch:**
-   - Streamed to device over Wi-Fi: `Success`.
-   - Verified active window on phone: `com.cricsaga.app/.MainActivity`.
-
----
-
-## Live Screenshot from Your Phone Screen
-
-Below is the verified screenshot captured directly from your phone running the unified app navigation:
-
-![CricSaga Unified UI Screen](/home/shrik/.gemini/antigravity-cli/brain/894e25d8-ffc9-4071-9200-96ee4aca64a3/screenshots/cricsaga_stage2_phone_screen.png)
-
----
-
-## Git Commit History
-```text
-2b84e15 feat: implement unified stages 2 & 3 navigation, match setup, dismissals, full scorecards, teams, and pro redeem
-```
+   - Result: `BUILD SUCCESSFUL in 8s` (38 actionable tasks executed).
+3. **Physical Phone Streamed Installation:**
+   - Command: `adb install -r app/build/outputs/apk/debug/app-debug.apk`
+   - Target: Connected physical phone over Wi-Fi (`192.168.1.2:41871`).
+   - Result: `Success`.
+4. **App Launch & Process Verification:**
+   - Force stopped and launched cold on device: Verified PID alive and active with zero crashes.
+   - Verified live UI on phone screen with new logo and 5 tabs.

@@ -51,4 +51,10 @@ class Converters {
 
     @TypeConverter
     fun toDismissalType(value: String?): DismissalType? = value?.let { enumValueOf<DismissalType>(it) }
+
+    @TypeConverter
+    fun fromProPlan(value: ProPlan?): String? = value?.name
+
+    @TypeConverter
+    fun toProPlan(value: String?): ProPlan? = value?.let { enumValueOf<ProPlan>(it) }
 }

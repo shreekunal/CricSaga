@@ -62,12 +62,23 @@ Avoid expanding the initial MVP with costly or complex features such as live str
 - Keep the scoring rules and calculations testable independently from the UI.
 - Keep the system modular enough that hosting providers or individual services can be changed later.
 
-### Decision 3 — Membership model
+### Decision 3 — Membership model & Monetization
 
-- **Free:** A free tier for users.
-- **Premium:** ₹99 per month per individual user.
+- **Free Tier Policy:** 
+  - Complete access to scoring engine, live radar, discover directory, and match centers.
+  - **Minimal Ads:** Non-intrusive inline banner ads only (local sports sponsors, turf bookings). Strictly **NO** full-screen interstitial popups before balls, **NO** unskippable video ads during scoring, and **NO** betting/gambling app ads (unlike CricHeroes' heavy barrage of betting sponsors).
+- **Pro Membership Pricing Structure:**
+  1. **₹99 for 3 Months (Seasonal Pass):** Perfect for a local tournament or seasonal league.
+  2. **₹199 for 1 Year (Annual Pass - Most Popular):** Unbeatable value for regular grassroots players (less than ₹17/month).
+  3. **₹2,000 for Lifetime (VIP Founder Pass):** One-time payment for lifetime ad-free access, special Gold badge, and founder perks.
+- **Pro Perks Included:**
+  - 100% Ad-Free experience across the entire app.
+  - Unwatermarked PDF scorecard export and sharing.
+  - WhatsApp Status match summary graphic poster generator.
+  - Advanced analytics: Wagon wheel, Manhattan, worm chart, run rate comparisons.
+  - Priority support and early access to tournament management features.
 - **Redemption / Direct Payment Strategy:**
-  - In initial days, users can activate/redeem Pro membership using **Redeem / Promo Codes** provided directly by us (via direct UPI/payment), bypassing third-party payment gateways and Google Play's 15–30% commission.
+  - In initial days, users can activate/redeem Pro membership using **Redeem / Promo Codes** provided directly by us (via direct UPI/cash payment to founder/turf organizers), bypassing third-party payment gateways and Google Play's 15–30% commission.
   - Server-side verification: The backend validates the code and applies the Pro entitlement expiration date.
   - Google Play Billing can be added later as an optional convenience when volume requires it.
 - Each person manages their own subscription.
