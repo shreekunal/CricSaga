@@ -283,70 +283,56 @@ fun WhatsAppMatchPosterTab(
     scoreState: InningsScoreState,
     onShare: () -> Unit
 ) {
-    // Beautiful WhatsApp Status Card (High Contrast)
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF1B1B1B)),
-        shape = RoundedCornerShape(16.dp),
-        border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(CrimsonPrimaryDark))
+        colors = CardDefaults.cardColors(containerColor = SlateSurfaceDark),
+        shape = RoundedCornerShape(12.dp),
+        border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(CardBorderDark))
     ) {
         Column(
             modifier = Modifier
-                .padding(20.dp)
+                .padding(18.dp)
                 .fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Image(
-                painter = painterResource(id = R.drawable.cricsaga_logo),
-                contentDescription = "CricSaga Logo",
-                modifier = Modifier.size(42.dp)
-            )
-            Spacer(modifier = Modifier.height(6.dp))
             Text(
-                text = "CRICSAGA",
-                color = CrimsonPrimaryDark,
-                fontWeight = FontWeight.ExtraBold,
-                fontSize = 20.sp,
-                letterSpacing = 2.sp
-            )
-            Text(
-                text = "HAR RUN KI KAHANI",
-                color = MutedGrey,
+                text = "MATCH SUMMARY",
+                color = TextSecondary,
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Bold,
                 letterSpacing = 1.sp
             )
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
             Text(
-                text = matchTitle.uppercase(),
-                color = Color.White,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Bold
+                text = matchTitle,
+                color = TextPrimary,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold
             )
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
             // Score Banner
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(Color(0xFF252525), RoundedCornerShape(10.dp))
+                    .background(ElevatedSurfaceDark, RoundedCornerShape(8.dp))
                     .padding(vertical = 12.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
-                        text = "$battingTeamName: ${scoreState.totalRuns} / ${scoreState.totalWickets}",
-                        fontSize = 26.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = Color.White
+                        text = "$battingTeamName: ${scoreState.totalRuns}/${scoreState.totalWickets}",
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = TextPrimary
                     )
                     Text(
-                        text = "(${scoreState.oversFormatted} ov • CRR: ${String.format("%.2f", scoreState.currentRunRate)})",
-                        fontSize = 13.sp,
-                        color = BoundaryAmber
+                        text = "${scoreState.oversFormatted} ov • CRR ${String.format("%.2f", scoreState.currentRunRate)}",
+                        fontSize = 12.sp,
+                        color = TextSecondary
                     )
                 }
             }
@@ -359,27 +345,28 @@ fun WhatsAppMatchPosterTab(
 
             if (topBatter != null) {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("Top Batter:", color = MutedGrey, fontSize = 12.sp)
-                    Text("${topBatter.playerName} ${topBatter.runs}* (${topBatter.ballsFaced})", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    Text("Top Batter:", color = TextTertiary, fontSize = 12.sp)
+                    Text("${topBatter.playerName} ${topBatter.runs}* (${topBatter.ballsFaced})", color = TextPrimary, fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
                 }
             }
             if (topBowler != null) {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("Top Bowler:", color = MutedGrey, fontSize = 12.sp)
-                    Text("${topBowler.bowlerName} ${topBowler.wickets}/${topBowler.runsConceded}", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    Text("Top Bowler:", color = TextTertiary, fontSize = 12.sp)
+                    Text("${topBowler.bowlerName} ${topBowler.wickets}/${topBowler.runsConceded}", color = TextPrimary, fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
                 }
             }
 
-            Spacer(modifier = Modifier.height(18.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
             Button(
                 onClick = onShare,
-                colors = ButtonDefaults.buttonColors(containerColor = BoundaryGreen),
+                colors = ButtonDefaults.buttonColors(containerColor = ElevatedSurfaceDark),
+                shape = RoundedCornerShape(8.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Icon(Icons.Default.Share, contentDescription = null, tint = Color.Black)
+                Icon(Icons.Default.Share, contentDescription = null, tint = TextPrimary, modifier = Modifier.size(16.dp))
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("SHARE TO WHATSAPP STATUS", color = Color.Black, fontWeight = FontWeight.Bold)
+                Text("Share Summary", color = TextPrimary, fontWeight = FontWeight.Medium, fontSize = 13.sp)
             }
         }
     }

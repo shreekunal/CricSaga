@@ -1,8 +1,6 @@
 package com.cricsaga.app.ui.redeem
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -10,21 +8,17 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CardMembership
-import androidx.compose.material.icons.filled.Diamond
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.cricsaga.app.R
 import com.cricsaga.app.data.local.ProManager
 import com.cricsaga.app.data.local.ProPlan
 import com.cricsaga.app.ui.theme.*
@@ -45,15 +39,12 @@ fun RedeemCodeScreen(proManager: ProManager) {
         topBar = {
             TopAppBar(
                 title = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Image(
-                            painter = painterResource(id = R.drawable.cricsaga_logo),
-                            contentDescription = "CricSaga Logo",
-                            modifier = Modifier.size(32.dp)
-                        )
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Text("CricSaga Pro Membership", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 17.sp)
-                    }
+                    Text(
+                        text = "Pro Membership",
+                        fontWeight = FontWeight.Bold,
+                        color = TextPrimary,
+                        fontSize = 18.sp
+                    )
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = CharcoalBackgroundDark)
             )
@@ -71,38 +62,39 @@ fun RedeemCodeScreen(proManager: ProManager) {
             // Pro Member Status Card
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = if (subscriptionState.isActive) Color(0xFF2C240E) else SlateSurfaceDark),
-                shape = RoundedCornerShape(16.dp),
-                border = if (subscriptionState.isActive) CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(BoundaryAmber)) else null
+                colors = CardDefaults.cardColors(containerColor = SlateSurfaceDark),
+                shape = RoundedCornerShape(10.dp),
+                border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(CardBorderDark))
             ) {
                 Column(
-                    modifier = Modifier.padding(20.dp),
+                    modifier = Modifier.padding(18.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Image(
-                        painter = painterResource(id = R.drawable.cricsaga_logo),
-                        contentDescription = "Logo",
-                        modifier = Modifier.size(48.dp)
+                    Icon(
+                        Icons.Default.Star,
+                        contentDescription = null,
+                        tint = if (subscriptionState.isActive) BoundaryAmber else TextSecondary,
+                        modifier = Modifier.size(32.dp)
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         text = if (subscriptionState.isActive) {
-                            "CRICSAGA PRO ACTIVE • ${subscriptionState.plan?.title ?: "MEMBER"}"
+                            "Pro Active • ${subscriptionState.plan?.title ?: "Member"}"
                         } else {
-                            "GET CRICSAGA PRO"
+                            "Upgrade to Pro"
                         },
-                        fontWeight = FontWeight.ExtraBold,
-                        fontSize = 18.sp,
-                        color = if (subscriptionState.isActive) BoundaryAmber else Color.White
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp,
+                        color = TextPrimary
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = if (subscriptionState.isActive) {
-                            "Validity: ${subscriptionState.formattedExpiry} (Redeemed Code: ${subscriptionState.redeemedCode})"
+                            "Valid until: ${subscriptionState.formattedExpiry}"
                         } else {
-                            "Enter your single-use redeem code to unlock Pro perks directly without 3rd party fees."
+                            "100% ad-free scoring, unwatermarked PDF exports, and detailed analytics."
                         },
-                        color = MutedGrey,
+                        color = TextTertiary,
                         fontSize = 12.sp,
                         textAlign = TextAlign.Center
                     )
@@ -111,10 +103,11 @@ fun RedeemCodeScreen(proManager: ProManager) {
 
             // The 3 Plan Types
             Text(
-                text = "AVAILABLE MEMBERSHIP TIERS",
-                color = BoundaryAmber,
+                text = "MEMBERSHIP TIERS",
+                color = TextSecondary,
                 fontWeight = FontWeight.Bold,
-                fontSize = 12.sp,
+                fontSize = 11.sp,
+                letterSpacing = 1.sp,
                 modifier = Modifier.fillMaxWidth()
             )
 
@@ -144,23 +137,21 @@ fun RedeemCodeScreen(proManager: ProManager) {
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(containerColor = SlateSurfaceDark),
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape(10.dp),
+                border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(CardBorderDark))
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.CardMembership, contentDescription = null, tint = BoundaryAmber, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "REDEEM ONE-TIME CODE",
-                            color = BoundaryAmber,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 13.sp
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(6.dp))
+                Column(modifier = Modifier.padding(14.dp)) {
                     Text(
-                        text = "Each code is generated for a specific subscription and can only be used one time:",
-                        color = MutedGrey,
+                        text = "REDEEM PRO CODE",
+                        color = TextSecondary,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 11.sp,
+                        letterSpacing = 1.sp
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Each code is single-use and activates the specified plan:",
+                        color = TextTertiary,
                         fontSize = 12.sp
                     )
                     Spacer(modifier = Modifier.height(10.dp))
@@ -168,18 +159,18 @@ fun RedeemCodeScreen(proManager: ProManager) {
                     OutlinedTextField(
                         value = codeInput,
                         onValueChange = { codeInput = it.uppercase() },
-                        placeholder = { Text("ENTER REDEEM CODE HERE", color = Color.Gray, fontSize = 13.sp) },
+                        placeholder = { Text("ENTER CODE HERE", color = TextTertiary, fontSize = 12.sp) },
                         modifier = Modifier.fillMaxWidth(),
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = BoundaryAmber,
-                            unfocusedBorderColor = Color.DarkGray,
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White
+                            focusedBorderColor = TextSecondary,
+                            unfocusedBorderColor = CardBorderDark,
+                            focusedTextColor = TextPrimary,
+                            unfocusedTextColor = TextPrimary
                         ),
                         singleLine = true
                     )
 
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(10.dp))
 
                     Button(
                         onClick = {
@@ -196,32 +187,24 @@ fun RedeemCodeScreen(proManager: ProManager) {
                         enabled = !isRedeeming,
                         modifier = Modifier.fillMaxWidth(),
                         colors = ButtonDefaults.buttonColors(containerColor = CrimsonPrimaryDark),
-                        shape = RoundedCornerShape(8.dp)
+                        shape = RoundedCornerShape(6.dp)
                     ) {
                         Text(
-                            text = if (isRedeeming) "VALIDATING CODE..." else "APPLY REDEEM CODE",
+                            text = if (isRedeeming) "Verifying..." else "Apply Code",
                             fontWeight = FontWeight.Bold,
-                            color = Color.White
+                            color = Color.White,
+                            fontSize = 13.sp
                         )
                     }
 
                     if (feedbackMessage != null) {
-                        Spacer(modifier = Modifier.height(10.dp))
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = CardDefaults.cardColors(
-                                containerColor = if (isSuccess) Color(0xFF142B1A) else Color(0xFF2B1414)
-                            ),
-                            shape = RoundedCornerShape(8.dp)
-                        ) {
-                            Text(
-                                text = feedbackMessage!!,
-                                color = if (isSuccess) BoundaryGreen else DismissalRed,
-                                fontWeight = FontWeight.SemiBold,
-                                fontSize = 12.sp,
-                                modifier = Modifier.padding(10.dp)
-                            )
-                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = feedbackMessage!!,
+                            color = if (isSuccess) BoundaryGreen else DismissalRed,
+                            fontWeight = FontWeight.Medium,
+                            fontSize = 12.sp
+                        )
                     }
                 }
             }
@@ -230,39 +213,34 @@ fun RedeemCodeScreen(proManager: ProManager) {
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(containerColor = SlateSurfaceDark),
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape(10.dp),
+                border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(CardBorderDark))
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text("PRO MEMBER PRIVILEGES", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                    Spacer(modifier = Modifier.height(10.dp))
+                Column(modifier = Modifier.padding(14.dp)) {
+                    Text("PRO INCLUDED PERKS", color = TextSecondary, fontWeight = FontWeight.Bold, fontSize = 11.sp, letterSpacing = 1.sp)
+                    Spacer(modifier = Modifier.height(8.dp))
                     ProPerkRow("100% Ad-Free experience across the entire app")
-                    ProPerkRow("Export clean, unwatermarked PDF scorecards")
-                    ProPerkRow("Instant WhatsApp Status match highlight poster maker")
+                    ProPerkRow("Export unwatermarked PDF scorecards")
+                    ProPerkRow("Instant WhatsApp match summary poster maker")
                     ProPerkRow("Wagon wheel, spider chart & Manhattan run-rate analytics")
-                    ProPerkRow("Unlimited historical match migration via companion tool")
-                    ProPerkRow("Gold Verified Scorer & Player badge on public scorecards")
+                    ProPerkRow("Unlimited historical migration via companion tool")
                 }
             }
 
-            // One-Time Security Note
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = ElevatedSurfaceDark),
-                shape = RoundedCornerShape(10.dp)
+            // Single-Use Security Note
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(
-                    modifier = Modifier.padding(12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(Icons.Default.Lock, contentDescription = null, tint = BoundaryAmber, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Text(
-                        text = "Single-Use Security: Every issued code is verified against our database and permanently expires upon first redemption.",
-                        color = Color.LightGray,
-                        fontSize = 11.sp,
-                        lineHeight = 15.sp
-                    )
-                }
+                Icon(Icons.Default.Lock, contentDescription = null, tint = TextTertiary, modifier = Modifier.size(13.dp))
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = "Each issued code permanently expires upon first redemption.",
+                    color = TextTertiary,
+                    fontSize = 11.sp
+                )
             }
         }
     }
@@ -278,10 +256,12 @@ fun PlanCard(
     Card(
         modifier = modifier,
         colors = CardDefaults.cardColors(
-            containerColor = if (highlight) Color(0xFF2B1D1D) else SlateSurfaceDark
+            containerColor = if (highlight) ElevatedSurfaceDark else SlateSurfaceDark
         ),
-        shape = RoundedCornerShape(12.dp),
-        border = if (highlight) CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(CrimsonPrimaryDark)) else null
+        shape = RoundedCornerShape(8.dp),
+        border = CardDefaults.outlinedCardBorder().copy(
+            brush = androidx.compose.ui.graphics.SolidColor(if (highlight) CrimsonPrimaryDark else CardBorderDark)
+        )
     ) {
         Column(
             modifier = Modifier.padding(10.dp),
@@ -289,46 +269,34 @@ fun PlanCard(
         ) {
             if (highlight) {
                 Text(
-                    text = "MOST POPULAR",
-                    color = BoundaryAmber,
-                    fontSize = 9.sp,
-                    fontWeight = FontWeight.Bold
+                    text = "BEST VALUE",
+                    color = CrimsonPrimaryDark,
+                    fontSize = 8.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.5.sp
                 )
                 Spacer(modifier = Modifier.height(2.dp))
             }
             Text(
                 text = plan.title,
-                color = Color.White,
+                color = TextPrimary,
                 fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
+                fontWeight = FontWeight.SemiBold,
                 textAlign = TextAlign.Center
             )
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(2.dp))
             Text(
                 text = plan.price,
-                color = if (highlight) CrimsonPrimaryDark else BoundaryAmber,
-                fontSize = 17.sp,
-                fontWeight = FontWeight.ExtraBold
+                color = TextPrimary,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold
             )
             Text(
                 text = plan.durationText,
-                color = MutedGrey,
+                color = TextTertiary,
                 fontSize = 10.sp,
                 textAlign = TextAlign.Center
             )
-            Spacer(modifier = Modifier.height(6.dp))
-            Surface(
-                color = CharcoalBackgroundDark,
-                shape = RoundedCornerShape(4.dp)
-            ) {
-                Text(
-                    text = sampleCode,
-                    color = Color.LightGray,
-                    fontSize = 8.sp,
-                    fontWeight = FontWeight.Medium,
-                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
-                )
-            }
         }
     }
 }
@@ -338,11 +306,11 @@ fun ProPerkRow(text: String) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 4.dp),
+            .padding(vertical = 3.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(Icons.Default.CheckCircle, contentDescription = null, tint = BoundaryGreen, modifier = Modifier.size(16.dp))
+        Icon(Icons.Default.CheckCircle, contentDescription = null, tint = TextSecondary, modifier = Modifier.size(14.dp))
         Spacer(modifier = Modifier.width(8.dp))
-        Text(text, color = Color.LightGray, fontSize = 12.sp)
+        Text(text, color = TextSecondary, fontSize = 12.sp)
     }
 }

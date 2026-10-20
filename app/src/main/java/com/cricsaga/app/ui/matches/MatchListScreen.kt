@@ -1,6 +1,5 @@
 package com.cricsaga.app.ui.matches
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -32,10 +31,12 @@ fun MatchListScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Column {
-                        Text("CricSaga", fontWeight = FontWeight.ExtraBold, color = Color.White)
-                        Text("Har Run Ki Kahani", style = MaterialTheme.typography.bodyMedium, color = MutedGrey)
-                    }
+                    Text(
+                        text = "Matches",
+                        fontWeight = FontWeight.Bold,
+                        color = TextPrimary,
+                        fontSize = 20.sp
+                    )
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = CharcoalBackgroundDark)
             )
@@ -46,9 +47,9 @@ fun MatchListScreen(
                 containerColor = CrimsonPrimaryDark,
                 contentColor = Color.White
             ) {
-                Icon(Icons.Default.Add, contentDescription = null)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("START MATCH", fontWeight = FontWeight.Bold)
+                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("Start Match", fontWeight = FontWeight.Bold, fontSize = 13.sp)
             }
         }
     ) { paddingValues ->
@@ -56,34 +57,26 @@ fun MatchListScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .padding(16.dp)
+                .padding(horizontal = 16.dp, vertical = 8.dp)
         ) {
-            Text(
-                text = "MATCHES",
-                color = BoundaryAmber,
-                fontWeight = FontWeight.Bold,
-                fontSize = 12.sp,
-                letterSpacing = 1.sp
-            )
-            Spacer(modifier = Modifier.height(10.dp))
-
             if (matches.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(Icons.Default.SportsCricket, contentDescription = null, tint = Color.Gray, modifier = Modifier.size(56.dp))
+                        Icon(Icons.Default.SportsCricket, contentDescription = null, tint = TextTertiary, modifier = Modifier.size(48.dp))
                         Spacer(modifier = Modifier.height(10.dp))
-                        Text("No matches yet. Tap 'Start Match' to begin scoring!", color = MutedGrey, fontSize = 14.sp)
+                        Text("No matches yet. Tap 'Start Match' to begin.", color = TextTertiary, fontSize = 13.sp)
                     }
                 }
             } else {
-                LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(matches) { match ->
                         Card(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clickable { onMatchClick(match.matchId) },
                             colors = CardDefaults.cardColors(containerColor = SlateSurfaceDark),
-                            shape = RoundedCornerShape(12.dp)
+                            shape = RoundedCornerShape(8.dp),
+                            border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(CardBorderDark))
                         ) {
                             Column(modifier = Modifier.padding(14.dp)) {
                                 Row(
@@ -93,44 +86,36 @@ fun MatchListScreen(
                                 ) {
                                     Text(
                                         text = match.matchTitle,
-                                        style = MaterialTheme.typography.titleMedium,
-                                        color = Color.White,
-                                        fontWeight = FontWeight.Bold
+                                        color = TextPrimary,
+                                        fontWeight = FontWeight.SemiBold,
+                                        fontSize = 14.sp
                                     )
-                                    Box(
-                                        modifier = Modifier
-                                            .background(
-                                                if (match.matchStatus == MatchStatus.LIVE) CrimsonPrimaryDark else Color.DarkGray,
-                                                RoundedCornerShape(4.dp)
-                                            )
-                                            .padding(horizontal = 8.dp, vertical = 2.dp)
+                                    Surface(
+                                        color = if (match.matchStatus == MatchStatus.LIVE) Color(0x22DC2626) else ElevatedSurfaceDark,
+                                        shape = RoundedCornerShape(4.dp)
                                     ) {
                                         Text(
                                             text = match.matchStatus.name,
-                                            color = Color.White,
-                                            fontSize = 10.sp,
-                                            fontWeight = FontWeight.Bold
+                                            color = if (match.matchStatus == MatchStatus.LIVE) DismissalRed else TextSecondary,
+                                            fontSize = 9.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                                         )
                                     }
                                 }
-                                Spacer(modifier = Modifier.height(6.dp))
+                                Spacer(modifier = Modifier.height(4.dp))
                                 Text(
-                                    text = "${match.totalOvers} Overs • ${match.ballType.name.replace("_", " ")}",
-                                    color = MutedGrey,
-                                    fontSize = 12.sp
+                                    text = "${match.totalOvers} Overs • ${match.ballType.name.replace("_", " ").lowercase().replaceFirstChar { it.uppercase() }}",
+                                    color = TextTertiary,
+                                    fontSize = 11.sp
                                 )
                                 Spacer(modifier = Modifier.height(8.dp))
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.End
-                                ) {
-                                    Text(
-                                        text = if (match.matchStatus == MatchStatus.LIVE) "Resume Scoring →" else "View Scorecard →",
-                                        color = BoundaryAmber,
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 12.sp
-                                    )
-                                }
+                                Text(
+                                    text = if (match.matchStatus == MatchStatus.LIVE) "Resume Scoring →" else "View Scorecard →",
+                                    color = TextSecondary,
+                                    fontWeight = FontWeight.Medium,
+                                    fontSize = 11.sp
+                                )
                             }
                         }
                     }

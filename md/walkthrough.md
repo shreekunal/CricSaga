@@ -95,6 +95,23 @@ Locked pricing structure matching the user's latest decisions:
 
 ---
 
+### 10. Smooth 1.5s Startup Animation & Minimalist Restrained UI
+- **Smooth 1.5s Splash Sequence ([`SplashScreen.kt`](file:///home/shrik/Work/CricSaga/app/src/main/java/com/cricsaga/app/ui/splash/SplashScreen.kt)):**
+  - Displays exclusively on cold launch for exactly 1.5 seconds (`1500ms`).
+  - Speed-trail cricket ball logo scales in smoothly (`scale: 0.82f -> 1.0f`) with `FastOutSlowInEasing` and a subtle horizontal swoop.
+  - "CRICSAGA" fades in at 300ms, followed by "HAR RUN KI KAHANI" tagline at 500ms.
+  - Smoothly crossfades (`Crossfade` with `tween(400)`) into the main app.
+- **Complete De-branding across App Headers:**
+  - Removed all logo images and tagline subtitles from every inner top app bar (`Home`, `Matches`, `Discover`, `Tournaments`, `Profile`).
+  - Replaced with clean, confident typography headers (`CricSaga`, `Matches`, `Discover`, `Tournaments`, `My Career`).
+- **Color Clutter Elimination:**
+  - Removed all bright colored card borders (no neon amber or red borders).
+  - Cards now use quiet, elegant Slate Charcoal (`#17191E`) with 0.5dp neutral borders (`#262933`).
+  - Replaced colorful profile boxes with a sleek 4-metric hero strip and clean tabular rows.
+  - Single accent color (Crimson `#E53935`) used strictly for primary CTAs and live dots.
+
+---
+
 ## Verification & Deployment Summary
 
 1. **Automated Unit Tests:**
@@ -102,11 +119,5 @@ Locked pricing structure matching the user's latest decisions:
    - Result: 10/10 tests passed green (100% pass rate).
 2. **Build & APK Assembly:**
    - Command: `./gradlew assembleDebug`
-   - Result: `BUILD SUCCESSFUL in 8s` (38 actionable tasks executed).
-3. **Physical Phone Streamed Installation:**
-   - Command: `adb install -r app/build/outputs/apk/debug/app-debug.apk`
-   - Target: Connected physical phone over Wi-Fi (`192.168.1.2:41871`).
-   - Result: `Success`.
-4. **App Launch & Process Verification:**
-   - Force stopped and launched cold on device: Verified PID alive and active with zero crashes.
-   - Verified live UI on phone screen with new logo and 5 tabs.
+   - Result: `BUILD SUCCESSFUL in 40s` (45 actionable tasks executed).
+   - Artifact: `app/build/outputs/apk/debug/app-debug.apk` ready for launch.

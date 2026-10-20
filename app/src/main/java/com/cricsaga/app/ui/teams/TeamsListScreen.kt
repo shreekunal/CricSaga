@@ -35,7 +35,7 @@ fun TeamsListScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Teams & Squads", fontWeight = FontWeight.Bold, color = Color.White) },
+                title = { Text("Teams & Squads", fontWeight = FontWeight.Bold, color = TextPrimary, fontSize = 20.sp) },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = CharcoalBackgroundDark)
             )
         },
@@ -57,38 +57,39 @@ fun TeamsListScreen(
         ) {
             if (teams.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("No teams created yet. Tap '+' to create your first team!", color = MutedGrey)
+                    Text("No teams created yet. Tap '+' to create your first team.", color = TextTertiary, fontSize = 13.sp)
                 }
             } else {
-                LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(teams) { team ->
                         Card(
                             modifier = Modifier.fillMaxWidth(),
                             colors = CardDefaults.cardColors(containerColor = SlateSurfaceDark),
-                            shape = RoundedCornerShape(12.dp)
+                            shape = RoundedCornerShape(8.dp),
+                            border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(CardBorderDark))
                         ) {
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(16.dp),
+                                    .padding(14.dp),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Column {
                                     Text(
                                         text = team.teamName,
-                                        style = MaterialTheme.typography.titleMedium,
-                                        color = Color.White,
-                                        fontWeight = FontWeight.Bold
+                                        color = TextPrimary,
+                                        fontWeight = FontWeight.SemiBold,
+                                        fontSize = 14.sp
                                     )
                                     Text(
-                                        text = "Code: ${team.shortCode} • City: ${team.city}",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MutedGrey
+                                        text = "${team.shortCode} • ${team.city}",
+                                        color = TextTertiary,
+                                        fontSize = 11.sp
                                     )
                                 }
                                 IconButton(onClick = { selectedTeamForAddPlayer = team }) {
-                                    Icon(Icons.Default.PersonAdd, contentDescription = "Add Player", tint = BoundaryAmber)
+                                    Icon(Icons.Default.PersonAdd, contentDescription = "Add Player", tint = TextSecondary, modifier = Modifier.size(20.dp))
                                 }
                             }
                         }

@@ -73,8 +73,8 @@ fun AppNavigation(
         bottomBar = {
             if (showBottomBar) {
                 NavigationBar(
-                    containerColor = SlateSurfaceDark,
-                    contentColor = Color.White
+                    containerColor = CharcoalBackgroundDark,
+                    tonalElevation = 0.dp
                 ) {
                     bottomBarScreens.forEach { screen ->
                         val isSelected = currentRoute == screen.route
@@ -94,22 +94,26 @@ fun AppNavigation(
                                     Icon(
                                         it,
                                         contentDescription = screen.title,
-                                        tint = if (isSelected) CrimsonPrimaryDark else MutedGrey,
-                                        modifier = Modifier.size(22.dp)
+                                        tint = if (isSelected) TextPrimary else TextTertiary,
+                                        modifier = Modifier.size(20.dp)
                                     )
                                 }
                             },
                             label = {
                                 Text(
                                     text = screen.title,
-                                    color = if (isSelected) Color.White else MutedGrey,
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                    color = if (isSelected) TextPrimary else TextTertiary,
+                                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
                                     fontSize = 10.sp,
                                     maxLines = 1
                                 )
                             },
                             colors = NavigationBarItemDefaults.colors(
-                                indicatorColor = ElevatedSurfaceDark
+                                indicatorColor = ElevatedSurfaceDark,
+                                selectedIconColor = TextPrimary,
+                                unselectedIconColor = TextTertiary,
+                                selectedTextColor = TextPrimary,
+                                unselectedTextColor = TextTertiary
                             )
                         )
                     }
