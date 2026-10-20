@@ -11,6 +11,7 @@ import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.*
@@ -110,7 +111,7 @@ fun DiscoverScreen(
             surfaceType = "Astroturf",
             hasLights = true,
             pricePerHour = "₹900/hr",
-            rating = "4.8 ★",
+            rating = "4.8",
             phone = "9820111222"
         ),
         TurfItem(
@@ -121,7 +122,7 @@ fun DiscoverScreen(
             surfaceType = "Astroturf + Nets",
             hasLights = true,
             pricePerHour = "₹1,100/hr",
-            rating = "4.9 ★",
+            rating = "4.9",
             phone = "9820333444"
         ),
         TurfItem(
@@ -132,7 +133,7 @@ fun DiscoverScreen(
             surfaceType = "Natural Red Clay",
             hasLights = false,
             pricePerHour = "₹2,500/slot",
-            rating = "4.7 ★",
+            rating = "4.7",
             phone = "9820777888"
         )
     )
@@ -368,12 +369,21 @@ fun DiscoverScreen(
                                             fontWeight = FontWeight.SemiBold,
                                             fontSize = 14.sp
                                         )
-                                        Text(
-                                            text = turf.rating,
-                                            color = TextSecondary,
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Medium
-                                        )
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Icon(
+                                                imageVector = Icons.Default.Star,
+                                                contentDescription = null,
+                                                tint = BoundaryAmber,
+                                                modifier = Modifier.size(11.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(3.dp))
+                                            Text(
+                                                text = turf.rating,
+                                                color = TextSecondary,
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Medium
+                                            )
+                                        }
                                     }
 
                                     Spacer(modifier = Modifier.height(2.dp))

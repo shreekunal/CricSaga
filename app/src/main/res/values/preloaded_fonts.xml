@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    CricSaga — Font Preload Array
+    Declares fonts to be fetched by the Google Fonts provider before first Activity launch.
+    Referenced in AndroidManifest.xml via the "preloaded_fonts" meta-data entry.
+-->
+<resources>
+    <array name="preloaded_fonts" translatable="false">
+        <item>@font/barlow_condensed</item>
+        <item>@font/dm_sans</item>
+    </array>
+</resources>

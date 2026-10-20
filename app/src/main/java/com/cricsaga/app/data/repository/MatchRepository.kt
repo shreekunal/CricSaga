@@ -228,6 +228,8 @@ class MatchRepository(private val database: CricSagaDatabase) {
         userDao.getUserByPhone(phoneNumber)
     }
 
+    fun getAllUsers(): Flow<List<UserEntity>> = userDao.getAllUsers()
+
     suspend fun recordMatchPlayerStats(
         innings1: InningsScoreState?,
         innings2: InningsScoreState

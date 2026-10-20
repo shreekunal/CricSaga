@@ -26,10 +26,13 @@ import java.util.UUID
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileSetupScreen(
-    phoneNumber: String,
+    phoneNumber: String = "",
+    initialFullName: String = "",
+    initialEmail: String = "",
     onProfileCreated: (UserEntity) -> Unit
 ) {
-    var fullName by remember { mutableStateOf("") }
+    var fullName by remember { mutableStateOf(initialFullName) }
+    var contactNumber by remember { mutableStateOf(phoneNumber) }
     var jerseyNumber by remember { mutableStateOf("18") }
     var city by remember { mutableStateOf("") }
     var selectedRole by remember { mutableStateOf(PlayingRole.ALL_ROUNDER) }
@@ -61,15 +64,20 @@ fun ProfileSetupScreen(
                         if (fullName.trim().isEmpty()) {
                             errorMessage = "Please enter your full name"
                         } else {
+                            val userId = if (initialEmail.isNotEmpty()) {
+                                "user_" + initialEmail.replace("@", "_").replace(".", "_")
+                            } else {
+                                UUID.randomUUID().toString()
+                            }
                             val newUser = UserEntity(
-                                userId = UUID.randomUUID().toString(),
-                                phoneNumber = phoneNumber,
+                                userId = userId,
+                                phoneNumber = contactNumber.trim(),
                                 fullName = fullName.trim(),
                                 playingRole = selectedRole,
                                 battingStyle = selectedBattingStyle,
                                 bowlingStyle = selectedBowlingStyle,
                                 city = city.trim(),
-                                jerseyNumber = jerseyNumber.trim().ifEmpty { "00" }
+                                jerseyNumber = jerseyNumber.trim().ifEmpty { "18" }
                             )
                             onProfileCreated(newUser)
                         }
@@ -136,6 +144,21 @@ fun ProfileSetupScreen(
                             value = fullName,
                             onValueChange = { fullName = it; errorMessage = null },
                             label = { Text("Full Name * (e.g. Rohit Verma)") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = CrimsonPrimaryDark,
+                                unfocusedBorderColor = CardBorderDark,
+                                focusedTextColor = TextPrimary,
+                                unfocusedTextColor = TextPrimary
+                            )
+                        )
+
+                        OutlinedTextField(
+                            value = contactNumber,
+                            onValueChange = { contactNumber = it },
+                            label = { Text("WhatsApp / Contact (Optional)") },
+                            placeholder = { Text("For match invites & roster contact") },
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth(),
                             colors = OutlinedTextFieldDefaults.colors(

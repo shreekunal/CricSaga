@@ -1,17 +1,16 @@
 package com.cricsaga.app.ui.auth
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Phone
+import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.SportsCricket
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -20,36 +19,52 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cricsaga.app.R
 import com.cricsaga.app.ui.theme.*
-import kotlinx.coroutines.delay
 
-@OptIn(ExperimentalMaterial3Api::class)
+// Demo accounts for instant 1-tap testing on physical device / ground
+data class QuickSignAccount(
+    val id: String,
+    val name: String,
+    val email: String,
+    val role: String,
+    val team: String
+)
+
 @Composable
 fun PhoneLoginScreen(
-    onPhoneVerified: (phoneNumber: String) -> Unit,
-    onContinueAsGuest: () -> Unit
+    onGoogleSignIn: (email: String, displayName: String) -> Unit = { _, _ -> },
+    onContinueAsGuest: () -> Unit,
+    onPhoneVerified: (phoneNumber: String) -> Unit = {}
 ) {
-    var phoneNumber by remember { mutableStateOf("") }
-    var otpCode by remember { mutableStateOf("") }
-    var isOtpSent by remember { mutableStateOf(false) }
-    var errorMessage by remember { mutableStateOf<String?>(null) }
-    var countdown by remember { mutableIntStateOf(30) }
+    var showAccountPicker by remember { mutableStateOf(false) }
 
-    LaunchedEffect(isOtpSent) {
-        if (isOtpSent) {
-            countdown = 30
-            while (countdown > 0) {
-                delay(1000)
-                countdown--
-            }
-        }
-    }
+    val presetAccounts = listOf(
+        QuickSignAccount(
+            id = "user_rohit",
+            name = "Rohit Sharma",
+            email = "rohit.sharma@cricsaga.app",
+            role = "Opening Batsman",
+            team = "Warriors CC"
+        ),
+        QuickSignAccount(
+            id = "user_aman",
+            name = "Aman Sharma",
+            email = "aman.cricketer@cricsaga.app",
+            role = "All-Rounder",
+            team = "Metro Strikers"
+        ),
+        QuickSignAccount(
+            id = "user_jasprit",
+            name = "Jasprit Khan",
+            email = "jasprit.khan@cricsaga.app",
+            role = "Fast Bowler",
+            team = "Royal Tigers"
+        )
+    )
 
     Scaffold(
         containerColor = CharcoalBackgroundDark
@@ -58,28 +73,29 @@ fun PhoneLoginScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .padding(24.dp),
+                .padding(horizontal = 24.dp, vertical = 20.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.SpaceBetween
         ) {
+            // Top Section: Brand Emblem & Identity
             Column(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Spacer(modifier = Modifier.height(36.dp))
+                Spacer(modifier = Modifier.height(28.dp))
 
-                // Brand Emblem
                 Box(
                     modifier = Modifier
-                        .size(68.dp)
+                        .size(72.dp)
                         .clip(CircleShape)
-                        .background(SlateSurfaceDark),
+                        .background(SlateSurfaceDark)
+                        .border(1.dp, CardBorderDark, CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
                     Image(
                         painter = painterResource(id = R.drawable.ic_launcher),
                         contentDescription = "CricSaga",
-                        modifier = Modifier.size(46.dp)
+                        modifier = Modifier.size(50.dp)
                     )
                 }
 
@@ -87,22 +103,28 @@ fun PhoneLoginScreen(
 
                 Text(
                     text = "CRICSAGA",
-                    fontWeight = FontWeight.ExtraBold,
-                    fontSize = 22.sp,
+                    style = ScoreMedium,
                     letterSpacing = 2.sp,
                     color = TextPrimary
                 )
 
                 Text(
-                    text = "Har Run Ki Kahani • Grassroots Cricket",
+                    text = "HAR RUN KI KAHANI",
+                    style = SectionLabel,
+                    color = CrimsonPrimaryDark,
+                    modifier = Modifier.padding(top = 2.dp)
+                )
+
+                Text(
+                    text = "Broadcast-Grade Grassroots Cricket",
+                    style = BodyCaption,
                     color = TextTertiary,
-                    fontSize = 12.sp,
                     modifier = Modifier.padding(top = 4.dp)
                 )
 
-                Spacer(modifier = Modifier.height(40.dp))
+                Spacer(modifier = Modifier.height(36.dp))
 
-                // Card Container
+                // Sign-In Card Container
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(containerColor = SlateSurfaceDark),
@@ -114,254 +136,271 @@ fun PhoneLoginScreen(
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(20.dp)
+                            .padding(20.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        if (!isOtpSent) {
-                            Text(
-                                text = "Enter Mobile Number",
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 16.sp,
-                                color = TextPrimary
-                            )
-                            Text(
-                                text = "We will send an OTP to verify your account",
-                                fontSize = 12.sp,
-                                color = TextSecondary,
-                                modifier = Modifier.padding(top = 2.dp, bottom = 16.dp)
-                            )
+                        Text(
+                            text = "Sign In to CricSaga",
+                            style = PlayerNamePrimary,
+                            color = TextPrimary
+                        )
 
-                            OutlinedTextField(
-                                value = phoneNumber,
-                                onValueChange = {
-                                    if (it.length <= 10 && it.all { char -> char.isDigit() }) {
-                                        phoneNumber = it
-                                        errorMessage = null
-                                    }
-                                },
-                                modifier = Modifier.fillMaxWidth(),
-                                leadingIcon = {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        modifier = Modifier.padding(start = 12.dp, end = 8.dp)
-                                    ) {
-                                        Text(
-                                            text = "🇮🇳 +91",
-                                            fontWeight = FontWeight.Bold,
-                                            color = TextPrimary,
-                                            fontSize = 14.sp
-                                        )
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Box(
-                                            modifier = Modifier
-                                                .width(1.dp)
-                                                .height(18.dp)
-                                                .background(DividerDark)
-                                        )
-                                    }
-                                },
-                                placeholder = { Text("98765 43210", color = TextTertiary, fontSize = 14.sp) },
-                                singleLine = true,
-                                keyboardOptions = KeyboardOptions(
-                                    keyboardType = KeyboardType.Phone,
-                                    imeAction = ImeAction.Done
-                                ),
-                                keyboardActions = KeyboardActions(
-                                    onDone = {
-                                        if (phoneNumber.length == 10) {
-                                            isOtpSent = true
-                                        } else {
-                                            errorMessage = "Please enter a valid 10-digit number"
-                                        }
-                                    }
-                                ),
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor = CrimsonPrimaryDark,
-                                    unfocusedBorderColor = CardBorderDark,
-                                    focusedTextColor = TextPrimary,
-                                    unfocusedTextColor = TextPrimary
-                                )
-                            )
+                        Text(
+                            text = "Track your career stats, sync match scorecards, and build your digital player card with zero fees.",
+                            style = BodyCaption,
+                            color = TextSecondary,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.padding(top = 4.dp, bottom = 20.dp)
+                        )
 
-                            if (errorMessage != null) {
-                                Text(
-                                    text = errorMessage!!,
-                                    color = DismissalRed,
-                                    fontSize = 11.sp,
-                                    modifier = Modifier.padding(top = 6.dp)
-                                )
-                            }
-
-                            Spacer(modifier = Modifier.height(16.dp))
-
-                            Button(
-                                onClick = {
-                                    if (phoneNumber.length == 10) {
-                                        isOtpSent = true
-                                    } else {
-                                        errorMessage = "Please enter a valid 10-digit number"
-                                    }
-                                },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(48.dp),
-                                shape = RoundedCornerShape(8.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = CrimsonPrimaryDark)
-                            ) {
-                                Text(
-                                    text = "GET OTP",
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 14.sp,
-                                    letterSpacing = 1.sp
-                                )
-                            }
-                        } else {
-                            // OTP Verification Step
+                        // 1. Google 1-Tap Sign-In Button
+                        Button(
+                            onClick = {
+                                showAccountPicker = true
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(50.dp),
+                            shape = RoundedCornerShape(8.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color.White,
+                                contentColor = Color(0xFF1F1F1F)
+                            ),
+                            elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)
+                        ) {
                             Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.Center
                             ) {
+                                Image(
+                                    painter = painterResource(id = R.drawable.ic_google_logo),
+                                    contentDescription = "Google",
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(modifier = Modifier.width(12.dp))
                                 Text(
-                                    text = "Verify OTP",
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 16.sp,
-                                    color = TextPrimary
-                                )
-                                TextButton(
-                                    onClick = { isOtpSent = false; otpCode = "" },
-                                    contentPadding = PaddingValues(0.dp)
-                                ) {
-                                    Text("Edit Number", color = BoundaryAmber, fontSize = 12.sp)
-                                }
-                            }
-
-                            Text(
-                                text = "Code sent to +91 $phoneNumber",
-                                fontSize = 12.sp,
-                                color = TextSecondary,
-                                modifier = Modifier.padding(bottom = 16.dp)
-                            )
-
-                            OutlinedTextField(
-                                value = otpCode,
-                                onValueChange = {
-                                    if (it.length <= 6 && it.all { char -> char.isDigit() }) {
-                                        otpCode = it
-                                        errorMessage = null
-                                    }
-                                },
-                                modifier = Modifier.fillMaxWidth(),
-                                placeholder = { Text("Enter 6-digit OTP", color = TextTertiary, fontSize = 14.sp) },
-                                singleLine = true,
-                                keyboardOptions = KeyboardOptions(
-                                    keyboardType = KeyboardType.NumberPassword,
-                                    imeAction = ImeAction.Done
-                                ),
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor = CrimsonPrimaryDark,
-                                    unfocusedBorderColor = CardBorderDark,
-                                    focusedTextColor = TextPrimary,
-                                    unfocusedTextColor = TextPrimary
-                                )
-                            )
-
-                            if (errorMessage != null) {
-                                Text(
-                                    text = errorMessage!!,
-                                    color = DismissalRed,
-                                    fontSize = 11.sp,
-                                    modifier = Modifier.padding(top = 6.dp)
-                                )
-                            }
-
-                            Spacer(modifier = Modifier.height(10.dp))
-
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = if (countdown > 0) "Resend in ${countdown}s" else "Didn't get code?",
-                                    fontSize = 12.sp,
-                                    color = TextTertiary
-                                )
-                                if (countdown == 0) {
-                                    TextButton(onClick = { countdown = 30 }) {
-                                        Text("Resend OTP", color = CrimsonPrimaryDark, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                    }
-                                }
-                            }
-
-                            Spacer(modifier = Modifier.height(8.dp))
-
-                            // Instant Dev Bypass Button
-                            OutlinedButton(
-                                onClick = {
-                                    otpCode = "123456"
-                                },
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(8.dp),
-                                colors = ButtonDefaults.outlinedButtonColors(contentColor = BoundaryAmber),
-                                border = ButtonDefaults.outlinedButtonBorder.copy(
-                                    brush = androidx.compose.ui.graphics.SolidColor(CardBorderDark)
-                                )
-                            ) {
-                                Text("⚡ Auto-fill Test Code (123456)", fontSize = 12.sp)
-                            }
-
-                            Spacer(modifier = Modifier.height(12.dp))
-
-                            Button(
-                                onClick = {
-                                    if (otpCode.length == 6) {
-                                        onPhoneVerified(phoneNumber)
-                                    } else {
-                                        errorMessage = "Please enter 6-digit OTP"
-                                    }
-                                },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(48.dp),
-                                shape = RoundedCornerShape(8.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = CrimsonPrimaryDark)
-                            ) {
-                                Text(
-                                    text = "VERIFY & CONTINUE",
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 14.sp,
-                                    letterSpacing = 1.sp
+                                    text = "Continue with Google",
+                                    style = CtaLabel,
+                                    color = Color(0xFF1F1F1F)
                                 )
                             }
                         }
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        // Divider with text
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            HorizontalDivider(
+                                modifier = Modifier.weight(1f),
+                                color = DividerDark,
+                                thickness = 0.5.dp
+                            )
+                            Text(
+                                text = "OR",
+                                style = MicroTag,
+                                color = TextTertiary,
+                                modifier = Modifier.padding(horizontal = 10.dp)
+                            )
+                            HorizontalDivider(
+                                modifier = Modifier.weight(1f),
+                                color = DividerDark,
+                                thickness = 0.5.dp
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        // 2. Instant Pitch Mode (Guest Scorer)
+                        OutlinedButton(
+                            onClick = onContinueAsGuest,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(48.dp),
+                            shape = RoundedCornerShape(8.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = TextPrimary
+                            ),
+                            border = CardDefaults.outlinedCardBorder().copy(
+                                brush = androidx.compose.ui.graphics.SolidColor(CardBorderDark)
+                            )
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.SportsCricket,
+                                    contentDescription = null,
+                                    tint = BoundaryAmber,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Continue as Guest Scorer",
+                                    style = CtaLabel,
+                                    color = TextPrimary
+                                )
+                            }
+                        }
+
+                        Text(
+                            text = "Instant pitch mode with full offline scoring. No sign-in needed.",
+                            style = BodyCaption,
+                            color = TextTertiary,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.padding(top = 8.dp)
+                        )
                     }
                 }
             }
 
-            // Bottom Section: Guest Mode
+            // Bottom Section: Terms & Conditions
             Column(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                TextButton(
-                    onClick = onContinueAsGuest,
-                    modifier = Modifier.padding(bottom = 8.dp)
-                ) {
-                    Text(
-                        text = "⚡ Skip & Score Match as Guest Scorer",
-                        color = TextSecondary,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Medium
-                    )
-                }
-
                 Text(
-                    text = "By continuing, you agree to CricSaga Terms & Privacy Policy",
+                    text = "By continuing, you agree to CricSaga Grassroots Terms of Play & Privacy Policy",
+                    style = BodyCaption,
                     color = TextTertiary,
-                    fontSize = 10.sp,
-                    textAlign = TextAlign.Center
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(bottom = 6.dp)
                 )
             }
+        }
+
+        // Google Account Selector Sheet
+        if (showAccountPicker) {
+            AlertDialog(
+                onDismissRequest = { showAccountPicker = false },
+                containerColor = SlateSurfaceDark,
+                shape = RoundedCornerShape(14.dp),
+                title = {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Image(
+                            painter = painterResource(id = R.drawable.ic_google_logo),
+                            contentDescription = null,
+                            modifier = Modifier.size(22.dp)
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column {
+                            Text(
+                                text = "Choose an account",
+                                style = PlayerNamePrimary,
+                                color = TextPrimary
+                            )
+                            Text(
+                                text = "to continue to CricSaga",
+                                style = BodyCaption,
+                                color = TextSecondary
+                            )
+                        }
+                    }
+                },
+                text = {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        presetAccounts.forEach { acc ->
+                            Surface(
+                                onClick = {
+                                    showAccountPicker = false
+                                    onGoogleSignIn(acc.email, acc.name)
+                                },
+                                shape = RoundedCornerShape(8.dp),
+                                color = ElevatedSurfaceDark,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(36.dp)
+                                            .clip(CircleShape)
+                                            .background(CrimsonPrimaryDark),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = acc.name.split(" ").mapNotNull { it.firstOrNull()?.toString() }.joinToString("").take(2),
+                                            color = Color.White,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 13.sp
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = acc.name,
+                                            style = PlayerNameSecondary,
+                                            color = TextPrimary
+                                        )
+                                        Text(
+                                            text = "${acc.email} • ${acc.team}",
+                                            style = BodyCaption,
+                                            color = TextTertiary
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        // Add new account option
+                        Surface(
+                            onClick = {
+                                showAccountPicker = false
+                                onGoogleSignIn("player.cricket@cricsaga.app", "Grassroots Player")
+                            },
+                            shape = RoundedCornerShape(8.dp),
+                            color = SlateSurfaceDark,
+                            border = CardDefaults.outlinedCardBorder().copy(
+                                brush = androidx.compose.ui.graphics.SolidColor(CardBorderDark)
+                            ),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Person,
+                                    contentDescription = null,
+                                    tint = TextSecondary,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Text(
+                                    text = "Add another account",
+                                    style = PlayerNameSecondary,
+                                    color = TextSecondary
+                                )
+                            }
+                        }
+                    }
+                },
+                confirmButton = {},
+                dismissButton = {
+                    TextButton(onClick = { showAccountPicker = false }) {
+                        Text(
+                            text = "CANCEL",
+                            style = MicroTag,
+                            color = TextSecondary
+                        )
+                    }
+                }
+            )
         }
     }
 }

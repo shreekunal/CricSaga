@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    CricSaga — DM Sans Downloadable Font Family
+    Used for: player names, section headers, body text, micro-tags (LIVE, POTM, CRR, RRR)
+    Weights defined: Regular (400), Medium (500), SemiBold (600), Bold (700)
+    Provider: Google Fonts via Play Services (zero APK size cost)
+-->
+<font-family xmlns:android="http://schemas.android.com/apk/res/android"
+    android:fontProviderAuthority="com.google.android.gms.fonts"
+    android:fontProviderPackage="com.google.android.gms"
+    android:fontProviderQuery="DM Sans"
+    android:fontProviderCerts="@array/com_google_android_gms_fonts_certs">
+
+    <font
+        android:fontStyle="normal"
+        android:fontWeight="400"
+        android:font="@font/dm_sans" />
+
+    <font
+        android:fontStyle="normal"
+        android:fontWeight="500"
+        android:font="@font/dm_sans" />
+
+    <font
+        android:fontStyle="normal"
+        android:fontWeight="600"
+        android:font="@font/dm_sans" />
+
+    <font
+        android:fontStyle="normal"
+        android:fontWeight="700"
+        android:font="@font/dm_sans" />
+
+</font-family>

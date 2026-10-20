@@ -1,6 +1,7 @@
 package com.cricsaga.app.ui.profile
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -8,9 +9,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Logout
-import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.automirrored.filled.Logout
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.*
@@ -18,15 +18,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cricsaga.app.data.local.ProManager
 import com.cricsaga.app.data.local.entity.PlayerStatsEntity
 import com.cricsaga.app.data.local.entity.UserEntity
+import com.cricsaga.app.domain.model.PlayingRole
 import com.cricsaga.app.ui.profile.dialog.EditProfileDialog
 import com.cricsaga.app.ui.theme.*
+import com.cricsaga.app.ui.utils.ShareUtils
 
 data class CareerMatchRecord(
     val matchTitle: String,
@@ -46,6 +49,7 @@ fun PlayerProfileScreen(
     onUpdateProfile: (UserEntity) -> Unit = {},
     onLogout: () -> Unit = {}
 ) {
+    val context = LocalContext.current
     var showEditProfileDialog by remember { mutableStateOf(false) }
     var selectedTab by remember { mutableIntStateOf(0) }
     val tabs = listOf("Overview", "Batting", "Bowling", "Fielding", "Matches")
@@ -64,7 +68,8 @@ fun PlayerProfileScreen(
     val bowlingFormatted = currentUser?.bowlingStyle?.name?.replace('_', ' ')?.lowercase()
         ?.replaceFirstChar { it.uppercase() } ?: "Right-Arm Medium"
     val roleText = "$roleFormatted • $bowlingFormatted"
-    val cityText = "${currentUser?.city?.ifBlank { "Mumbai" } ?: "Mumbai"} • Jersey #${currentUser?.jerseyNumber?.ifBlank { "45" } ?: "45"}"
+    val jerseyNum = currentUser?.jerseyNumber?.ifBlank { "18" } ?: "18"
+    val cityText = "${currentUser?.city?.ifBlank { "Mumbai" } ?: "Mumbai"} • Jersey #$jerseyNum"
 
     val totalMatches = 24 + (playerStats?.matches ?: 0)
     val totalInnings = 22 + (playerStats?.innings ?: 0)
@@ -85,6 +90,15 @@ fun PlayerProfileScreen(
     val batSr = if (totalBalls > 0) String.format("%.1f", (totalRuns.toDouble() / totalBalls.toDouble()) * 100.0) else "0.0"
     val bowlEcon = if (totalBallsBowled > 0) String.format("%.2f", (totalRunsConceded.toDouble() / (totalBallsBowled.toDouble() / 6.0))) else "0.0"
     val bowlAvg = if (totalWickets > 0) String.format("%.2f", totalRunsConceded.toDouble() / totalWickets.toDouble()) else "0.0"
+
+    // Archetype resolution
+    val archetype = when {
+        (batSr.toDoubleOrNull() ?: 0.0) >= 140.0 -> "POWER HITTER"
+        currentUser?.playingRole == PlayingRole.BOWLER -> "STRIKE BOWLER"
+        currentUser?.playingRole == PlayingRole.WICKET_KEEPER -> "WK ANCHOR"
+        (batAvg.toDoubleOrNull() ?: 0.0) >= 35.0 -> "SOLID ANCHOR"
+        else -> "ALL-ROUNDER"
+    }
 
     val matchHistory = listOf(
         CareerMatchRecord(
@@ -116,15 +130,37 @@ fun PlayerProfileScreen(
                 title = {
                     Text(
                         text = "My Career",
-                        fontWeight = FontWeight.Bold,
-                        color = TextPrimary,
-                        fontSize = 20.sp
+                        style = PlayerNamePrimary,
+                        color = TextPrimary
                     )
                 },
                 actions = {
+                    // Share Collectible Athlete Card Action
+                    IconButton(onClick = {
+                        ShareUtils.generateAndShareAthleteCard(
+                            context = context,
+                            playerName = playerName,
+                            jerseyNumber = jerseyNum,
+                            archetype = archetype,
+                            city = currentUser?.city?.ifBlank { "Mumbai" } ?: "Mumbai",
+                            matches = totalMatches,
+                            runs = totalRuns,
+                            wickets = totalWickets,
+                            average = batAvg
+                        )
+                    }) {
+                        Icon(
+                            Icons.Default.Share,
+                            contentDescription = "Share Athlete Card",
+                            tint = BoundaryAmber,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+
+                    // Logout / Switch Account Action
                     IconButton(onClick = onLogout) {
                         Icon(
-                            Icons.Default.Logout,
+                            Icons.AutoMirrored.Filled.Logout,
                             contentDescription = "Switch Account / Logout",
                             tint = TextSecondary,
                             modifier = Modifier.size(20.dp)
@@ -141,16 +177,26 @@ fun PlayerProfileScreen(
                 .padding(paddingValues),
             contentPadding = PaddingValues(bottom = 24.dp)
         ) {
-            // 1. Clean Player Hero Header
+            // 1. Collectible Athlete Card Hero
             item {
-                Card(
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 6.dp),
-                    colors = CardDefaults.cardColors(containerColor = SlateSurfaceDark),
-                    shape = RoundedCornerShape(10.dp),
-                    border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(CardBorderDark))
+                        .padding(horizontal = 16.dp, vertical = 6.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(SlateSurfaceDark)
+                        .border(1.dp, CardBorderDark, RoundedCornerShape(12.dp))
                 ) {
+                    // Oversized Jersey Watermark (Barlow Condensed ExtraBold)
+                    Text(
+                        text = "#$jerseyNum",
+                        style = JerseyWatermark,
+                        color = TextPrimary.copy(alpha = 0.05f),
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .offset(x = 16.dp, y = 24.dp)
+                    )
+
                     Column(
                         modifier = Modifier.padding(16.dp)
                     ) {
@@ -160,50 +206,69 @@ fun PlayerProfileScreen(
                         ) {
                             Box(
                                 modifier = Modifier
-                                    .size(52.dp)
+                                    .size(54.dp)
                                     .clip(CircleShape)
-                                    .background(ElevatedSurfaceDark),
+                                    .background(ElevatedSurfaceDark)
+                                    .border(1.5.dp, CrimsonPrimaryDark.copy(alpha = 0.6f), CircleShape),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
                                     text = initials,
-                                    color = TextPrimary,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 18.sp
+                                    style = ScoreSmall,
+                                    color = TextPrimary
                                 )
                             }
-                            Spacer(modifier = Modifier.width(12.dp))
+
+                            Spacer(modifier = Modifier.width(14.dp))
+
                             Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = playerName,
-                                    color = TextPrimary,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 17.sp
-                                )
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Text(
+                                        text = playerName,
+                                        style = PlayerNamePrimary,
+                                        color = TextPrimary
+                                    )
+                                    Surface(
+                                        color = CrimsonPrimaryDark.copy(alpha = 0.15f),
+                                        shape = RoundedCornerShape(4.dp)
+                                    ) {
+                                        Text(
+                                            text = archetype,
+                                            style = MicroTag,
+                                            color = CrimsonPrimaryDark,
+                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                        )
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(2.dp))
                                 Text(
                                     text = roleText,
-                                    color = TextSecondary,
-                                    fontSize = 12.sp
+                                    style = BodyCaption,
+                                    color = TextSecondary
                                 )
                                 Text(
                                     text = cityText,
-                                    color = TextTertiary,
-                                    fontSize = 11.sp
+                                    style = BodyCaption,
+                                    color = TextTertiary
                                 )
                             }
+
                             if (currentUser != null) {
                                 IconButton(onClick = { showEditProfileDialog = true }) {
                                     Icon(
                                         Icons.Default.Edit,
                                         contentDescription = "Edit Profile",
                                         tint = TextSecondary,
-                                        modifier = Modifier.size(20.dp)
+                                        modifier = Modifier.size(18.dp)
                                     )
                                 }
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(12.dp))
+                        Spacer(modifier = Modifier.height(14.dp))
                         HorizontalDivider(color = DividerDark, thickness = 0.5.dp)
                         Spacer(modifier = Modifier.height(10.dp))
 
@@ -227,11 +292,10 @@ fun PlayerProfileScreen(
                                     text = if (subscriptionState.isActive) {
                                         "PRO • ${subscriptionState.plan?.title ?: "ACTIVE"}"
                                     } else {
-                                        "Free Tier"
+                                        "Free Grassroots Tier"
                                     },
                                     color = if (subscriptionState.isActive) BoundaryAmber else TextSecondary,
-                                    fontWeight = FontWeight.SemiBold,
-                                    fontSize = 11.sp
+                                    style = MicroTag
                                 )
                             }
 
@@ -243,8 +307,7 @@ fun PlayerProfileScreen(
                             ) {
                                 Text(
                                     text = if (subscriptionState.isActive) "View Perks" else "Redeem Code",
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Medium,
+                                    style = BodyCaption,
                                     color = TextPrimary
                                 )
                             }
@@ -275,8 +338,7 @@ fun PlayerProfileScreen(
                             text = {
                                 Text(
                                     text = title,
-                                    fontSize = 12.sp,
-                                    fontWeight = if (selectedTab == index) FontWeight.Bold else FontWeight.Normal,
+                                    style = if (selectedTab == index) PlayerNameSecondary else BodyCaption,
                                     color = if (selectedTab == index) TextPrimary else TextSecondary
                                 )
                             }
@@ -288,7 +350,7 @@ fun PlayerProfileScreen(
             // 3. Tab Content
             when (selectedTab) {
                 0 -> {
-                    // Overview: 4-Stat Hero Row + Career Highlights Table
+                    // Overview: 4-Stat Hero Row + Honours Shelf + Career Highlights Table
                     item {
                         Column(
                             modifier = Modifier
@@ -296,7 +358,7 @@ fun PlayerProfileScreen(
                                 .padding(16.dp),
                             verticalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            // 4 Key Metrics Strip
+                            // 4 Key Metrics Strip (Barlow Condensed figures)
                             Card(
                                 modifier = Modifier.fillMaxWidth(),
                                 colors = CardDefaults.cardColors(containerColor = SlateSurfaceDark),
@@ -313,6 +375,77 @@ fun PlayerProfileScreen(
                                     CleanMetricCol("RUNS", "$totalRuns")
                                     CleanMetricCol("WICKETS", "$totalWickets")
                                     CleanMetricCol("AVG", batAvg)
+                                }
+                            }
+
+                            // Honours & Milestones Shelf
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = CardDefaults.cardColors(containerColor = SlateSurfaceDark),
+                                shape = RoundedCornerShape(10.dp),
+                                border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(CardBorderDark))
+                            ) {
+                                Column(modifier = Modifier.padding(14.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = "CAREER HONOURS & MILESTONES",
+                                            style = SectionLabel,
+                                            color = BoundaryAmber
+                                        )
+                                        Text(
+                                            text = "Verified",
+                                            style = MicroTag,
+                                            color = TextTertiary
+                                        )
+                                    }
+
+                                    Spacer(modifier = Modifier.height(10.dp))
+
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        HonourBadgeCard(
+                                            icon = Icons.Default.EmojiEvents,
+                                            title = "CENTURY",
+                                            subtitle = if (totalHundreds > 0) "$totalHundreds Scored" else "In Progress",
+                                            isUnlocked = totalHundreds > 0,
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                        HonourBadgeCard(
+                                            icon = Icons.Default.GpsFixed,
+                                            title = "FIVE-FOR",
+                                            subtitle = if (totalWickets >= 5) "Unlocked" else "$totalWickets/5 Wkts",
+                                            isUnlocked = totalWickets >= 5,
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                    }
+
+                                    Spacer(modifier = Modifier.height(8.dp))
+
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        HonourBadgeCard(
+                                            icon = Icons.Default.Bolt,
+                                            title = "STRIKER",
+                                            subtitle = "SR $batSr",
+                                            isUnlocked = (batSr.toDoubleOrNull() ?: 0.0) >= 140.0,
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                        HonourBadgeCard(
+                                            icon = Icons.Default.Shield,
+                                            title = "SAFE HANDS",
+                                            subtitle = "15 Catches",
+                                            isUnlocked = true,
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                    }
                                 }
                             }
 
@@ -348,7 +481,7 @@ fun PlayerProfileScreen(
                             border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(CardBorderDark))
                         ) {
                             Column(modifier = Modifier.padding(14.dp)) {
-                                Text("BATTING CAREER", color = TextSecondary, fontWeight = FontWeight.Bold, fontSize = 11.sp, letterSpacing = 1.sp)
+                                Text("BATTING CAREER", style = SectionLabel, color = TextSecondary)
                                 Spacer(modifier = Modifier.height(10.dp))
                                 TableStatRow("Innings Batted", "$totalInnings")
                                 TableStatRow("Not Outs (NO)", "3")
@@ -377,7 +510,7 @@ fun PlayerProfileScreen(
                             border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(CardBorderDark))
                         ) {
                             Column(modifier = Modifier.padding(14.dp)) {
-                                Text("BOWLING CAREER", color = TextSecondary, fontWeight = FontWeight.Bold, fontSize = 11.sp, letterSpacing = 1.sp)
+                                Text("BOWLING CAREER", style = SectionLabel, color = TextSecondary)
                                 Spacer(modifier = Modifier.height(10.dp))
                                 TableStatRow("Overs Bowled", "$oversBowledFormatted ov")
                                 TableStatRow("Maiden Overs", "$totalMaidens")
@@ -403,7 +536,7 @@ fun PlayerProfileScreen(
                             border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(CardBorderDark))
                         ) {
                             Column(modifier = Modifier.padding(14.dp)) {
-                                Text("FIELDING CAREER", color = TextSecondary, fontWeight = FontWeight.Bold, fontSize = 11.sp, letterSpacing = 1.sp)
+                                Text("FIELDING CAREER", style = SectionLabel, color = TextSecondary)
                                 Spacer(modifier = Modifier.height(10.dp))
                                 TableStatRow("Catches", "12")
                                 TableStatRow("Direct Run Outs", "3")
@@ -431,24 +564,23 @@ fun PlayerProfileScreen(
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Text(record.matchTitle, color = TextPrimary, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                                    Text(record.matchTitle, style = PlayerNameSecondary, color = TextPrimary)
                                     Text(
-                                        text = if (record.resultWon) "Won" else "Lost",
+                                        text = if (record.resultWon) "WON" else "LOST",
                                         color = if (record.resultWon) BoundaryGreen else TextTertiary,
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Medium
+                                        style = MicroTag
                                     )
                                 }
 
-                                Text(record.dateText, color = TextTertiary, fontSize = 11.sp)
+                                Text(record.dateText, style = BodyCaption, color = TextTertiary)
                                 Spacer(modifier = Modifier.height(6.dp))
 
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
-                                    Text("Bat: ${record.battingPerformance}", color = TextSecondary, fontSize = 11.sp)
-                                    Text("Bowl: ${record.bowlingPerformance}", color = TextSecondary, fontSize = 11.sp)
+                                    Text("Bat: ${record.battingPerformance}", style = BodyCaption, color = TextSecondary)
+                                    Text("Bowl: ${record.bowlingPerformance}", style = BodyCaption, color = TextSecondary)
                                 }
                             }
                         }
@@ -471,11 +603,65 @@ fun PlayerProfileScreen(
 }
 
 @Composable
+fun HonourBadgeCard(
+    icon: ImageVector,
+    title: String,
+    subtitle: String,
+    isUnlocked: Boolean,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        color = if (isUnlocked) ElevatedSurfaceDark else ElevatedSurfaceDark.copy(alpha = 0.5f),
+        shape = RoundedCornerShape(8.dp),
+        border = CardDefaults.outlinedCardBorder().copy(
+            brush = androidx.compose.ui.graphics.SolidColor(
+                if (isUnlocked) BoundaryAmber.copy(alpha = 0.5f) else CardBorderDark
+            )
+        ),
+        modifier = modifier
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(28.dp)
+                    .clip(CircleShape)
+                    .background(if (isUnlocked) BoundaryAmber.copy(alpha = 0.15f) else CardBorderDark),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = if (isUnlocked) BoundaryAmber else TextTertiary,
+                    modifier = Modifier.size(16.dp)
+                )
+            }
+            Spacer(modifier = Modifier.width(8.dp))
+            Column {
+                Text(
+                    text = title,
+                    style = MicroTag,
+                    color = if (isUnlocked) TextPrimary else TextTertiary
+                )
+                Text(
+                    text = subtitle,
+                    style = BodyCaption,
+                    color = if (isUnlocked) BoundaryAmber else TextTertiary,
+                    fontSize = 10.sp
+                )
+            }
+        }
+    }
+}
+
+@Composable
 fun CleanMetricCol(label: String, value: String) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(value, color = TextPrimary, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+        Text(value, style = MetricDisplay, color = TextPrimary)
         Spacer(modifier = Modifier.height(2.dp))
-        Text(label, color = TextTertiary, fontSize = 9.sp, fontWeight = FontWeight.Medium, letterSpacing = 0.5.sp)
+        Text(label, style = MicroTag, color = TextTertiary)
     }
 }
 
@@ -488,8 +674,8 @@ fun TableStatRow(label: String, value: String) {
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(label, color = TextSecondary, fontSize = 12.sp)
-        Text(value, color = TextPrimary, fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
+        Text(label, style = StatTableLabel, color = TextSecondary)
+        Text(value, style = StatTableValue, color = TextPrimary)
     }
     HorizontalDivider(color = DividerDark, thickness = 0.5.dp)
 }

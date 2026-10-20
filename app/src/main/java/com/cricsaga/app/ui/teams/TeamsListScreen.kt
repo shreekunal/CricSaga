@@ -26,6 +26,7 @@ import com.cricsaga.app.ui.theme.*
 @Composable
 fun TeamsListScreen(
     teams: List<TeamEntity>,
+    onTeamClick: (TeamEntity) -> Unit = {},
     onCreateTeam: (name: String, code: String, city: String) -> Unit,
     onAddPlayer: (teamId: String, name: String, role: PlayingRole) -> Unit
 ) {
@@ -63,6 +64,7 @@ fun TeamsListScreen(
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(teams) { team ->
                         Card(
+                            onClick = { onTeamClick(team) },
                             modifier = Modifier.fillMaxWidth(),
                             colors = CardDefaults.cardColors(containerColor = SlateSurfaceDark),
                             shape = RoundedCornerShape(8.dp),

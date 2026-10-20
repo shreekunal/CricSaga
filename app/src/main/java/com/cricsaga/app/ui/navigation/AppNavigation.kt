@@ -1,6 +1,7 @@
 package com.cricsaga.app.ui.navigation
 
 import android.content.Intent
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.*
@@ -16,6 +17,7 @@ import androidx.navigation.compose.*
 import com.cricsaga.app.data.local.AuthManager
 import com.cricsaga.app.data.local.AuthState
 import com.cricsaga.app.data.local.ProManager
+import com.cricsaga.app.data.local.entity.TeamEntity
 import com.cricsaga.app.data.local.entity.UserEntity
 import com.cricsaga.app.domain.model.BallType
 import com.cricsaga.app.domain.model.ExtraType
@@ -26,6 +28,7 @@ import com.cricsaga.app.ui.auth.ProfileSetupScreen
 import com.cricsaga.app.ui.discover.DiscoverScreen
 import com.cricsaga.app.ui.home.HomeScreen
 import com.cricsaga.app.ui.matches.MatchListScreen
+import com.cricsaga.app.ui.profile.PlayerDetailScreen
 import com.cricsaga.app.ui.profile.PlayerProfileScreen
 import com.cricsaga.app.ui.redeem.RedeemCodeScreen
 import com.cricsaga.app.ui.scorecard.FullScorecardScreen
@@ -36,19 +39,26 @@ import com.cricsaga.app.ui.scoring.dialog.DismissalBottomSheet
 import com.cricsaga.app.ui.scoring.dialog.InningsBreakDialog
 import com.cricsaga.app.ui.scoring.dialog.MatchResultDialog
 import com.cricsaga.app.ui.scoring.dialog.SecondInningsOpenersDialog
+import com.cricsaga.app.ui.settings.SettingsScreen
+import com.cricsaga.app.ui.utils.BroadcastNotifier
+import com.cricsaga.app.ui.utils.HapticManager
 import com.cricsaga.app.ui.utils.ShareUtils
 import com.cricsaga.app.ui.setup.MatchSetupScreen
 import com.cricsaga.app.ui.setup.OpenersSelectionScreen
+import com.cricsaga.app.ui.teams.TeamDetailScreen
 import com.cricsaga.app.ui.teams.TeamsListScreen
 import com.cricsaga.app.ui.tournaments.TournamentListScreen
 import com.cricsaga.app.ui.theme.*
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 @Composable
 fun AppNavigation(
     scoringViewModel: ScoringViewModel,
     proManager: ProManager,
-    authManager: AuthManager
+    authManager: AuthManager,
+    themeManager: ThemeManager,
+    hapticManager: HapticManager
 ) {
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
@@ -57,6 +67,10 @@ fun AppNavigation(
     val subscriptionState by proManager.subscriptionState.collectAsState()
     val authState by authManager.authState.collectAsState()
     var tempAuthPhone by remember { mutableStateOf("") }
+    var tempGoogleName by remember { mutableStateOf("") }
+    var tempGoogleEmail by remember { mutableStateOf("") }
+    var selectedTeamForDetail by remember { mutableStateOf<TeamEntity?>(null) }
+    var selectedUserForDetail by remember { mutableStateOf<UserEntity?>(null) }
 
     // 5 Primary Bottom Navigation Bar Tabs
     val bottomBarScreens = listOf(
@@ -139,9 +153,35 @@ fun AppNavigation(
             startDestination = if (authState is AuthState.Unauthenticated) Screen.PhoneLogin.route else Screen.Home.route,
             modifier = Modifier.padding(paddingValues)
         ) {
-            // Auth Flow: Phone Login
+            // Auth Flow: Google Sign-In & Pitch Guest Scorer
             composable(Screen.PhoneLogin.route) {
                 PhoneLoginScreen(
+                    onGoogleSignIn = { email, displayName ->
+                        coroutineScope.launch {
+                            val allUsers = scoringViewModel.repository.getAllUsers().first()
+                            val existingUser = allUsers.find {
+                                it.userId == "user_${email.replace("@", "_").replace(".", "_")}" ||
+                                it.fullName.equals(displayName, ignoreCase = true)
+                            }
+                            if (existingUser != null) {
+                                authManager.setLoggedIn(existingUser.userId, existingUser.phoneNumber)
+                                navController.navigate(Screen.Home.route) {
+                                    popUpTo(0) { inclusive = true }
+                                }
+                            } else {
+                                tempGoogleName = displayName
+                                tempGoogleEmail = email
+                                tempAuthPhone = ""
+                                navController.navigate(Screen.ProfileSetup.route)
+                            }
+                        }
+                    },
+                    onContinueAsGuest = {
+                        authManager.setGuestMode()
+                        navController.navigate(Screen.Home.route) {
+                            popUpTo(0) { inclusive = true }
+                        }
+                    },
                     onPhoneVerified = { phone ->
                         coroutineScope.launch {
                             val existingUser = scoringViewModel.repository.getUserByPhone(phone)
@@ -155,12 +195,6 @@ fun AppNavigation(
                                 navController.navigate(Screen.ProfileSetup.route)
                             }
                         }
-                    },
-                    onContinueAsGuest = {
-                        authManager.setGuestMode()
-                        navController.navigate(Screen.Home.route) {
-                            popUpTo(0) { inclusive = true }
-                        }
                     }
                 )
             }
@@ -169,6 +203,8 @@ fun AppNavigation(
             composable(Screen.ProfileSetup.route) {
                 ProfileSetupScreen(
                     phoneNumber = tempAuthPhone,
+                    initialFullName = tempGoogleName,
+                    initialEmail = tempGoogleEmail,
                     onProfileCreated = { newUser ->
                         coroutineScope.launch {
                             scoringViewModel.repository.insertUser(newUser)
@@ -184,9 +220,16 @@ fun AppNavigation(
             // Tab 1: Home Screen
             composable(Screen.Home.route) {
                 val matches by scoringViewModel.allMatches.collectAsState()
+                val isSystemDark = isSystemInDarkTheme()
                 HomeScreen(
                     isPro = subscriptionState.isActive,
                     matches = matches,
+                    isDarkTheme = themeManager.isDark(isSystemDark),
+                    onThemeToggleClick = {
+                        hapticManager.tapUiClick()
+                        themeManager.toggleTheme()
+                    },
+                    onSettingsClick = { navController.navigate(Screen.Settings.route) },
                     onStartMatchClick = { navController.navigate(Screen.MatchSetup.route) },
                     onManageTeamsClick = { navController.navigate(Screen.Teams.route) },
                     onExploreTournamentsClick = { navController.navigate(Screen.Tournaments.route) },
@@ -258,6 +301,10 @@ fun AppNavigation(
                 val teams by scoringViewModel.allTeams.collectAsState()
                 TeamsListScreen(
                     teams = teams,
+                    onTeamClick = { team ->
+                        selectedTeamForDetail = team
+                        navController.navigate(Screen.TeamDetail.route)
+                    },
                     onCreateTeam = { name, code, city ->
                         coroutineScope.launch {
                             scoringViewModel.repository.createTeam(name, code, city)
@@ -268,6 +315,46 @@ fun AppNavigation(
                             scoringViewModel.repository.addPlayerToTeam(teamId, name, role = role)
                         }
                     }
+                )
+            }
+
+            // Flow: Team Squad Detail
+            composable(Screen.TeamDetail.route) {
+                selectedTeamForDetail?.let { team ->
+                    val squad by scoringViewModel.repository.getTeamMembers(team.teamId).collectAsState(initial = emptyList())
+                    TeamDetailScreen(
+                        team = team,
+                        squad = squad,
+                        onAddPlayerClick = {
+                            // Can add via dialog
+                        },
+                        onPlayerClick = { player ->
+                            selectedUserForDetail = player
+                            navController.navigate(Screen.PlayerDetail.route)
+                        },
+                        onBackClick = { navController.popBackStack() }
+                    )
+                }
+            }
+
+            // Flow: Public Player Profile Detail
+            composable(Screen.PlayerDetail.route) {
+                selectedUserForDetail?.let { player ->
+                    val stats by scoringViewModel.repository.getPlayerStatsFlow(player.userId).collectAsState(initial = null)
+                    PlayerDetailScreen(
+                        user = player,
+                        stats = stats,
+                        onBackClick = { navController.popBackStack() }
+                    )
+                }
+            }
+
+            // Flow: App Settings & Preferences
+            composable(Screen.Settings.route) {
+                SettingsScreen(
+                    themeManager = themeManager,
+                    hapticManager = hapticManager,
+                    onBackClick = { navController.popBackStack() }
                 )
             }
 
@@ -359,11 +446,31 @@ fun AppNavigation(
 
                 ScoringScreen(
                     state = uiState,
-                    onBallTapped = { runs: Int -> scoringViewModel.recordDelivery(runs) },
-                    onExtraTapped = { extra: ExtraType -> scoringViewModel.recordExtra(extra) },
-                    onWicketTapped = { scoringViewModel.openDismissalDialog() },
-                    onUndoTapped = { scoringViewModel.undo() },
-                    onRotateStrikeTapped = { scoringViewModel.rotateStrike() },
+                    onBallTapped = { runs: Int ->
+                        when (runs) {
+                            4 -> hapticManager.tapFour()
+                            6 -> hapticManager.tapSix()
+                            else -> hapticManager.tapDotOrSingle()
+                        }
+                        scoringViewModel.recordDelivery(runs)
+                    },
+                    onExtraTapped = { extra: ExtraType ->
+                        hapticManager.tapDotOrSingle()
+                        scoringViewModel.recordExtra(extra)
+                    },
+                    onWicketTapped = {
+                        hapticManager.tapWicket()
+                        scoringViewModel.openDismissalDialog()
+                    },
+                    onUndoTapped = {
+                        hapticManager.tapUndo()
+                        scoringViewModel.undo()
+                        BroadcastNotifier.postRevert("Delivery undone from scorecard")
+                    },
+                    onRotateStrikeTapped = {
+                        hapticManager.tapUiClick()
+                        scoringViewModel.rotateStrike()
+                    },
                     onViewScorecardClick = { navController.navigate(Screen.FullScorecard.route) }
                 )
 

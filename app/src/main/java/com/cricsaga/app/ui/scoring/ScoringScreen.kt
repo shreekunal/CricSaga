@@ -1,16 +1,23 @@
 package com.cricsaga.app.ui.scoring
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -39,13 +46,13 @@ fun ScoringScreen(
                     Column {
                         Text(
                             text = state.matchTitle,
-                            style = MaterialTheme.typography.titleMedium,
+                            style = PlayerNamePrimary,
                             color = Color.White
                         )
                         Text(
                             text = if (state.inningsNumber == 1) "1st Innings • ${state.totalOvers} Overs" else "2nd Innings • Target: ${state.scoreState.targetRuns ?: 0}",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MutedGrey
+                            style = BodyCaption,
+                            color = TextSecondary
                         )
                     }
                 },
@@ -53,9 +60,8 @@ fun ScoringScreen(
                     TextButton(onClick = onViewScorecardClick) {
                         Text(
                             text = "SCORECARD",
-                            color = BoundaryAmber,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 12.sp
+                            style = MicroTag,
+                            color = BoundaryAmber
                         )
                     }
                 },
@@ -63,227 +69,251 @@ fun ScoringScreen(
                     containerColor = CharcoalBackgroundDark
                 )
             )
-        }
+        },
+        containerColor = CharcoalBackgroundDark
     ) { paddingValues ->
+        // Spatial Cockpit Layout: Scrollable Match Telemetry (Top) + Fixed Pitch Keypad (Bottom)
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .padding(horizontal = 14.dp, vertical = 8.dp)
-                .verticalScroll(scrollState),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            // Chase Equation Banner (2nd Innings Only)
-            if (state.inningsNumber == 2) {
+            // Upper Section: Live Match Telemetry (Scrollable)
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .verticalScroll(scrollState)
+                    .padding(horizontal = 14.dp, vertical = 6.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // 1. Chase Equation & 5-State Pressure Bar (2nd Innings Only)
+                if (state.inningsNumber == 2) {
+                    val targetRuns = state.scoreState.targetRuns ?: 0
+                    val currentRuns = state.scoreState.totalRuns
+                    val runsNeeded = state.scoreState.runsNeeded ?: 0
+                    val ballsRemaining = state.scoreState.ballsRemaining ?: 0
+                    val rrr = state.scoreState.requiredRunRate ?: 0.0
+
+                    ChasePressureBarCard(
+                        firstInningsTeam = state.innings1BattingTeamName,
+                        firstInningsScoreText = "${state.innings1Score?.totalRuns ?: 0}/${state.innings1Score?.totalWickets ?: 0} (${state.innings1Score?.oversFormatted ?: "0.0"} ov)",
+                        targetRuns = targetRuns,
+                        currentRuns = currentRuns,
+                        runsNeeded = runsNeeded,
+                        ballsRemaining = ballsRemaining,
+                        rrr = rrr,
+                        isTargetAchieved = runsNeeded <= 0,
+                        isAllOut = state.scoreState.totalWickets >= 10 || (ballsRemaining <= 0 && runsNeeded > 0)
+                    )
+                }
+
+                // 2. Broadcast Scoreboard Banner
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFF1E2128)),
-                    shape = RoundedCornerShape(10.dp)
+                    colors = CardDefaults.cardColors(containerColor = SlateSurfaceDark),
+                    shape = RoundedCornerShape(12.dp),
+                    border = CardDefaults.outlinedCardBorder().copy(
+                        brush = androidx.compose.ui.graphics.SolidColor(CardBorderDark)
+                    )
                 ) {
                     Column(
-                        modifier = Modifier.padding(12.dp),
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 12.dp, horizontal = 16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
+                        Text(
+                            text = state.battingTeamName.uppercase() + " INNINGS",
+                            style = SectionLabel,
+                            color = CrimsonPrimaryDark
+                        )
+
+                        Spacer(modifier = Modifier.height(2.dp))
+
+                        // Large athletic numerals via Barlow Condensed
+                        Text(
+                            text = "${state.scoreState.totalRuns} / ${state.scoreState.totalWickets}",
+                            style = ScoreBig,
+                            color = Color.White
+                        )
+
+                        Spacer(modifier = Modifier.height(2.dp))
+
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            Text(
+                                text = "Overs: ${state.scoreState.oversFormatted} / ${state.totalOvers}.0",
+                                style = BodyCaption,
+                                color = TextSecondary
+                            )
+                            Text(
+                                text = "  •  ",
+                                color = TextTertiary,
+                                fontSize = 12.sp
+                            )
+                            Text(
+                                text = "CRR: ${String.format("%.2f", state.scoreState.currentRunRate)}",
+                                style = BodyCaption,
+                                color = BoundaryAmber,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                    }
+                }
+
+                // 3. Batsman & Bowler Live Tables
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = SlateSurfaceDark),
+                    shape = RoundedCornerShape(12.dp),
+                    border = CardDefaults.outlinedCardBorder().copy(
+                        brush = androidx.compose.ui.graphics.SolidColor(CardBorderDark)
+                    )
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        // Header
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text("BATSMAN", style = MicroTag, color = TextTertiary)
+                            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                Text("R", style = MicroTag, color = TextTertiary, modifier = Modifier.width(24.dp), textAlign = TextAlign.End)
+                                Text("B", style = MicroTag, color = TextTertiary, modifier = Modifier.width(24.dp), textAlign = TextAlign.End)
+                                Text("4s", style = MicroTag, color = TextTertiary, modifier = Modifier.width(24.dp), textAlign = TextAlign.End)
+                                Text("6s", style = MicroTag, color = TextTertiary, modifier = Modifier.width(24.dp), textAlign = TextAlign.End)
+                                Text("SR", style = MicroTag, color = TextTertiary, modifier = Modifier.width(42.dp), textAlign = TextAlign.End)
+                            }
+                        }
+                        HorizontalDivider(modifier = Modifier.padding(vertical = 6.dp), color = DividerDark)
+
+                        // Striker Row
+                        val striker = state.scoreState.batsmen[state.scoreState.strikerId]
+                        BatsmanRow(
+                            name = (striker?.playerName ?: state.striker?.fullName ?: "Striker"),
+                            runs = striker?.runs ?: 0,
+                            balls = striker?.ballsFaced ?: 0,
+                            fours = striker?.fours ?: 0,
+                            sixes = striker?.sixes ?: 0,
+                            sr = striker?.strikeRate ?: 0.0,
+                            isStriker = true
+                        )
+
+                        Spacer(modifier = Modifier.height(4.dp))
+
+                        // Non-Striker Row
+                        val nonStriker = state.scoreState.batsmen[state.scoreState.nonStrikerId]
+                        BatsmanRow(
+                            name = (nonStriker?.playerName ?: state.nonStriker?.fullName ?: "Non-Striker"),
+                            runs = nonStriker?.runs ?: 0,
+                            balls = nonStriker?.ballsFaced ?: 0,
+                            fours = nonStriker?.fours ?: 0,
+                            sixes = nonStriker?.sixes ?: 0,
+                            sr = nonStriker?.strikeRate ?: 0.0,
+                            isStriker = false
+                        )
+
+                        HorizontalDivider(modifier = Modifier.padding(vertical = 6.dp), color = DividerDark)
+
+                        // Bowler Row
+                        val bowler = state.scoreState.bowlers[state.scoreState.currentBowlerId]
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = "1st Inn: ${state.innings1BattingTeamName} ${state.innings1Score?.totalRuns ?: 0}/${state.innings1Score?.totalWickets ?: 0} (${state.innings1Score?.oversFormatted ?: "0.0"})",
-                                color = MutedGrey,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Medium
+                                text = "BOWL: " + (bowler?.bowlerName ?: state.bowler?.fullName ?: "Bowler"),
+                                style = PlayerNameSecondary,
+                                color = Color.White
                             )
                             Text(
-                                text = "TARGET: ${state.scoreState.targetRuns ?: 0}",
+                                text = "${bowler?.oversFormatted ?: "0.0"}-${bowler?.maidens ?: 0}-${bowler?.runsConceded ?: 0}-${bowler?.wickets ?: 0}  (Econ: ${String.format("%.2f", bowler?.economyRate ?: 0.0)})",
+                                style = BodyCaption,
                                 color = BoundaryAmber,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold
+                                fontWeight = FontWeight.SemiBold
                             )
                         }
-                        val runsNeeded = state.scoreState.runsNeeded ?: 0
-                        val ballsRemaining = state.scoreState.ballsRemaining ?: 0
-                        val rrr = state.scoreState.requiredRunRate ?: 0.0
-                        Text(
-                            text = "Need $runsNeeded runs from $ballsRemaining balls  •  RRR: ${String.format("%.2f", rrr)}",
-                            color = Color.White,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold
-                        )
                     }
                 }
-            }
 
-            // 1. Live Match Scoreboard Banner
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = SlateSurfaceDark),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Column(
-                    modifier = Modifier.padding(14.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                // 4. Current Over Badges Timeline
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = SlateSurfaceDark),
+                    shape = RoundedCornerShape(10.dp),
+                    border = CardDefaults.outlinedCardBorder().copy(
+                        brush = androidx.compose.ui.graphics.SolidColor(CardBorderDark)
+                    )
                 ) {
-                    Text(
-                        text = state.battingTeamName.uppercase() + " INNINGS",
-                        color = CrimsonPrimaryDark,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 12.sp,
-                        letterSpacing = 1.sp
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "${state.scoreState.totalRuns} / ${state.scoreState.totalWickets}",
-                        fontSize = 38.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = Color.White
-                    )
-                    Text(
-                        text = "Overs: ${state.scoreState.oversFormatted} / ${state.totalOvers}.0  •  CRR: ${String.format("%.2f", state.scoreState.currentRunRate)}",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MutedGrey
-                    )
-                }
-            }
-
-            // 2. Batsman & Bowler Live Tables
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = SlateSurfaceDark),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Column(modifier = Modifier.padding(12.dp)) {
-                    // Header
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text("BATSMAN", color = MutedGrey, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Text("R", color = MutedGrey, fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(24.dp), textAlign = TextAlign.End)
-                            Text("B", color = MutedGrey, fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(24.dp), textAlign = TextAlign.End)
-                            Text("4s", color = MutedGrey, fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(24.dp), textAlign = TextAlign.End)
-                            Text("6s", color = MutedGrey, fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(24.dp), textAlign = TextAlign.End)
-                            Text("SR", color = MutedGrey, fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(42.dp), textAlign = TextAlign.End)
-                        }
-                    }
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 6.dp), color = Color(0xFF2E2E2E))
-
-                    // Striker Row
-                    val striker = state.scoreState.batsmen[state.scoreState.strikerId]
-                    BatsmanRow(
-                        name = "* " + (striker?.playerName ?: state.striker?.fullName ?: "Striker"),
-                        runs = striker?.runs ?: 0,
-                        balls = striker?.ballsFaced ?: 0,
-                        fours = striker?.fours ?: 0,
-                        sixes = striker?.sixes ?: 0,
-                        sr = striker?.strikeRate ?: 0.0,
-                        isStriker = true
-                    )
-
-                    Spacer(modifier = Modifier.height(4.dp))
-
-                    // Non-Striker Row
-                    val nonStriker = state.scoreState.batsmen[state.scoreState.nonStrikerId]
-                    BatsmanRow(
-                        name = "  " + (nonStriker?.playerName ?: state.nonStriker?.fullName ?: "Non-Striker"),
-                        runs = nonStriker?.runs ?: 0,
-                        balls = nonStriker?.ballsFaced ?: 0,
-                        fours = nonStriker?.fours ?: 0,
-                        sixes = nonStriker?.sixes ?: 0,
-                        sr = nonStriker?.strikeRate ?: 0.0,
-                        isStriker = false
-                    )
-
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 6.dp), color = Color(0xFF2E2E2E))
-
-                    // Bowler Row
-                    val bowler = state.scoreState.bowlers[state.scoreState.currentBowlerId]
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 7.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Text(
-                            text = "Bowler: " + (bowler?.bowlerName ?: state.bowler?.fullName ?: "Bowler"),
-                            color = Color.White,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.SemiBold
+                            text = "THIS OVER:",
+                            style = MicroTag,
+                            color = TextTertiary
                         )
-                        Text(
-                            text = "${bowler?.oversFormatted ?: "0.0"} - ${bowler?.maidens ?: 0} - ${bowler?.runsConceded ?: 0} - ${bowler?.wickets ?: 0} (Econ: ${String.format("%.1f", bowler?.economyRate ?: 0.0)})",
-                            color = BoundaryAmber,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
-                }
-            }
-
-            // 3. Current Over Badges Timeline
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = SlateSurfaceDark),
-                shape = RoundedCornerShape(10.dp)
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Text(
-                        text = "THIS OVER:",
-                        color = MutedGrey,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                    if (state.scoreState.currentOverBalls.isEmpty()) {
-                        Text(
-                            text = "Awaiting first ball...",
-                            color = Color.Gray,
-                            fontSize = 12.sp
-                        )
-                    } else {
-                        state.scoreState.currentOverBalls.forEach { ball ->
-                            Box(
-                                modifier = Modifier
-                                    .size(32.dp)
-                                    .background(
-                                        when {
-                                            ball.isWicket -> DismissalRed
-                                            ball.runsOffBat == 4 -> BoundaryAmber
-                                            ball.runsOffBat == 6 -> BoundaryGreen
-                                            ball.extraType != ExtraType.NONE -> ExtraBlue
-                                            else -> ElevatedSurfaceDark
-                                        },
-                                        CircleShape
-                                    ),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = ball.label,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = if (ball.runsOffBat == 4 || ball.runsOffBat == 6 || ball.extraType != ExtraType.NONE) Color.Black else Color.White
-                                )
+                        if (state.scoreState.currentOverBalls.isEmpty()) {
+                            Text(
+                                text = "Awaiting first ball of the over...",
+                                style = BodyCaption,
+                                color = TextTertiary
+                            )
+                        } else {
+                            state.scoreState.currentOverBalls.forEach { ball ->
+                                Box(
+                                    modifier = Modifier
+                                        .size(30.dp)
+                                        .background(
+                                            when {
+                                                ball.isWicket -> DismissalRed
+                                                ball.runsOffBat == 4 -> BoundaryAmber
+                                                ball.runsOffBat == 6 -> BoundaryGreen
+                                                ball.extraType != ExtraType.NONE -> ExtraBlue
+                                                else -> ElevatedSurfaceDark
+                                            },
+                                            CircleShape
+                                        ),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = ball.label,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (ball.runsOffBat == 4 || ball.runsOffBat == 6 || ball.extraType != ExtraType.NONE) Color.Black else Color.White
+                                    )
+                                }
                             }
                         }
                     }
                 }
             }
 
-            // 4. Interactive Keypad (Exact CricHeroes Muscle Memory)
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = SlateSurfaceDark),
-                shape = RoundedCornerShape(12.dp)
+            // Lower Section: Fixed Pitch Scoring Keypad (Never Scrolls Off Screen)
+            Surface(
+                color = SlateSurfaceDark,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .border(
+                        width = 0.5.dp,
+                        color = CardBorderDark,
+                        shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
+                    ),
+                shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
+                tonalElevation = 6.dp
             ) {
                 Column(
-                    modifier = Modifier.padding(10.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                    verticalArrangement = Arrangement.spacedBy(7.dp)
                 ) {
                     // Row 1: 0, 1, 2, 3
                     Row(
@@ -303,8 +333,8 @@ fun ScoringScreen(
                     ) {
                         KeypadButton("4", BoundaryAmber, Color.Black, Modifier.weight(1f)) { onBallTapped(4) }
                         KeypadButton("6", BoundaryGreen, Color.Black, Modifier.weight(1f)) { onBallTapped(6) }
-                        KeypadButton("WIDE", ExtraBlue, Color.Black, Modifier.weight(1f)) { onExtraTapped(ExtraType.WIDE) }
-                        KeypadButton("NO BALL", ExtraBlue, Color.Black, Modifier.weight(1f)) { onExtraTapped(ExtraType.NO_BALL) }
+                        KeypadButton("WD", ExtraBlue, Color.Black, Modifier.weight(1f)) { onExtraTapped(ExtraType.WIDE) }
+                        KeypadButton("NB", ExtraBlue, Color.Black, Modifier.weight(1f)) { onExtraTapped(ExtraType.NO_BALL) }
                     }
 
                     // Row 3: Bye, Leg Bye, OUT, UNDO
@@ -313,46 +343,197 @@ fun ScoringScreen(
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         KeypadButton("BYE", ElevatedSurfaceDark, Color.White, Modifier.weight(1f)) { onExtraTapped(ExtraType.BYE) }
-                        KeypadButton("LEG BYE", ElevatedSurfaceDark, Color.White, Modifier.weight(1f)) { onExtraTapped(ExtraType.LEG_BYE) }
+                        KeypadButton("LB", ElevatedSurfaceDark, Color.White, Modifier.weight(1f)) { onExtraTapped(ExtraType.LEG_BYE) }
                         KeypadButton("OUT / W", DismissalRed, Color.White, Modifier.weight(1f)) { onWicketTapped() }
                         KeypadButton("UNDO", ElevatedSurfaceDark, BoundaryAmber, Modifier.weight(1f)) { onUndoTapped() }
                     }
 
-                    // Row 4: Quick Action Bar
+                    // Row 4: Action & Telemetry Strip
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        KeypadButton("🔄 Rotate Strike", Color(0xFF2A2A2A), Color.White, Modifier.weight(1f)) {
-                            onRotateStrikeTapped()
+                        // Rotate Strike Action Pill
+                        Surface(
+                            onClick = onRotateStrikeTapped,
+                            shape = RoundedCornerShape(8.dp),
+                            color = ElevatedSurfaceDark,
+                            border = CardDefaults.outlinedCardBorder().copy(
+                                brush = androidx.compose.ui.graphics.SolidColor(CardBorderDark)
+                            ),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(vertical = 10.dp),
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.SwapHoriz,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "ROTATE STRIKE",
+                                    style = MicroTag,
+                                    color = Color.White
+                                )
+                            }
+                        }
+
+                        // Status Telemetry Pill
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = CharcoalBackgroundDark,
+                            border = CardDefaults.outlinedCardBorder().copy(
+                                brush = androidx.compose.ui.graphics.SolidColor(CardBorderDark)
+                            ),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .padding(vertical = 10.dp, horizontal = 8.dp)
+                                    .fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.Center
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(6.dp)
+                                        .background(BoundaryGreen, CircleShape)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = state.lastActionMessage.take(24),
+                                    style = BodyCaption,
+                                    color = TextSecondary,
+                                    maxLines = 1
+                                )
+                            }
                         }
                     }
                 }
             }
+        }
+    }
+}
 
-            // 5. Database Status & Log Indicator
-            Card(
+/**
+ * 5-State Animated Chase Pressure Bar
+ *
+ * State 1: BALANCED (RRR <= 7.0) -> Cool Muted Slate
+ * State 2: PRESSURE (RRR 7.1..10.0) -> Cricket Amber
+ * State 3: CRITICAL (RRR > 10.0) -> Dismissal Crimson
+ * State 4: TARGET ACHIEVED -> Boundary Green
+ * State 5: ALL OUT / LOSS -> Dismissal Red
+ */
+@Composable
+fun ChasePressureBarCard(
+    firstInningsTeam: String,
+    firstInningsScoreText: String,
+    targetRuns: Int,
+    currentRuns: Int,
+    runsNeeded: Int,
+    ballsRemaining: Int,
+    rrr: Double,
+    isTargetAchieved: Boolean,
+    isAllOut: Boolean
+) {
+    val progressTarget = if (targetRuns > 0) {
+        (currentRuns.toFloat() / targetRuns.toFloat()).coerceIn(0f, 1f)
+    } else 0f
+
+    val animatedProgress by animateFloatAsState(
+        targetValue = if (isTargetAchieved) 1f else progressTarget,
+        animationSpec = tween(400),
+        label = "ChaseBarProgress"
+    )
+
+    val (pressureTag, targetColor) = when {
+        isTargetAchieved -> "TARGET ACHIEVED" to BoundaryGreen
+        isAllOut -> "ALL OUT" to DismissalRed
+        rrr > 10.0 -> "CRITICAL" to DismissalRed
+        rrr > 7.0 -> "HIGH PRESSURE" to BoundaryAmber
+        else -> "BALANCED" to TextSecondary
+    }
+
+    val animatedBarColor by animateColorAsState(
+        targetValue = targetColor,
+        animationSpec = tween(400),
+        label = "ChaseBarColor"
+    )
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = SlateSurfaceDark),
+        shape = RoundedCornerShape(10.dp),
+        border = CardDefaults.outlinedCardBorder().copy(
+            brush = androidx.compose.ui.graphics.SolidColor(CardBorderDark)
+        )
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Row(
                 modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF191919)),
-                shape = RoundedCornerShape(8.dp)
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(
-                    modifier = Modifier.padding(10.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                Text(
+                    text = "1st Inn: $firstInningsTeam $firstInningsScoreText",
+                    style = BodyCaption,
+                    color = TextTertiary
+                )
+                Surface(
+                    color = animatedBarColor.copy(alpha = 0.15f),
+                    shape = RoundedCornerShape(4.dp)
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(8.dp)
-                            .background(Color(0xFF4CAF50), CircleShape)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = state.lastActionMessage,
-                        color = MutedGrey,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Medium
+                        text = pressureTag,
+                        style = MicroTag,
+                        color = animatedBarColor,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                     )
                 }
+            }
+
+            // Animated progress line
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(6.dp)
+                    .clip(RoundedCornerShape(3.dp))
+                    .background(ElevatedSurfaceDark)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(animatedProgress)
+                        .fillMaxHeight()
+                        .clip(RoundedCornerShape(3.dp))
+                        .background(animatedBarColor)
+                )
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = if (isTargetAchieved) "Target of $targetRuns runs achieved!" else "Need $runsNeeded runs from $ballsRemaining balls",
+                    style = PlayerNameSecondary,
+                    color = Color.White
+                )
+                Text(
+                    text = "RRR: ${String.format("%.2f", rrr)}",
+                    style = BodyCaption,
+                    color = animatedBarColor,
+                    fontWeight = FontWeight.Bold
+                )
             }
         }
     }
@@ -373,19 +554,63 @@ fun BatsmanRow(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(
-            text = name,
-            color = if (isStriker) Color.White else MutedGrey,
-            fontWeight = if (isStriker) FontWeight.Bold else FontWeight.Normal,
-            fontSize = 13.sp,
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.weight(1f)
-        )
+        ) {
+            if (isStriker) {
+                Box(
+                    modifier = Modifier
+                        .size(6.dp)
+                        .background(BoundaryAmber, CircleShape)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+            } else {
+                Spacer(modifier = Modifier.width(12.dp))
+            }
+            Text(
+                text = name,
+                style = if (isStriker) PlayerNameSecondary else BodyCaption,
+                color = if (isStriker) Color.White else TextSecondary
+            )
+        }
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("$runs", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.width(24.dp), textAlign = TextAlign.End)
-            Text("$balls", color = MutedGrey, fontSize = 13.sp, modifier = Modifier.width(24.dp), textAlign = TextAlign.End)
-            Text("$fours", color = MutedGrey, fontSize = 13.sp, modifier = Modifier.width(24.dp), textAlign = TextAlign.End)
-            Text("$sixes", color = MutedGrey, fontSize = 13.sp, modifier = Modifier.width(24.dp), textAlign = TextAlign.End)
-            Text(String.format("%.1f", sr), color = BoundaryAmber, fontSize = 12.sp, modifier = Modifier.width(42.dp), textAlign = TextAlign.End)
+            Text(
+                text = "$runs",
+                style = ScoreSmall,
+                color = Color.White,
+                modifier = Modifier.width(24.dp),
+                textAlign = TextAlign.End
+            )
+            Text(
+                text = "$balls",
+                style = BodyCaption,
+                color = TextSecondary,
+                modifier = Modifier.width(24.dp),
+                textAlign = TextAlign.End
+            )
+            Text(
+                text = "$fours",
+                style = BodyCaption,
+                color = TextSecondary,
+                modifier = Modifier.width(24.dp),
+                textAlign = TextAlign.End
+            )
+            Text(
+                text = "$sixes",
+                style = BodyCaption,
+                color = TextSecondary,
+                modifier = Modifier.width(24.dp),
+                textAlign = TextAlign.End
+            )
+            Text(
+                text = String.format("%.1f", sr),
+                style = BodyCaption,
+                color = BoundaryAmber,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.width(42.dp),
+                textAlign = TextAlign.End
+            )
         }
     }
 }
@@ -400,8 +625,9 @@ fun KeypadButton(
 ) {
     Box(
         modifier = modifier
-            .height(48.dp)
-            .background(backgroundColor, RoundedCornerShape(8.dp))
+            .height(44.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(backgroundColor)
             .clickable { onClick() },
         contentAlignment = Alignment.Center
     ) {

@@ -12,8 +12,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.Groups
+import androidx.compose.material.icons.filled.LightMode
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.SportsCricket
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -29,6 +33,14 @@ import com.cricsaga.app.R
 import com.cricsaga.app.data.local.entity.MatchEntity
 import com.cricsaga.app.domain.model.MatchStatus
 import com.cricsaga.app.ui.theme.*
+
+// Phase 5.0 — Named text styles
+import com.cricsaga.app.ui.theme.SectionLabel
+import com.cricsaga.app.ui.theme.MicroTag
+import com.cricsaga.app.ui.theme.ScoreMedium
+import com.cricsaga.app.ui.theme.BodyCaption
+import com.cricsaga.app.ui.theme.PlayerNamePrimary
+import com.cricsaga.app.ui.theme.PlayerNameSecondary
 
 data class LiveRadarItem(
     val matchId: String,
@@ -53,6 +65,9 @@ data class GrassrootsHeroItem(
 fun HomeScreen(
     isPro: Boolean,
     matches: List<MatchEntity>,
+    isDarkTheme: Boolean = true,
+    onThemeToggleClick: () -> Unit = {},
+    onSettingsClick: () -> Unit = {},
     onStartMatchClick: () -> Unit,
     onManageTeamsClick: () -> Unit,
     onExploreTournamentsClick: () -> Unit,
@@ -111,6 +126,32 @@ fun HomeScreen(
                     )
                 },
                 actions = {
+                    // Settings Action Button
+                    IconButton(
+                        onClick = onSettingsClick,
+                        modifier = Modifier.padding(end = 2.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Settings,
+                            contentDescription = "Settings",
+                            tint = TextSecondary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+
+                    // Theme Switcher Button (Dark Stadium <-> Crisp Sunlight)
+                    IconButton(
+                        onClick = onThemeToggleClick,
+                        modifier = Modifier.padding(end = 4.dp)
+                    ) {
+                        Icon(
+                            imageVector = if (isDarkTheme) Icons.Default.LightMode else Icons.Default.DarkMode,
+                            contentDescription = "Toggle Theme Mode",
+                            tint = TextSecondary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+
                     Surface(
                         onClick = onProBadgeClick,
                         shape = RoundedCornerShape(6.dp),
@@ -160,10 +201,8 @@ fun HomeScreen(
                 ) {
                     Text(
                         text = "LIVE MATCHES",
-                        color = TextSecondary,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 11.sp,
-                        letterSpacing = 1.sp
+                        style = SectionLabel,
+                        color = TextSecondary
                     )
                     Text(
                         text = "${demoRadarMatches.size} Active",
@@ -192,21 +231,45 @@ fun HomeScreen(
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Text(
-                                        text = "${radar.teamA} vs ${radar.teamB}",
-                                        color = TextPrimary,
-                                        fontWeight = FontWeight.SemiBold,
-                                        fontSize = 13.sp
-                                    )
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(10.dp)
+                                                .background(Color(0xFF1E40AF), CircleShape)
+                                        )
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text(
+                                            text = radar.teamA,
+                                            style = PlayerNameSecondary,
+                                            color = TextPrimary
+                                        )
+                                        Text(
+                                            text = " vs ",
+                                            style = BodyCaption,
+                                            color = TextTertiary
+                                        )
+                                        Box(
+                                            modifier = Modifier
+                                                .size(10.dp)
+                                                .background(Color(0xFFB45309), CircleShape)
+                                        )
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text(
+                                            text = radar.teamB,
+                                            style = PlayerNameSecondary,
+                                            color = TextPrimary
+                                        )
+                                    }
+
+                                    // LIVE micro-tag
                                     Surface(
                                         color = Color(0x22DC2626),
                                         shape = RoundedCornerShape(4.dp)
                                     ) {
                                         Text(
                                             text = "LIVE",
+                                            style = MicroTag,
                                             color = DismissalRed,
-                                            fontSize = 9.sp,
-                                            fontWeight = FontWeight.Bold,
                                             modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
                                         )
                                     }
@@ -217,34 +280,51 @@ fun HomeScreen(
                                 Row(
                                     verticalAlignment = Alignment.Bottom
                                 ) {
+                                    // Score in BarlowCondensed via ScoreMedium
                                     Text(
                                         text = radar.scoreText,
-                                        fontSize = 22.sp,
-                                        fontWeight = FontWeight.Bold,
+                                        style = ScoreMedium,
                                         color = TextPrimary
                                     )
                                     Spacer(modifier = Modifier.width(6.dp))
                                     Text(
                                         text = "(${radar.oversText})",
-                                        fontSize = 12.sp,
+                                        style = BodyCaption,
                                         color = TextSecondary,
-                                        modifier = Modifier.padding(bottom = 2.dp)
+                                        modifier = Modifier.padding(bottom = 4.dp)
                                     )
                                     Spacer(modifier = Modifier.weight(1f))
                                     Text(
                                         text = radar.crrText,
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Medium,
+                                        style = BodyCaption,
                                         color = TextSecondary,
-                                        modifier = Modifier.padding(bottom = 2.dp)
+                                        modifier = Modifier.padding(bottom = 4.dp)
                                     )
                                 }
 
                                 Spacer(modifier = Modifier.height(8.dp))
+
+                                // Mini Chase Pressure Bar
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(3.dp)
+                                        .clip(RoundedCornerShape(1.5.dp))
+                                        .background(ElevatedSurfaceDark)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth(0.65f)
+                                            .fillMaxHeight()
+                                            .background(BoundaryAmber)
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.height(6.dp))
                                 Text(
                                     text = radar.equationText,
-                                    color = TextSecondary,
-                                    fontSize = 11.sp
+                                    style = BodyCaption,
+                                    color = TextSecondary
                                 )
                             }
                         }
@@ -319,10 +399,8 @@ fun HomeScreen(
             Column(modifier = Modifier.padding(horizontal = 16.dp)) {
                 Text(
                     text = "TOP PERFORMERS",
-                    color = TextSecondary,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 11.sp,
-                    letterSpacing = 1.sp
+                    style = SectionLabel,
+                    color = TextSecondary
                 )
                 Spacer(modifier = Modifier.height(8.dp))
 
@@ -387,10 +465,8 @@ fun HomeScreen(
             Column(modifier = Modifier.padding(horizontal = 16.dp)) {
                 Text(
                     text = "RECENT MATCHES",
-                    color = TextSecondary,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 11.sp,
-                    letterSpacing = 1.sp
+                    style = SectionLabel,
+                    color = TextSecondary
                 )
                 Spacer(modifier = Modifier.height(8.dp))
 
@@ -401,16 +477,39 @@ fun HomeScreen(
                         shape = RoundedCornerShape(10.dp),
                         border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(CardBorderDark))
                     ) {
-                        Box(
+                        Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(20.dp),
-                            contentAlignment = Alignment.Center
+                                .padding(24.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
                         ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(44.dp)
+                                    .clip(CircleShape)
+                                    .background(ElevatedSurfaceDark),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.SportsCricket,
+                                    contentDescription = null,
+                                    tint = BoundaryAmber,
+                                    modifier = Modifier.size(22.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(10.dp))
                             Text(
-                                text = "No matches scored yet.",
+                                text = "FIRST MATCH AWAITS",
+                                style = SectionLabel,
+                                color = TextPrimary
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "Start a match to record your scorecards, ball-by-ball analysis, and player averages.",
+                                style = BodyCaption,
                                 color = TextTertiary,
-                                fontSize = 12.sp
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center
                             )
                         }
                     }
