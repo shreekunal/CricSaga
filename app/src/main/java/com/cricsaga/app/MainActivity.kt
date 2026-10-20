@@ -1,16 +1,20 @@
 package com.cricsaga.app
 
-import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.viewModels
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -18,39 +22,48 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.cricsaga.app.domain.model.ExtraType
+import com.cricsaga.app.ui.scoring.ScoringUiState
+import com.cricsaga.app.ui.scoring.ScoringViewModel
 import com.cricsaga.app.ui.theme.*
 
-/**
- * MainActivity is the main entry point of CricSaga.
- *
- * In modern Android with Jetpack Compose:
- * - We extend [ComponentActivity].
- * - Instead of XML layouts (like setContentView(R.layout.activity_main)),
- *   we use [setContent] to build UI declaratively with Kotlin composable functions.
- */
 class MainActivity : ComponentActivity() {
+
+    private val viewModel: ScoringViewModel by viewModels()
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
             CricSagaTheme {
+                val uiState by viewModel.uiState.collectAsState()
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    StageZeroVerificationScreen()
+                    ScoringScreen(
+                        state = uiState,
+                        onBallTapped = { runs -> viewModel.recordDelivery(runs) },
+                        onExtraTapped = { extra -> viewModel.recordExtra(extra) },
+                        onWicketTapped = { viewModel.recordWicket() },
+                        onUndoTapped = { viewModel.undo() },
+                        onRotateStrikeTapped = { viewModel.rotateStrike() }
+                    )
                 }
             }
         }
     }
 }
 
-/**
- * StageZeroVerificationScreen renders a confirmation card displaying the CricSaga brand
- * and physical device details to verify our end-to-end build, install, and run pipeline.
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun StageZeroVerificationScreen() {
+fun ScoringScreen(
+    state: ScoringUiState,
+    onBallTapped: (Int) -> Unit,
+    onExtraTapped: (ExtraType) -> Unit,
+    onWicketTapped: () -> Unit,
+    onUndoTapped: () -> Unit,
+    onRotateStrikeTapped: () -> Unit
+) {
     val scrollState = rememberScrollState()
 
     Scaffold(
@@ -59,12 +72,12 @@ fun StageZeroVerificationScreen() {
                 title = {
                     Column {
                         Text(
-                            text = "CricSaga",
-                            style = MaterialTheme.typography.titleLarge,
+                            text = "CricSaga — " + state.matchTitle,
+                            style = MaterialTheme.typography.titleMedium,
                             color = Color.White
                         )
                         Text(
-                            text = "Har Run Ki Kahani",
+                            text = "1st Innings • 20 Overs • Local-First Room DB",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MutedGrey
                         )
@@ -80,116 +93,247 @@ fun StageZeroVerificationScreen() {
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .padding(16.dp)
+                .padding(horizontal = 14.dp, vertical = 8.dp)
                 .verticalScroll(scrollState),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            // Milestone Status Banner
+            // 1. Live Match Scoreboard Banner
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(containerColor = SlateSurfaceDark),
                 shape = RoundedCornerShape(12.dp)
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
+                Column(
+                    modifier = Modifier.padding(14.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
                     Text(
-                        text = "STAGE 0 VERIFIED",
+                        text = state.battingTeamName.uppercase() + " INNINGS",
                         color = CrimsonPrimaryDark,
                         fontWeight = FontWeight.Bold,
-                        fontSize = 12.sp
+                        fontSize = 12.sp,
+                        letterSpacing = 1.sp
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "Android System & Device Connected",
-                        style = MaterialTheme.typography.titleMedium,
+                        text = "${state.scoreState.totalRuns} / ${state.scoreState.totalWickets}",
+                        fontSize = 38.sp,
+                        fontWeight = FontWeight.ExtraBold,
                         color = Color.White
                     )
-                    Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = "Minimal Kotlin + Jetpack Compose project successfully compiled and running natively on your hardware.",
+                        text = "Overs: ${state.scoreState.oversFormatted} / 20.0  •  CRR: ${String.format("%.2f", state.scoreState.currentRunRate)}",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MutedGrey
                     )
                 }
             }
 
-            // Physical Device Information Card
+            // 2. Batsman & Bowler Live Tables
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(containerColor = SlateSurfaceDark),
                 shape = RoundedCornerShape(12.dp)
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        text = "TARGET DEVICE INFO",
-                        color = BoundaryAmber,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 12.sp
+                Column(modifier = Modifier.padding(12.dp)) {
+                    // Header
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("BATSMAN", color = MutedGrey, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Text("R", color = MutedGrey, fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(24.dp), textAlign = TextAlign.End)
+                            Text("B", color = MutedGrey, fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(24.dp), textAlign = TextAlign.End)
+                            Text("4s", color = MutedGrey, fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(24.dp), textAlign = TextAlign.End)
+                            Text("6s", color = MutedGrey, fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(24.dp), textAlign = TextAlign.End)
+                            Text("SR", color = MutedGrey, fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(42.dp), textAlign = TextAlign.End)
+                        }
+                    }
+                    Divider(color = Color(0xFF2E2E2E), modifier = Modifier.padding(vertical = 6.dp))
+
+                    // Striker Row
+                    val striker = state.scoreState.batsmen[state.scoreState.strikerId]
+                    BatsmanRow(
+                        name = "* " + (striker?.playerName ?: state.strikerName),
+                        runs = striker?.runs ?: 0,
+                        balls = striker?.ballsFaced ?: 0,
+                        fours = striker?.fours ?: 0,
+                        sixes = striker?.sixes ?: 0,
+                        sr = striker?.strikeRate ?: 0.0,
+                        isStriker = true
                     )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    DeviceInfoRow("Device", "${Build.MANUFACTURER.uppercase()} ${Build.MODEL}")
-                    DeviceInfoRow("Android Version", "Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})")
-                    DeviceInfoRow("Build Mode", "Debug • Jetpack Compose 2.0")
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    // Non-Striker Row
+                    val nonStriker = state.scoreState.batsmen[state.scoreState.nonStrikerId]
+                    BatsmanRow(
+                        name = "  " + (nonStriker?.playerName ?: state.nonStrikerName),
+                        runs = nonStriker?.runs ?: 0,
+                        balls = nonStriker?.ballsFaced ?: 0,
+                        fours = nonStriker?.fours ?: 0,
+                        sixes = nonStriker?.sixes ?: 0,
+                        sr = nonStriker?.strikeRate ?: 0.0,
+                        isStriker = false
+                    )
+
+                    Divider(color = Color(0xFF2E2E2E), modifier = Modifier.padding(vertical = 6.dp))
+
+                    // Bowler Row
+                    val bowler = state.scoreState.bowlers[state.scoreState.currentBowlerId]
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Bowler: " + (bowler?.bowlerName ?: state.bowlerName),
+                            color = Color.White,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            text = "${bowler?.oversFormatted ?: "0.0"} - ${bowler?.maidens ?: 0} - ${bowler?.runsConceded ?: 0} - ${bowler?.wickets ?: 0} (Econ: ${String.format("%.1f", bowler?.economyRate ?: 0.0)})",
+                            color = BoundaryAmber,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
                 }
             }
 
-            // CricHeroes-Parity Keypad Theme Preview
+            // 3. Current Over Badges Timeline
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = SlateSurfaceDark),
+                shape = RoundedCornerShape(10.dp)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = "THIS OVER:",
+                        color = MutedGrey,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    if (state.scoreState.currentOverBalls.isEmpty()) {
+                        Text(
+                            text = "Awaiting first ball...",
+                            color = Color.Gray,
+                            fontSize = 12.sp
+                        )
+                    } else {
+                        state.scoreState.currentOverBalls.forEach { ball ->
+                            Box(
+                                modifier = Modifier
+                                    .size(32.dp)
+                                    .background(
+                                        when {
+                                            ball.isWicket -> DismissalRed
+                                            ball.runsOffBat == 4 -> BoundaryAmber
+                                            ball.runsOffBat == 6 -> BoundaryGreen
+                                            ball.extraType != ExtraType.NONE -> ExtraBlue
+                                            else -> ElevatedSurfaceDark
+                                        },
+                                        CircleShape
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = ball.label,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (ball.runsOffBat == 4 || ball.runsOffBat == 6 || ball.extraType != ExtraType.NONE) Color.Black else Color.White
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 4. Interactive Keypad (Exact CricHeroes Muscle Memory)
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(containerColor = SlateSurfaceDark),
                 shape = RoundedCornerShape(12.dp)
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        text = "SCORING THEME PREVIEW",
-                        color = BoundaryGreen,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 12.sp
-                    )
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Text(
-                        text = "High-contrast keypad tokens verified for direct pitch sunlight:",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MutedGrey
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-
+                Column(
+                    modifier = Modifier.padding(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
                     // Row 1: 0, 1, 2, 3
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        KeypadPreviewButton("0", ElevatedSurfaceDark, Color.White, Modifier.weight(1f))
-                        KeypadPreviewButton("1", ElevatedSurfaceDark, Color.White, Modifier.weight(1f))
-                        KeypadPreviewButton("2", ElevatedSurfaceDark, Color.White, Modifier.weight(1f))
-                        KeypadPreviewButton("3", ElevatedSurfaceDark, Color.White, Modifier.weight(1f))
+                        KeypadButton("0", ElevatedSurfaceDark, Color.White, Modifier.weight(1f)) { onBallTapped(0) }
+                        KeypadButton("1", ElevatedSurfaceDark, Color.White, Modifier.weight(1f)) { onBallTapped(1) }
+                        KeypadButton("2", ElevatedSurfaceDark, Color.White, Modifier.weight(1f)) { onBallTapped(2) }
+                        KeypadButton("3", ElevatedSurfaceDark, Color.White, Modifier.weight(1f)) { onBallTapped(3) }
                     }
-
-                    Spacer(modifier = Modifier.height(8.dp))
 
                     // Row 2: 4, 6, Wide, No Ball
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        KeypadPreviewButton("4", BoundaryAmber, Color.Black, Modifier.weight(1f))
-                        KeypadPreviewButton("6", BoundaryGreen, Color.Black, Modifier.weight(1f))
-                        KeypadPreviewButton("Wd", ExtraBlue, Color.Black, Modifier.weight(1f))
-                        KeypadPreviewButton("Nb", ExtraBlue, Color.Black, Modifier.weight(1f))
+                        KeypadButton("4", BoundaryAmber, Color.Black, Modifier.weight(1f)) { onBallTapped(4) }
+                        KeypadButton("6", BoundaryGreen, Color.Black, Modifier.weight(1f)) { onBallTapped(6) }
+                        KeypadButton("WIDE", ExtraBlue, Color.Black, Modifier.weight(1f)) { onExtraTapped(ExtraType.WIDE) }
+                        KeypadButton("NO BALL", ExtraBlue, Color.Black, Modifier.weight(1f)) { onExtraTapped(ExtraType.NO_BALL) }
                     }
 
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    // Row 3: Bye, Leg Bye, Out, Undo
+                    // Row 3: Bye, Leg Bye, OUT, UNDO
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        KeypadPreviewButton("B", ElevatedSurfaceDark, Color.White, Modifier.weight(1f))
-                        KeypadPreviewButton("Lb", ElevatedSurfaceDark, Color.White, Modifier.weight(1f))
-                        KeypadPreviewButton("OUT", DismissalRed, Color.White, Modifier.weight(1f))
-                        KeypadPreviewButton("UNDO", ElevatedSurfaceDark, BoundaryAmber, Modifier.weight(1f))
+                        KeypadButton("BYE", ElevatedSurfaceDark, Color.White, Modifier.weight(1f)) { onExtraTapped(ExtraType.BYE) }
+                        KeypadButton("LEG BYE", ElevatedSurfaceDark, Color.White, Modifier.weight(1f)) { onExtraTapped(ExtraType.LEG_BYE) }
+                        KeypadButton("OUT / W", DismissalRed, Color.White, Modifier.weight(1f)) { onWicketTapped() }
+                        KeypadButton("UNDO", ElevatedSurfaceDark, BoundaryAmber, Modifier.weight(1f)) { onUndoTapped() }
                     }
+
+                    // Row 4: Quick Action Bar
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        KeypadButton("🔄 Rotate Strike", Color(0xFF2A2A2A), Color.White, Modifier.weight(1f)) {
+                            onRotateStrikeTapped()
+                        }
+                    }
+                }
+            }
+
+            // 5. Database Status & Log Indicator
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF191919)),
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Row(
+                    modifier = Modifier.padding(10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .background(Color(0xFF4CAF50), CircleShape)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = state.lastActionMessage,
+                        color = MutedGrey,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium
+                    )
                 }
             }
         }
@@ -197,36 +341,57 @@ fun StageZeroVerificationScreen() {
 }
 
 @Composable
-fun DeviceInfoRow(label: String, value: String) {
+fun BatsmanRow(
+    name: String,
+    runs: Int,
+    balls: Int,
+    fours: Int,
+    sixes: Int,
+    sr: Double,
+    isStriker: Boolean
+) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp),
-        horizontalArrangement = Arrangement.SpaceBetween
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(text = label, color = MutedGrey, style = MaterialTheme.typography.bodyMedium)
-        Text(text = value, color = Color.White, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
+        Text(
+            text = name,
+            color = if (isStriker) Color.White else MutedGrey,
+            fontWeight = if (isStriker) FontWeight.Bold else FontWeight.Normal,
+            fontSize = 13.sp,
+            modifier = Modifier.weight(1f)
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text("$runs", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.width(24.dp), textAlign = TextAlign.End)
+            Text("$balls", color = MutedGrey, fontSize = 13.sp, modifier = Modifier.width(24.dp), textAlign = TextAlign.End)
+            Text("$fours", color = MutedGrey, fontSize = 13.sp, modifier = Modifier.width(24.dp), textAlign = TextAlign.End)
+            Text("$sixes", color = MutedGrey, fontSize = 13.sp, modifier = Modifier.width(24.dp), textAlign = TextAlign.End)
+            Text(String.format("%.1f", sr), color = BoundaryAmber, fontSize = 12.sp, modifier = Modifier.width(42.dp), textAlign = TextAlign.End)
+        }
     }
 }
 
 @Composable
-fun KeypadPreviewButton(
+fun KeypadButton(
     label: String,
     backgroundColor: Color,
     textColor: Color,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
 ) {
     Box(
         modifier = modifier
-            .height(44.dp)
-            .background(backgroundColor, RoundedCornerShape(8.dp)),
+            .height(48.dp)
+            .background(backgroundColor, RoundedCornerShape(8.dp))
+            .clickable { onClick() },
         contentAlignment = Alignment.Center
     ) {
         Text(
             text = label,
             color = textColor,
             fontWeight = FontWeight.Bold,
-            fontSize = 14.sp,
+            fontSize = 13.sp,
             textAlign = TextAlign.Center
         )
     }
