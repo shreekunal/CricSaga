@@ -34,43 +34,54 @@ class MainActivity : ComponentActivity() {
         val authManager = AuthManager(applicationContext)
         val themeManager = ThemeManager(applicationContext)
         val hapticManager = HapticManager(applicationContext)
+        com.cricsaga.app.ui.utils.NotificationHelper.createChannels(applicationContext)
 
         setContent {
             val themeMode by themeManager.themeMode.collectAsState()
-            val isDark = themeManager.isDark(isSystemInDarkTheme())
+            val isSystemDark = isSystemInDarkTheme()
+            val isDark = when (themeMode) {
+                com.cricsaga.app.ui.theme.ThemeMode.DARK -> true
+                com.cricsaga.app.ui.theme.ThemeMode.LIGHT -> false
+                com.cricsaga.app.ui.theme.ThemeMode.SYSTEM -> isSystemDark
+            }
 
             CricSagaTheme(darkTheme = isDark) {
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background
+                CompositionLocalProvider(
+                    com.cricsaga.app.ui.utils.LocalHapticManager provides hapticManager
                 ) {
-                    Box(modifier = Modifier.fillMaxSize()) {
-                        var showSplash by remember { mutableStateOf(true) }
+                    Surface(
+                        modifier = Modifier.fillMaxSize(),
+                        color = MaterialTheme.colorScheme.background
+                    ) {
+                        Box(modifier = Modifier.fillMaxSize()) {
+                            var showSplash by remember { mutableStateOf(true) }
 
-                        Crossfade(
-                            targetState = showSplash,
-                            animationSpec = tween(400),
-                            label = "AppStartCrossfade"
-                        ) { isSplash ->
-                            if (isSplash) {
-                                SplashScreen(
-                                    onAnimationFinish = { showSplash = false }
-                                )
-                            } else {
-                                AppNavigation(
-                                    scoringViewModel = viewModel,
-                                    proManager = proManager,
-                                    authManager = authManager,
-                                    themeManager = themeManager,
-                                    hapticManager = hapticManager
-                                )
+                            Crossfade(
+                                targetState = showSplash,
+                                animationSpec = tween(400),
+                                label = "AppStartCrossfade"
+                            ) { isSplash ->
+                                if (isSplash) {
+                                    SplashScreen(
+                                        onAnimationFinish = { showSplash = false }
+                                    )
+                                } else {
+                                    AppNavigation(
+                                        scoringViewModel = viewModel,
+                                        proManager = proManager,
+                                        authManager = authManager,
+                                        themeManager = themeManager,
+                                        hapticManager = hapticManager,
+                                        isDark = isDark
+                                    )
+                                }
                             }
-                        }
 
-                        // Floating In-App Broadcast Toast Overlay Banner
-                        BroadcastBannerHost(
-                            modifier = Modifier.align(Alignment.TopCenter)
-                        )
+                            // Floating In-App Broadcast Toast Overlay Banner
+                            BroadcastBannerHost(
+                                modifier = Modifier.align(Alignment.TopCenter)
+                            )
+                        }
                     }
                 }
             }

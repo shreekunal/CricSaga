@@ -32,8 +32,10 @@ fun TeamsListScreen(
 ) {
     var showCreateTeamDialog by remember { mutableStateOf(false) }
     var selectedTeamForAddPlayer by remember { mutableStateOf<TeamEntity?>(null) }
+    val hapticManager = com.cricsaga.app.ui.utils.LocalHapticManager.current
 
     Scaffold(
+        containerColor = CharcoalBackgroundDark,
         topBar = {
             TopAppBar(
                 title = { Text("Teams & Squads", fontWeight = FontWeight.Bold, color = TextPrimary, fontSize = 20.sp) },
@@ -42,7 +44,10 @@ fun TeamsListScreen(
         },
         floatingActionButton = {
             FloatingActionButton(
-                onClick = { showCreateTeamDialog = true },
+                onClick = {
+                    hapticManager?.tapUiClick()
+                    showCreateTeamDialog = true
+                },
                 containerColor = CrimsonPrimaryDark,
                 contentColor = Color.White
             ) {
@@ -64,7 +69,10 @@ fun TeamsListScreen(
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(teams) { team ->
                         Card(
-                            onClick = { onTeamClick(team) },
+                            onClick = {
+                                hapticManager?.tapUiClick()
+                                onTeamClick(team)
+                            },
                             modifier = Modifier.fillMaxWidth(),
                             colors = CardDefaults.cardColors(containerColor = SlateSurfaceDark),
                             shape = RoundedCornerShape(8.dp),
@@ -109,7 +117,7 @@ fun TeamsListScreen(
             AlertDialog(
                 onDismissRequest = { showCreateTeamDialog = false },
                 containerColor = SlateSurfaceDark,
-                title = { Text("Create New Team", color = Color.White, fontWeight = FontWeight.Bold) },
+                title = { Text("Create New Team", color = TextPrimary, fontWeight = FontWeight.Bold) },
                 text = {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedTextField(
@@ -161,7 +169,7 @@ fun TeamsListScreen(
             AlertDialog(
                 onDismissRequest = { selectedTeamForAddPlayer = null },
                 containerColor = SlateSurfaceDark,
-                title = { Text("Add Player to ${team.teamName}", color = Color.White, fontWeight = FontWeight.Bold) },
+                title = { Text("Add Player to ${team.teamName}", color = TextPrimary, fontWeight = FontWeight.Bold) },
                 text = {
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         OutlinedTextField(

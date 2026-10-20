@@ -30,7 +30,10 @@ fun MatchListScreen(
     onStartNewMatchClick: () -> Unit,
     onMatchClick: (matchId: String) -> Unit
 ) {
+    val hapticManager = com.cricsaga.app.ui.utils.LocalHapticManager.current
+
     Scaffold(
+        containerColor = CharcoalBackgroundDark,
         topBar = {
             TopAppBar(
                 title = {
@@ -46,7 +49,10 @@ fun MatchListScreen(
         },
         floatingActionButton = {
             ExtendedFloatingActionButton(
-                onClick = onStartNewMatchClick,
+                onClick = {
+                    hapticManager?.tapUiClick()
+                    onStartNewMatchClick()
+                },
                 containerColor = CrimsonPrimaryDark,
                 contentColor = Color.White
             ) {
@@ -103,7 +109,10 @@ fun MatchListScreen(
                         Card(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable { onMatchClick(match.matchId) },
+                                .clickable {
+                                    hapticManager?.tapUiClick()
+                                    onMatchClick(match.matchId)
+                                },
                             colors = CardDefaults.cardColors(containerColor = SlateSurfaceDark),
                             shape = RoundedCornerShape(8.dp),
                             border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(CardBorderDark))

@@ -1,5 +1,6 @@
 package com.cricsaga.app.ui.profile
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -11,10 +12,12 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -23,6 +26,7 @@ import com.cricsaga.app.data.local.entity.PlayerStatsEntity
 import com.cricsaga.app.data.local.entity.UserEntity
 import com.cricsaga.app.domain.model.PlayingRole
 import com.cricsaga.app.ui.theme.*
+import com.cricsaga.app.ui.utils.ImageUtils
 import com.cricsaga.app.ui.utils.ShareUtils
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -69,6 +73,8 @@ fun PlayerDetailScreen(
         else -> "ALL-ROUNDER"
     }
 
+    val hapticManager = com.cricsaga.app.ui.utils.LocalHapticManager.current
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -80,7 +86,10 @@ fun PlayerDetailScreen(
                     )
                 },
                 navigationIcon = {
-                    IconButton(onClick = onBackClick) {
+                    IconButton(onClick = {
+                        hapticManager?.tapUiClick()
+                        onBackClick()
+                    }) {
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Back",
@@ -90,6 +99,7 @@ fun PlayerDetailScreen(
                 },
                 actions = {
                     IconButton(onClick = {
+                        hapticManager?.tapUiClick()
                         ShareUtils.generateAndShareAthleteCard(
                             context = context,
                             playerName = playerName,
@@ -99,7 +109,8 @@ fun PlayerDetailScreen(
                             matches = totalMatches,
                             runs = totalRuns,
                             wickets = totalWickets,
-                            average = batAvg
+                            average = batAvg,
+                            profilePhotoPath = user.profilePhotoUrl
                         )
                     }) {
                         Icon(
@@ -145,6 +156,10 @@ fun PlayerDetailScreen(
                             modifier = Modifier.fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
+                            val avatarBitmap = remember(user.profilePhotoUrl) {
+                                ImageUtils.loadBitmapFromPath(user.profilePhotoUrl)
+                            }
+
                             Box(
                                 modifier = Modifier
                                     .size(54.dp)
@@ -153,11 +168,20 @@ fun PlayerDetailScreen(
                                     .border(1.5.dp, CrimsonPrimaryDark.copy(alpha = 0.6f), CircleShape),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Text(
-                                    text = initials,
-                                    style = ScoreSmall,
-                                    color = TextPrimary
-                                )
+                                if (avatarBitmap != null) {
+                                    Image(
+                                        bitmap = avatarBitmap,
+                                        contentDescription = "Profile Photo",
+                                        modifier = Modifier.fillMaxSize(),
+                                        contentScale = ContentScale.Crop
+                                    )
+                                } else {
+                                    Text(
+                                        text = initials,
+                                        style = ScoreSmall,
+                                        color = TextPrimary
+                                    )
+                                }
                             }
 
                             Spacer(modifier = Modifier.width(14.dp))

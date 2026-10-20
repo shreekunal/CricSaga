@@ -8,12 +8,14 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -22,8 +24,13 @@ import androidx.compose.ui.unit.sp
 import com.cricsaga.app.R
 import com.cricsaga.app.domain.model.BatsmanScore
 import com.cricsaga.app.domain.model.BowlerFigures
+import com.cricsaga.app.domain.model.DeliveryRecord
 import com.cricsaga.app.domain.model.InningsScoreState
+import com.cricsaga.app.ui.analytics.ManhattanChart
+import com.cricsaga.app.ui.analytics.WormGraph
+import com.cricsaga.app.ui.utils.LocalHapticManager
 import com.cricsaga.app.ui.theme.*
+import com.cricsaga.app.ui.utils.PdfExportUtils
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -32,29 +39,56 @@ fun FullScorecardScreen(
     battingTeamName: String,
     bowlingTeamName: String,
     scoreState: InningsScoreState,
+    innings1Score: InningsScoreState? = null,
+    innings1BattingTeamName: String = "",
+    currentInningsDeliveries: List<DeliveryRecord> = emptyList(),
+    innings1Deliveries: List<DeliveryRecord> = emptyList(),
     onBackClick: () -> Unit,
     onSharePoster: () -> Unit
 ) {
     var selectedTab by remember { mutableIntStateOf(0) }
-    val tabs = listOf("Scorecard", "Fall of Wickets", "Match Poster")
+    val tabs = listOf("Scorecard", "Manhattan", "Worm Graph", "Fall of Wickets", "Match Poster")
     val scrollState = rememberScrollState()
+    val context = LocalContext.current
+    val hapticManager = LocalHapticManager.current
 
     Scaffold(
+        containerColor = CharcoalBackgroundDark,
         topBar = {
             TopAppBar(
                 title = {
                     Column {
-                        Text(matchTitle, style = MaterialTheme.typography.titleMedium, color = Color.White)
+                        Text(matchTitle, style = MaterialTheme.typography.titleMedium, color = TextPrimary)
                         Text("Complete Match Center", style = MaterialTheme.typography.bodyMedium, color = MutedGrey)
                     }
                 },
                 navigationIcon = {
-                    IconButton(onClick = onBackClick) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
+                    IconButton(onClick = {
+                        hapticManager?.tapUiClick()
+                        onBackClick()
+                    }) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = TextPrimary)
                     }
                 },
                 actions = {
-                    IconButton(onClick = onSharePoster) {
+                    IconButton(onClick = {
+                        hapticManager?.tapUiClick()
+                        PdfExportUtils.generateAndShareMatchPdf(
+                            context = context,
+                            matchTitle = matchTitle,
+                            battingTeamName = battingTeamName,
+                            bowlingTeamName = bowlingTeamName,
+                            scoreState = scoreState,
+                            firstInningsScore = innings1Score,
+                            firstInningsTeamName = innings1BattingTeamName
+                        )
+                    }) {
+                        Icon(Icons.Default.PictureAsPdf, contentDescription = "Export A4 PDF", tint = TextPrimary)
+                    }
+                    IconButton(onClick = {
+                        hapticManager?.tapUiClick()
+                        onSharePoster()
+                    }) {
                         Icon(Icons.Default.Share, contentDescription = "Share", tint = BoundaryAmber)
                     }
                 },
@@ -68,21 +102,25 @@ fun FullScorecardScreen(
                 .padding(paddingValues)
         ) {
             // Tab Row
-            TabRow(
+            ScrollableTabRow(
                 selectedTabIndex = selectedTab,
                 containerColor = SlateSurfaceDark,
-                contentColor = CrimsonPrimaryDark
+                contentColor = CrimsonPrimaryDark,
+                edgePadding = 12.dp
             ) {
                 tabs.forEachIndexed { index, title ->
                     Tab(
                         selected = selectedTab == index,
-                        onClick = { selectedTab = index },
+                        onClick = {
+                            hapticManager?.tapUiClick()
+                            selectedTab = index
+                        },
                         text = {
                             Text(
                                 title,
-                                color = if (selectedTab == index) Color.White else MutedGrey,
+                                color = if (selectedTab == index) TextPrimary else MutedGrey,
                                 fontWeight = if (selectedTab == index) FontWeight.Bold else FontWeight.Normal,
-                                fontSize = 13.sp
+                                fontSize = 12.sp
                             )
                         }
                     )
@@ -98,8 +136,21 @@ fun FullScorecardScreen(
             ) {
                 when (selectedTab) {
                     0 -> ScorecardTab(battingTeamName, bowlingTeamName, scoreState)
-                    1 -> FallOfWicketsTab(scoreState)
-                    2 -> WhatsAppMatchPosterTab(matchTitle, battingTeamName, bowlingTeamName, scoreState, onSharePoster)
+                    1 -> ManhattanChart(
+                        battingTeamName = battingTeamName,
+                        deliveries = currentInningsDeliveries,
+                        totalOvers = scoreState.totalOversAllotted
+                    )
+                    2 -> WormGraph(
+                        teamAName = if (innings1BattingTeamName.isNotBlank()) innings1BattingTeamName else bowlingTeamName,
+                        teamBName = battingTeamName,
+                        innings1Deliveries = innings1Deliveries,
+                        innings2Deliveries = currentInningsDeliveries,
+                        targetRuns = scoreState.targetRuns,
+                        totalOvers = scoreState.totalOversAllotted
+                    )
+                    3 -> FallOfWicketsTab(scoreState)
+                    4 -> WhatsAppMatchPosterTab(matchTitle, battingTeamName, bowlingTeamName, scoreState, onSharePoster)
                 }
             }
         }
@@ -130,7 +181,7 @@ fun ScorecardTab(
                 text = "${scoreState.totalRuns} / ${scoreState.totalWickets}",
                 fontSize = 34.sp,
                 fontWeight = FontWeight.ExtraBold,
-                color = Color.White
+                color = TextPrimary
             )
             Text(
                 text = "Overs: ${scoreState.oversFormatted} / ${scoreState.totalOversAllotted}.0  •  CRR: ${String.format("%.2f", scoreState.currentRunRate)}",
@@ -159,7 +210,7 @@ fun ScorecardTab(
                     Text("SR", color = MutedGrey, fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(42.dp), textAlign = TextAlign.End)
                 }
             }
-            HorizontalDivider(modifier = Modifier.padding(vertical = 6.dp), color = Color(0xFF2E2E2E))
+            HorizontalDivider(modifier = Modifier.padding(vertical = 6.dp), color = DividerDark)
 
             scoreState.batsmen.values.forEach { b ->
                 Column(modifier = Modifier.padding(vertical = 4.dp)) {
@@ -169,7 +220,7 @@ fun ScorecardTab(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
-                            Text(b.playerName, color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                            Text(b.playerName, color = TextPrimary, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
                             Text(
                                 text = if (b.isOut) "c & b (${b.dismissal?.dismissalType?.name ?: "Out"})" else "not out *",
                                 color = if (b.isOut) DismissalRed else BoundaryGreen,
@@ -177,7 +228,7 @@ fun ScorecardTab(
                             )
                         }
                         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            Text("${b.runs}", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp, modifier = Modifier.width(22.dp), textAlign = TextAlign.End)
+                            Text("${b.runs}", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 13.sp, modifier = Modifier.width(22.dp), textAlign = TextAlign.End)
                             Text("${b.ballsFaced}", color = MutedGrey, fontSize = 13.sp, modifier = Modifier.width(22.dp), textAlign = TextAlign.End)
                             Text("${b.fours}", color = MutedGrey, fontSize = 13.sp, modifier = Modifier.width(22.dp), textAlign = TextAlign.End)
                             Text("${b.sixes}", color = MutedGrey, fontSize = 13.sp, modifier = Modifier.width(22.dp), textAlign = TextAlign.End)
@@ -208,7 +259,7 @@ fun ScorecardTab(
                     Text("ECON", color = MutedGrey, fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(42.dp), textAlign = TextAlign.End)
                 }
             }
-            HorizontalDivider(modifier = Modifier.padding(vertical = 6.dp), color = Color(0xFF2E2E2E))
+            HorizontalDivider(modifier = Modifier.padding(vertical = 6.dp), color = DividerDark)
 
             scoreState.bowlers.values.forEach { bow ->
                 Row(
@@ -218,11 +269,11 @@ fun ScorecardTab(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(bow.bowlerName, color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, modifier = Modifier.weight(1f))
+                    Text(bow.bowlerName, color = TextPrimary, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, modifier = Modifier.weight(1f))
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Text(bow.oversFormatted, color = Color.White, fontSize = 13.sp, modifier = Modifier.width(24.dp), textAlign = TextAlign.End)
+                        Text(bow.oversFormatted, color = TextPrimary, fontSize = 13.sp, modifier = Modifier.width(24.dp), textAlign = TextAlign.End)
                         Text("${bow.maidens}", color = MutedGrey, fontSize = 13.sp, modifier = Modifier.width(22.dp), textAlign = TextAlign.End)
-                        Text("${bow.runsConceded}", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp, modifier = Modifier.width(24.dp), textAlign = TextAlign.End)
+                        Text("${bow.runsConceded}", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 13.sp, modifier = Modifier.width(24.dp), textAlign = TextAlign.End)
                         Text("${bow.wickets}", color = DismissalRed, fontWeight = FontWeight.Bold, fontSize = 13.sp, modifier = Modifier.width(22.dp), textAlign = TextAlign.End)
                         Text(String.format("%.1f", bow.economyRate), color = BoundaryAmber, fontSize = 12.sp, modifier = Modifier.width(42.dp), textAlign = TextAlign.End)
                     }
@@ -256,7 +307,7 @@ fun FallOfWicketsTab(scoreState: InningsScoreState) {
                     ) {
                         Text(
                             text = "${index + 1}-${b.runs} (${b.playerName})",
-                            color = Color.White,
+                            color = TextPrimary,
                             fontWeight = FontWeight.SemiBold,
                             fontSize = 13.sp
                         )
@@ -267,7 +318,7 @@ fun FallOfWicketsTab(scoreState: InningsScoreState) {
                         )
                     }
                     if (index < dismissedBatsmen.size - 1) {
-                        HorizontalDivider(color = Color(0xFF282828))
+                        HorizontalDivider(color = DividerDark)
                     }
                 }
             }

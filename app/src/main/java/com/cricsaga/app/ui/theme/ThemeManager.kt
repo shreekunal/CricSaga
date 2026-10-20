@@ -33,12 +33,15 @@ class ThemeManager(context: Context) {
         _themeMode.value = mode
     }
 
-    fun toggleTheme() {
-        val current = _themeMode.value
-        val next = when (current) {
-            ThemeMode.DARK -> ThemeMode.LIGHT
-            ThemeMode.LIGHT -> ThemeMode.DARK
-            ThemeMode.SYSTEM -> ThemeMode.DARK
+    fun toggleTheme(isCurrentlyDark: Boolean? = null) {
+        val next = if (isCurrentlyDark != null) {
+            if (isCurrentlyDark) ThemeMode.LIGHT else ThemeMode.DARK
+        } else {
+            when (_themeMode.value) {
+                ThemeMode.DARK -> ThemeMode.LIGHT
+                ThemeMode.LIGHT -> ThemeMode.DARK
+                ThemeMode.SYSTEM -> ThemeMode.LIGHT
+            }
         }
         setThemeMode(next)
     }

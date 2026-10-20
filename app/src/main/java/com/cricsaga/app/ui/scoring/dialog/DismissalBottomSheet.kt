@@ -34,6 +34,7 @@ fun DismissalBottomSheet(
     var selectedFielderId by remember { mutableStateOf(fieldingSquad.firstOrNull()?.userId ?: "") }
     var selectedIncomingId by remember { mutableStateOf(battingBench.firstOrNull()?.userId ?: "") }
     var runsCompletedBeforeOut by remember { mutableIntStateOf(0) }
+    val hapticManager = com.cricsaga.app.ui.utils.LocalHapticManager.current
 
     ModalBottomSheet(
         onDismissRequest = onDismissRequest,
@@ -67,7 +68,10 @@ fun DismissalBottomSheet(
                     val isSelected = selectedType == type
                     FilterChip(
                         selected = isSelected,
-                        onClick = { selectedType = type },
+                        onClick = {
+                            hapticManager?.tapUiClick()
+                            selectedType = type
+                        },
                         label = { Text(label, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal) },
                         colors = FilterChipDefaults.filterChipColors(
                             selectedContainerColor = if (type == DismissalType.CAUGHT) BoundaryAmber else DismissalRed,
@@ -83,12 +87,18 @@ fun DismissalBottomSheet(
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     FilterChip(
                         selected = selectedDismissedPlayerId == striker?.userId,
-                        onClick = { striker?.let { selectedDismissedPlayerId = it.userId } },
+                        onClick = {
+                            hapticManager?.tapUiClick()
+                            striker?.let { selectedDismissedPlayerId = it.userId }
+                        },
                         label = { Text("Striker (${striker?.fullName ?: ""})") }
                     )
                     FilterChip(
                         selected = selectedDismissedPlayerId == nonStriker?.userId,
-                        onClick = { nonStriker?.let { selectedDismissedPlayerId = it.userId } },
+                        onClick = {
+                            hapticManager?.tapUiClick()
+                            nonStriker?.let { selectedDismissedPlayerId = it.userId }
+                        },
                         label = { Text("Non-Striker (${nonStriker?.fullName ?: ""})") }
                     )
                 }
@@ -98,7 +108,10 @@ fun DismissalBottomSheet(
                     listOf(0, 1, 2, 3).forEach { runs ->
                         FilterChip(
                             selected = runsCompletedBeforeOut == runs,
-                            onClick = { runsCompletedBeforeOut = runs },
+                            onClick = {
+                                hapticManager?.tapUiClick()
+                                runsCompletedBeforeOut = runs
+                            },
                             label = { Text("$runs runs") }
                         )
                     }
@@ -114,7 +127,10 @@ fun DismissalBottomSheet(
                         val isSelected = selectedFielderId == fielder.userId
                         FilterChip(
                             selected = isSelected,
-                            onClick = { selectedFielderId = fielder.userId },
+                            onClick = {
+                                hapticManager?.tapUiClick()
+                                selectedFielderId = fielder.userId
+                            },
                             label = { Text(fielder.fullName) },
                             colors = FilterChipDefaults.filterChipColors(
                                 selectedContainerColor = BoundaryAmber,
@@ -135,7 +151,10 @@ fun DismissalBottomSheet(
                         val isSelected = selectedIncomingId == batter.userId
                         FilterChip(
                             selected = isSelected,
-                            onClick = { selectedIncomingId = batter.userId },
+                            onClick = {
+                                hapticManager?.tapUiClick()
+                                selectedIncomingId = batter.userId
+                            },
                             label = { Text(batter.fullName) },
                             colors = FilterChipDefaults.filterChipColors(
                                 selectedContainerColor = CrimsonPrimaryDark,
@@ -151,6 +170,7 @@ fun DismissalBottomSheet(
             // Confirm Button
             Button(
                 onClick = {
+                    hapticManager?.tapWicket()
                     val dismissal = DismissalDetails(
                         dismissalType = selectedType,
                         dismissedPlayerId = if (selectedType == DismissalType.RUN_OUT) selectedDismissedPlayerId else (striker?.userId ?: ""),

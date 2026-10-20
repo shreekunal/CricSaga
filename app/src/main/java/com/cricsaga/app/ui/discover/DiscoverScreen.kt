@@ -188,10 +188,14 @@ fun DiscoverScreen(
                         )
                     }
                 ) {
+                    val hapticManager = com.cricsaga.app.ui.utils.LocalHapticManager.current
                     tabs.forEachIndexed { index, title ->
                         Tab(
                             selected = selectedTab == index,
-                            onClick = { selectedTab = index },
+                            onClick = {
+                                hapticManager?.tapUiClick()
+                                selectedTab = index
+                            },
                             text = {
                                 Text(
                                     text = title,
@@ -535,12 +539,13 @@ fun DiscoverScreen(
             title = {
                 Text(
                     text = "Post Grassroots Requirement",
-                    color = Color.White,
+                    color = TextPrimary,
                     fontWeight = FontWeight.Bold,
                     fontSize = 16.sp
                 )
             },
             text = {
+                val hapticManager = com.cricsaga.app.ui.utils.LocalHapticManager.current
                 Column(
                     modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -553,7 +558,10 @@ fun DiscoverScreen(
                         typeOptions.forEach { type ->
                             FilterChip(
                                 selected = selectedType == type,
-                                onClick = { selectedType = type },
+                                onClick = {
+                                    hapticManager?.tapUiClick()
+                                    selectedType = type
+                                },
                                 label = { Text(type, fontSize = 11.sp) },
                                 colors = FilterChipDefaults.filterChipColors(
                                     selectedContainerColor = CrimsonPrimaryDark,
@@ -571,8 +579,8 @@ fun DiscoverScreen(
                         label = { Text("Title / Purpose", color = MutedGrey) },
                         placeholder = { Text("e.g. Weekend Match • 16 Overs", color = Color.Gray) },
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White,
+                            focusedTextColor = TextPrimary,
+                            unfocusedTextColor = TextPrimary,
                             focusedBorderColor = CrimsonPrimaryDark,
                             unfocusedBorderColor = CardBorderDark
                         ),
@@ -584,8 +592,8 @@ fun DiscoverScreen(
                         onValueChange = { organizerText = it },
                         label = { Text("Team / Organizer Name", color = MutedGrey) },
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White,
+                            focusedTextColor = TextPrimary,
+                            unfocusedTextColor = TextPrimary,
                             focusedBorderColor = CrimsonPrimaryDark,
                             unfocusedBorderColor = CardBorderDark
                         ),
@@ -597,8 +605,8 @@ fun DiscoverScreen(
                         onValueChange = { timingText = it },
                         label = { Text("Date & Timing", color = MutedGrey) },
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White,
+                            focusedTextColor = TextPrimary,
+                            unfocusedTextColor = TextPrimary,
                             focusedBorderColor = CrimsonPrimaryDark,
                             unfocusedBorderColor = CardBorderDark
                         ),
@@ -610,8 +618,8 @@ fun DiscoverScreen(
                         onValueChange = { locationText = it },
                         label = { Text("Ground / Location", color = MutedGrey) },
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White,
+                            focusedTextColor = TextPrimary,
+                            unfocusedTextColor = TextPrimary,
                             focusedBorderColor = CrimsonPrimaryDark,
                             unfocusedBorderColor = CardBorderDark
                         ),
@@ -623,8 +631,8 @@ fun DiscoverScreen(
                         onValueChange = { contactPhoneText = it },
                         label = { Text("WhatsApp Contact Number", color = MutedGrey) },
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White,
+                            focusedTextColor = TextPrimary,
+                            unfocusedTextColor = TextPrimary,
                             focusedBorderColor = CrimsonPrimaryDark,
                             unfocusedBorderColor = CardBorderDark
                         ),
@@ -633,8 +641,10 @@ fun DiscoverScreen(
                 }
             },
             confirmButton = {
+                val hapticManager = com.cricsaga.app.ui.utils.LocalHapticManager.current
                 Button(
                     onClick = {
+                        hapticManager?.tapUiClick()
                         val newItem = LookingForItem(
                             id = "lf_${System.currentTimeMillis()}",
                             type = selectedType,
@@ -655,7 +665,11 @@ fun DiscoverScreen(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showPostDialog = false }) {
+                val hapticManager = com.cricsaga.app.ui.utils.LocalHapticManager.current
+                TextButton(onClick = {
+                    hapticManager?.tapUiClick()
+                    showPostDialog = false
+                }) {
                     Text("CANCEL", color = MutedGrey)
                 }
             }

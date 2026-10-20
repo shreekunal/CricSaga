@@ -22,6 +22,7 @@ fun BowlerSelectionDialog(
 ) {
     val eligibleBowlers = bowlingSquad.filter { it.userId != lastBowlerId }
     var selectedBowler by remember { mutableStateOf(eligibleBowlers.firstOrNull()) }
+    val hapticManager = com.cricsaga.app.ui.utils.LocalHapticManager.current
 
     AlertDialog(
         onDismissRequest = { /* Modal must be chosen */ },
@@ -37,7 +38,7 @@ fun BowlerSelectionDialog(
                 Text(
                     text = "Select Next Bowler",
                     style = MaterialTheme.typography.titleMedium,
-                    color = Color.White
+                    color = TextPrimary
                 )
             }
         },
@@ -63,11 +64,14 @@ fun BowlerSelectionDialog(
                             FilterChip(
                                 selected = isSelected,
                                 enabled = !isPreviousBowler,
-                                onClick = { selectedBowler = bowler },
+                                onClick = {
+                                    hapticManager?.tapUiClick()
+                                    selectedBowler = bowler
+                                },
                                 label = {
                                     Text(
                                         text = bowler.fullName + if (isPreviousBowler) " (Just Bowled)" else "",
-                                        color = if (isPreviousBowler) Color.Gray else Color.White
+                                        color = if (isPreviousBowler) Color.Gray else TextPrimary
                                     )
                                 },
                                 colors = FilterChipDefaults.filterChipColors(
@@ -83,7 +87,12 @@ fun BowlerSelectionDialog(
         },
         confirmButton = {
             Button(
-                onClick = { selectedBowler?.let { onBowlerSelected(it) } },
+                onClick = {
+                    selectedBowler?.let {
+                        hapticManager?.tapUiClick()
+                        onBowlerSelected(it)
+                    }
+                },
                 enabled = selectedBowler != null,
                 colors = ButtonDefaults.buttonColors(containerColor = CrimsonPrimaryDark),
                 shape = RoundedCornerShape(8.dp)

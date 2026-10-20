@@ -36,4 +36,10 @@ interface TeamDao {
         ORDER BY u.fullName ASC
     """)
     fun getTeamMembers(teamId: String): Flow<List<UserEntity>>
+
+    @Query("DELETE FROM team_members WHERE teamId = :teamId AND userId = :userId")
+    suspend fun removeTeamMember(teamId: String, userId: String)
+
+    @Query("UPDATE teams SET captainId = :captainId WHERE teamId = :teamId")
+    suspend fun updateTeamCaptain(teamId: String, captainId: String)
 }

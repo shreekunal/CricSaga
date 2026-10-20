@@ -1,7 +1,9 @@
 package com.cricsaga.app.ui.teams
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -10,12 +12,16 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -23,16 +29,23 @@ import com.cricsaga.app.data.local.entity.TeamEntity
 import com.cricsaga.app.data.local.entity.UserEntity
 import com.cricsaga.app.domain.model.PlayingRole
 import com.cricsaga.app.ui.theme.*
+import com.cricsaga.app.ui.utils.ImageUtils
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TeamDetailScreen(
     team: TeamEntity,
     squad: List<UserEntity>,
-    onAddPlayerClick: () -> Unit,
+    onAddPlayer: (name: String, jersey: String, role: PlayingRole) -> Unit,
+    onRemovePlayer: (UserEntity) -> Unit = {},
+    onSetCaptain: (UserEntity) -> Unit = {},
     onPlayerClick: (UserEntity) -> Unit,
     onBackClick: () -> Unit
 ) {
+    var showAddDialog by remember { mutableStateOf(false) }
+    var playerForAction by remember { mutableStateOf<UserEntity?>(null) }
+    val hapticManager = com.cricsaga.app.ui.utils.LocalHapticManager.current
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -44,7 +57,10 @@ fun TeamDetailScreen(
                     )
                 },
                 navigationIcon = {
-                    IconButton(onClick = onBackClick) {
+                    IconButton(onClick = {
+                        hapticManager?.tapUiClick()
+                        onBackClick()
+                    }) {
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Back",
@@ -57,7 +73,10 @@ fun TeamDetailScreen(
         },
         floatingActionButton = {
             FloatingActionButton(
-                onClick = onAddPlayerClick,
+                onClick = {
+                    hapticManager?.tapUiClick()
+                    showAddDialog = true
+                },
                 containerColor = CrimsonPrimaryDark,
                 contentColor = Color.White
             ) {
@@ -100,15 +119,17 @@ fun TeamDetailScreen(
                                     color = BoundaryAmber
                                 )
                             }
+
                             Spacer(modifier = Modifier.width(14.dp))
-                            Column {
+
+                            Column(modifier = Modifier.weight(1f)) {
                                 Text(
                                     text = team.teamName,
                                     style = PlayerNamePrimary,
                                     color = TextPrimary
                                 )
                                 Text(
-                                    text = "${team.city} • Home Turf",
+                                    text = "${team.city.ifBlank { "Grassroots" }} • Squad Size: ${squad.size}/15",
                                     style = BodyCaption,
                                     color = TextSecondary
                                 )
@@ -117,23 +138,23 @@ fun TeamDetailScreen(
 
                         Spacer(modifier = Modifier.height(14.dp))
                         HorizontalDivider(color = DividerDark, thickness = 0.5.dp)
-                        Spacer(modifier = Modifier.height(10.dp))
+                        Spacer(modifier = Modifier.height(12.dp))
 
-                        // Team Record Row
+                        // Team Stats Quad
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceAround
                         ) {
-                            TeamStatCol("PLAYED", "14")
-                            TeamStatCol("WON", "10")
+                            TeamStatCol("PLAYED", "12")
+                            TeamStatCol("WON", "8")
                             TeamStatCol("LOST", "4")
-                            TeamStatCol("WIN %", "71.4%")
+                            TeamStatCol("WIN %", "66.7%")
                         }
                     }
                 }
             }
 
-            // Squad Roster Header
+            // Squad Roster Section Header
             item {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -141,12 +162,12 @@ fun TeamDetailScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "SQUAD ROSTER",
+                        text = "SQUAD ROSTER (${squad.size})",
                         style = SectionLabel,
-                        color = TextSecondary
+                        color = TextTertiary
                     )
                     Text(
-                        text = "${squad.size} Players",
+                        text = "MAX 15 SQUAD",
                         style = MicroTag,
                         color = TextTertiary
                     )
@@ -190,19 +211,33 @@ fun TeamDetailScreen(
                                 .padding(horizontal = 14.dp, vertical = 10.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            // Player initials avatar
+                            val playerBitmap = remember(player.profilePhotoUrl) {
+                                ImageUtils.loadBitmapFromPath(player.profilePhotoUrl)
+                            }
+
+                            // Player avatar / initials
                             Box(
                                 modifier = Modifier
-                                    .size(36.dp)
+                                    .size(38.dp)
                                     .clip(CircleShape)
-                                    .background(ElevatedSurfaceDark),
+                                    .background(ElevatedSurfaceDark)
+                                    .border(1.dp, CardBorderDark, CircleShape),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Text(
-                                    text = player.fullName.split(" ").mapNotNull { it.firstOrNull()?.toString() }.take(2).joinToString(""),
-                                    style = MicroTag,
-                                    color = TextPrimary
-                                )
+                                if (playerBitmap != null) {
+                                    Image(
+                                        bitmap = playerBitmap,
+                                        contentDescription = null,
+                                        modifier = Modifier.fillMaxSize(),
+                                        contentScale = ContentScale.Crop
+                                    )
+                                } else {
+                                    Text(
+                                        text = player.fullName.split(" ").mapNotNull { it.firstOrNull()?.toString() }.take(2).joinToString(""),
+                                        style = MicroTag,
+                                        color = TextPrimary
+                                    )
+                                }
                             }
 
                             Spacer(modifier = Modifier.width(12.dp))
@@ -217,7 +252,7 @@ fun TeamDetailScreen(
                                     Spacer(modifier = Modifier.width(6.dp))
 
                                     // Captain / VC / WK Badges
-                                    if (index == 0) {
+                                    if (player.userId == team.captainId || (team.captainId == null && index == 0)) {
                                         SquadRoleBadge("C", CrimsonPrimaryDark)
                                     } else if (index == 1) {
                                         SquadRoleBadge("VC", BoundaryAmber)
@@ -231,10 +266,164 @@ fun TeamDetailScreen(
                                     color = TextTertiary
                                 )
                             }
+
+                            // Action Menu (Make Captain / Remove)
+                            Box {
+                                IconButton(onClick = {
+                                    hapticManager?.tapUiClick()
+                                    playerForAction = player
+                                }) {
+                                    Icon(
+                                        Icons.Default.MoreVert,
+                                        contentDescription = "Player Options",
+                                        tint = TextSecondary,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+
+                                DropdownMenu(
+                                    expanded = playerForAction == player,
+                                    onDismissRequest = { playerForAction = null },
+                                    modifier = Modifier.background(SlateSurfaceDark)
+                                ) {
+                                    DropdownMenuItem(
+                                        text = { Text("Set as Captain (C)", color = TextPrimary, fontSize = 13.sp) },
+                                        leadingIcon = { Icon(Icons.Default.Star, contentDescription = null, tint = CrimsonPrimaryDark, modifier = Modifier.size(16.dp)) },
+                                        onClick = {
+                                            hapticManager?.tapUiClick()
+                                            onSetCaptain(player)
+                                            playerForAction = null
+                                        }
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text("Remove from Squad", color = DismissalRed, fontSize = 13.sp) },
+                                        leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null, tint = DismissalRed, modifier = Modifier.size(16.dp)) },
+                                        onClick = {
+                                            hapticManager?.tapUiClick()
+                                            onRemovePlayer(player)
+                                            playerForAction = null
+                                        }
+                                    )
+                                }
+                            }
                         }
                     }
                 }
             }
+        }
+
+        // Add Player Dialog
+        if (showAddDialog) {
+            var newPlayerName by remember { mutableStateOf("") }
+            var newPlayerJersey by remember { mutableStateOf("") }
+            var newPlayerRole by remember { mutableStateOf(PlayingRole.BATSMAN) }
+
+            AlertDialog(
+                onDismissRequest = { showAddDialog = false },
+                containerColor = SlateSurfaceDark,
+                shape = RoundedCornerShape(12.dp),
+                title = {
+                    Text(
+                        text = "Add Player to ${team.teamName}",
+                        fontWeight = FontWeight.Bold,
+                        color = TextPrimary,
+                        fontSize = 16.sp
+                    )
+                },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        OutlinedTextField(
+                            value = newPlayerName,
+                            onValueChange = { newPlayerName = it },
+                            label = { Text("Player Full Name *") },
+                            singleLine = true,
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = CrimsonPrimaryDark,
+                                unfocusedBorderColor = CardBorderDark,
+                                focusedTextColor = TextPrimary,
+                                unfocusedTextColor = TextPrimary
+                            ),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+
+                        OutlinedTextField(
+                            value = newPlayerJersey,
+                            onValueChange = { if (it.length <= 3) newPlayerJersey = it },
+                            label = { Text("Jersey Number (e.g. 7, 18, 45)") },
+                            singleLine = true,
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = CrimsonPrimaryDark,
+                                unfocusedBorderColor = CardBorderDark,
+                                focusedTextColor = TextPrimary,
+                                unfocusedTextColor = TextPrimary
+                            ),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+
+                        Text("Playing Role:", style = MicroTag, color = TextTertiary)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            listOf(
+                                PlayingRole.BATSMAN to "BAT",
+                                PlayingRole.BOWLER to "BOWL",
+                                PlayingRole.ALL_ROUNDER to "ALL",
+                                PlayingRole.WICKET_KEEPER to "WK"
+                            ).forEach { (role, label) ->
+                                val isSelected = newPlayerRole == role
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .background(if (isSelected) CrimsonPrimaryDark else ElevatedSurfaceDark)
+                                        .border(1.dp, if (isSelected) CrimsonPrimaryDark else CardBorderDark, RoundedCornerShape(6.dp))
+                                        .clickable {
+                                            hapticManager?.tapUiClick()
+                                            newPlayerRole = role
+                                        }
+                                        .padding(vertical = 8.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = label,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 11.sp,
+                                        color = if (isSelected) Color.White else TextSecondary
+                                    )
+                                }
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            if (newPlayerName.isNotBlank()) {
+                                hapticManager?.tapUiClick()
+                                onAddPlayer(
+                                    newPlayerName.trim(),
+                                    newPlayerJersey.trim().ifEmpty { "00" },
+                                    newPlayerRole
+                                )
+                                showAddDialog = false
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = CrimsonPrimaryDark),
+                        shape = RoundedCornerShape(6.dp)
+                    ) {
+                        Text("ADD TO SQUAD", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = {
+                        hapticManager?.tapUiClick()
+                        showAddDialog = false
+                    }) {
+                        Text("CANCEL", color = TextSecondary)
+                    }
+                }
+            )
         }
     }
 }

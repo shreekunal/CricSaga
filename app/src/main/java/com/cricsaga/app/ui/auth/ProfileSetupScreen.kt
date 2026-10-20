@@ -1,5 +1,10 @@
 package com.cricsaga.app.ui.auth
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -7,12 +12,16 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -21,6 +30,7 @@ import com.cricsaga.app.domain.model.BattingStyle
 import com.cricsaga.app.domain.model.BowlingStyle
 import com.cricsaga.app.domain.model.PlayingRole
 import com.cricsaga.app.ui.theme.*
+import com.cricsaga.app.ui.utils.ImageUtils
 import java.util.UUID
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -31,14 +41,37 @@ fun ProfileSetupScreen(
     initialEmail: String = "",
     onProfileCreated: (UserEntity) -> Unit
 ) {
+    val context = LocalContext.current
     var fullName by remember { mutableStateOf(initialFullName) }
     var contactNumber by remember { mutableStateOf(phoneNumber) }
     var jerseyNumber by remember { mutableStateOf("18") }
     var city by remember { mutableStateOf("") }
+    var profilePhotoUrl by remember { mutableStateOf<String?>(null) }
     var selectedRole by remember { mutableStateOf(PlayingRole.ALL_ROUNDER) }
     var selectedBattingStyle by remember { mutableStateOf(BattingStyle.RIGHT_HAND) }
     var selectedBowlingStyle by remember { mutableStateOf(BowlingStyle.RIGHT_ARM_MEDIUM) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+
+    val photoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            val tempId = if (initialEmail.isNotEmpty()) initialEmail.replace("@", "_").replace(".", "_") else "new_user"
+            val savedPath = ImageUtils.saveProfileImageFromUri(context, uri, tempId)
+            if (savedPath != null) {
+                profilePhotoUrl = savedPath
+            }
+        }
+    }
+
+    val initials = remember(fullName) {
+        fullName.trim().split(" ")
+            .filter { it.isNotBlank() }
+            .take(2)
+            .map { it.first().uppercaseChar() }
+            .joinToString("")
+            .ifEmpty { "P" }
+    }
 
     Scaffold(
         topBar = {
@@ -73,6 +106,7 @@ fun ProfileSetupScreen(
                                 userId = userId,
                                 phoneNumber = contactNumber.trim(),
                                 fullName = fullName.trim(),
+                                profilePhotoUrl = profilePhotoUrl,
                                 playingRole = selectedRole,
                                 battingStyle = selectedBattingStyle,
                                 bowlingStyle = selectedBowlingStyle,
@@ -139,6 +173,89 @@ fun ProfileSetupScreen(
                             color = BoundaryAmber,
                             letterSpacing = 1.sp
                         )
+
+                        // Avatar photo uploader
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(ElevatedSurfaceDark)
+                                .border(1.dp, CardBorderDark, RoundedCornerShape(8.dp))
+                                .padding(10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            val bitmap = remember(profilePhotoUrl) {
+                                ImageUtils.loadBitmapFromPath(profilePhotoUrl)
+                            }
+
+                            Box(
+                                modifier = Modifier
+                                    .size(54.dp)
+                                    .clip(CircleShape)
+                                    .background(SlateSurfaceDark)
+                                    .border(1.5.dp, CrimsonPrimaryDark, CircleShape)
+                                    .clickable {
+                                        photoPickerLauncher.launch(
+                                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                                        )
+                                    },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (bitmap != null) {
+                                    Image(
+                                        bitmap = bitmap,
+                                        contentDescription = "Profile Photo",
+                                        modifier = Modifier.fillMaxSize(),
+                                        contentScale = ContentScale.Crop
+                                    )
+                                } else {
+                                    Text(
+                                        text = initials,
+                                        style = ScoreSmall,
+                                        color = TextPrimary
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.width(12.dp))
+
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Athlete Passport Photo",
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = TextPrimary
+                                )
+                                Text(
+                                    text = "Tap to pick from gallery (optional)",
+                                    fontSize = 11.sp,
+                                    color = TextTertiary
+                                )
+                            }
+
+                            OutlinedButton(
+                                onClick = {
+                                    photoPickerLauncher.launch(
+                                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                                    )
+                                },
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                                shape = RoundedCornerShape(4.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.CameraAlt,
+                                    contentDescription = null,
+                                    tint = CrimsonPrimaryDark,
+                                    modifier = Modifier.size(13.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = if (profilePhotoUrl != null) "Change" else "Upload",
+                                    fontSize = 11.sp,
+                                    color = CrimsonPrimaryDark
+                                )
+                            }
+                        }
 
                         OutlinedTextField(
                             value = fullName,

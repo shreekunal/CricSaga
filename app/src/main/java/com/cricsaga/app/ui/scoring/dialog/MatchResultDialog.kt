@@ -68,7 +68,7 @@ fun MatchResultDialog(
                 Text(
                     text = matchResult.resultSummary,
                     style = MaterialTheme.typography.titleMedium,
-                    color = Color.White,
+                    color = TextPrimary,
                     fontWeight = FontWeight.ExtraBold,
                     textAlign = TextAlign.Center
                 )
@@ -97,7 +97,7 @@ fun MatchResultDialog(
                         ) {
                             Text(
                                 text = innings1TeamName,
-                                color = Color.White,
+                                color = TextPrimary,
                                 fontWeight = FontWeight.SemiBold,
                                 fontSize = 13.sp
                             )
@@ -109,7 +109,7 @@ fun MatchResultDialog(
                             )
                         }
 
-                        HorizontalDivider(color = Color(0xFF262933))
+                        HorizontalDivider(color = DividerDark)
 
                         // 2nd Innings
                         Row(
@@ -119,7 +119,7 @@ fun MatchResultDialog(
                         ) {
                             Text(
                                 text = innings2TeamName,
-                                color = Color.White,
+                                color = TextPrimary,
                                 fontWeight = FontWeight.SemiBold,
                                 fontSize = 13.sp
                             )
@@ -146,7 +146,7 @@ fun MatchResultDialog(
                         Text(
                             text = "PLAYER OF THE MATCH",
                             style = MicroTag,
-                            color = Color.White
+                            color = TextPrimary
                         )
                     }
                     Text(
@@ -156,12 +156,16 @@ fun MatchResultDialog(
                         fontWeight = FontWeight.SemiBold
                     )
 
+                    val hapticManager = com.cricsaga.app.ui.utils.LocalHapticManager.current
                     // Candidate chips
                     candidates.take(6).forEach { player ->
                         val isSelected = selectedPotm?.userId == player.userId
                         FilterChip(
                             selected = isSelected,
-                            onClick = { onPotmSelected(player) },
+                            onClick = {
+                                hapticManager?.tapUiClick()
+                                onPotmSelected(player)
+                            },
                             label = { Text(player.fullName, fontSize = 12.sp) },
                             colors = FilterChipDefaults.filterChipColors(
                                 selectedContainerColor = BoundaryAmber,

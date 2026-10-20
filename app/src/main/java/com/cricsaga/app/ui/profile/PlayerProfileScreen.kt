@@ -1,5 +1,6 @@
 package com.cricsaga.app.ui.profile
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -19,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -29,6 +31,7 @@ import com.cricsaga.app.data.local.entity.UserEntity
 import com.cricsaga.app.domain.model.PlayingRole
 import com.cricsaga.app.ui.profile.dialog.EditProfileDialog
 import com.cricsaga.app.ui.theme.*
+import com.cricsaga.app.ui.utils.ImageUtils
 import com.cricsaga.app.ui.utils.ShareUtils
 
 data class CareerMatchRecord(
@@ -124,7 +127,10 @@ fun PlayerProfileScreen(
         )
     )
 
+    val hapticManager = com.cricsaga.app.ui.utils.LocalHapticManager.current
+
     Scaffold(
+        containerColor = CharcoalBackgroundDark,
         topBar = {
             TopAppBar(
                 title = {
@@ -137,6 +143,7 @@ fun PlayerProfileScreen(
                 actions = {
                     // Share Collectible Athlete Card Action
                     IconButton(onClick = {
+                        hapticManager?.tapUiClick()
                         ShareUtils.generateAndShareAthleteCard(
                             context = context,
                             playerName = playerName,
@@ -146,7 +153,8 @@ fun PlayerProfileScreen(
                             matches = totalMatches,
                             runs = totalRuns,
                             wickets = totalWickets,
-                            average = batAvg
+                            average = batAvg,
+                            profilePhotoPath = currentUser?.profilePhotoUrl
                         )
                     }) {
                         Icon(
@@ -158,7 +166,10 @@ fun PlayerProfileScreen(
                     }
 
                     // Logout / Switch Account Action
-                    IconButton(onClick = onLogout) {
+                    IconButton(onClick = {
+                        hapticManager?.tapUiClick()
+                        onLogout()
+                    }) {
                         Icon(
                             Icons.AutoMirrored.Filled.Logout,
                             contentDescription = "Switch Account / Logout",
@@ -204,19 +215,33 @@ fun PlayerProfileScreen(
                             modifier = Modifier.fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
+                            val avatarBitmap = remember(currentUser?.profilePhotoUrl) {
+                                ImageUtils.loadBitmapFromPath(currentUser?.profilePhotoUrl)
+                            }
+
                             Box(
                                 modifier = Modifier
                                     .size(54.dp)
                                     .clip(CircleShape)
                                     .background(ElevatedSurfaceDark)
-                                    .border(1.5.dp, CrimsonPrimaryDark.copy(alpha = 0.6f), CircleShape),
+                                    .border(1.5.dp, CrimsonPrimaryDark.copy(alpha = 0.6f), CircleShape)
+                                    .clickable { showEditProfileDialog = true },
                                 contentAlignment = Alignment.Center
                             ) {
-                                Text(
-                                    text = initials,
-                                    style = ScoreSmall,
-                                    color = TextPrimary
-                                )
+                                if (avatarBitmap != null) {
+                                    Image(
+                                        bitmap = avatarBitmap,
+                                        contentDescription = "Profile Photo",
+                                        modifier = Modifier.fillMaxSize(),
+                                        contentScale = ContentScale.Crop
+                                    )
+                                } else {
+                                    Text(
+                                        text = initials,
+                                        style = ScoreSmall,
+                                        color = TextPrimary
+                                    )
+                                }
                             }
 
                             Spacer(modifier = Modifier.width(14.dp))
@@ -334,7 +359,10 @@ fun PlayerProfileScreen(
                     tabs.forEachIndexed { index, title ->
                         Tab(
                             selected = selectedTab == index,
-                            onClick = { selectedTab = index },
+                            onClick = {
+                                hapticManager?.tapUiClick()
+                                selectedTab = index
+                            },
                             text = {
                                 Text(
                                     text = title,

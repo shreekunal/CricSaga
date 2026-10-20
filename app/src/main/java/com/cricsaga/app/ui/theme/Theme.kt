@@ -52,7 +52,10 @@ fun CricSagaTheme(
             val window = (view.context as? Activity)?.window
             window?.let {
                 it.statusBarColor = cricsagaColors.backgroundCanvas.toArgb()
-                WindowCompat.getInsetsController(it, view).isAppearanceLightStatusBars = !darkTheme
+                it.navigationBarColor = cricsagaColors.backgroundCanvas.toArgb()
+                val controller = WindowCompat.getInsetsController(it, view)
+                controller.isAppearanceLightStatusBars = !darkTheme
+                controller.isAppearanceLightNavigationBars = !darkTheme
             }
         }
     }

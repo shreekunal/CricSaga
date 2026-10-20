@@ -32,14 +32,19 @@ fun OpenersSelectionScreen(
     var nonStrikerId by remember { mutableStateOf(battingSquad.getOrNull(1)?.userId ?: "") }
     var openingBowlerId by remember { mutableStateOf(bowlingSquad.getOrNull(0)?.userId ?: "") }
     val scrollState = rememberScrollState()
+    val hapticManager = com.cricsaga.app.ui.utils.LocalHapticManager.current
 
     Scaffold(
+        containerColor = CharcoalBackgroundDark,
         topBar = {
             TopAppBar(
-                title = { Text("Select Opening Players", fontWeight = FontWeight.Bold, color = Color.White) },
+                title = { Text("Select Opening Players", fontWeight = FontWeight.Bold, color = TextPrimary) },
                 navigationIcon = {
-                    IconButton(onClick = onBackClick) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color.White)
+                    IconButton(onClick = {
+                        hapticManager?.tapUiClick()
+                        onBackClick()
+                    }) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = TextPrimary)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = CharcoalBackgroundDark)
@@ -66,7 +71,10 @@ fun OpenersSelectionScreen(
                         items(battingSquad.filter { it.userId != nonStrikerId }) { p ->
                             FilterChip(
                                 selected = strikerId == p.userId,
-                                onClick = { strikerId = p.userId },
+                                onClick = {
+                                    hapticManager?.tapUiClick()
+                                    strikerId = p.userId
+                                },
                                 label = { Text(p.fullName) },
                                 colors = FilterChipDefaults.filterChipColors(
                                     selectedContainerColor = CrimsonPrimaryDark,
@@ -90,7 +98,10 @@ fun OpenersSelectionScreen(
                         items(battingSquad.filter { it.userId != strikerId }) { p ->
                             FilterChip(
                                 selected = nonStrikerId == p.userId,
-                                onClick = { nonStrikerId = p.userId },
+                                onClick = {
+                                    hapticManager?.tapUiClick()
+                                    nonStrikerId = p.userId
+                                },
                                 label = { Text(p.fullName) },
                                 colors = FilterChipDefaults.filterChipColors(
                                     selectedContainerColor = BoundaryAmber,
@@ -114,7 +125,10 @@ fun OpenersSelectionScreen(
                         items(bowlingSquad) { b ->
                             FilterChip(
                                 selected = openingBowlerId == b.userId,
-                                onClick = { openingBowlerId = b.userId },
+                                onClick = {
+                                    hapticManager?.tapUiClick()
+                                    openingBowlerId = b.userId
+                                },
                                 label = { Text(b.fullName) },
                                 colors = FilterChipDefaults.filterChipColors(
                                     selectedContainerColor = BoundaryGreen,
@@ -127,7 +141,10 @@ fun OpenersSelectionScreen(
             }
 
             Button(
-                onClick = { onStartMatch(strikerId, nonStrikerId, openingBowlerId) },
+                onClick = {
+                    hapticManager?.tapUiClick()
+                    onStartMatch(strikerId, nonStrikerId, openingBowlerId)
+                },
                 enabled = strikerId.isNotEmpty() && nonStrikerId.isNotEmpty() && openingBowlerId.isNotEmpty() && strikerId != nonStrikerId,
                 colors = ButtonDefaults.buttonColors(containerColor = CrimsonPrimaryDark),
                 shape = RoundedCornerShape(8.dp),

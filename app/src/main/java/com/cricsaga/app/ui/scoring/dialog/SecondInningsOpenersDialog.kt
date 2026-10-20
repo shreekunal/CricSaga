@@ -30,6 +30,7 @@ fun SecondInningsOpenersDialog(
     var selectedBowler by remember { mutableStateOf(bowlingSquad.firstOrNull()) }
 
     val scrollState = rememberScrollState()
+    val hapticManager = com.cricsaga.app.ui.utils.LocalHapticManager.current
 
     AlertDialog(
         onDismissRequest = { /* Must select */ },
@@ -47,7 +48,7 @@ fun SecondInningsOpenersDialog(
                 Text(
                     text = "$battingTeamName vs $bowlingTeamName",
                     style = MaterialTheme.typography.titleMedium,
-                    color = Color.White,
+                    color = TextPrimary,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
@@ -68,7 +69,7 @@ fun SecondInningsOpenersDialog(
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(
                         text = "1. Opening Striker ($battingTeamName)",
-                        color = Color.White,
+                        color = TextPrimary,
                         fontSize = 13.sp,
                         fontWeight = FontWeight.SemiBold
                     )
@@ -78,7 +79,10 @@ fun SecondInningsOpenersDialog(
                         FilterChip(
                             selected = isSelected,
                             enabled = !isNonStriker,
-                            onClick = { selectedStriker = player },
+                            onClick = {
+                                hapticManager?.tapUiClick()
+                                selectedStriker = player
+                            },
                             label = { Text(player.fullName, fontSize = 12.sp) },
                             colors = FilterChipDefaults.filterChipColors(
                                 selectedContainerColor = CrimsonPrimaryDark,
@@ -91,13 +95,13 @@ fun SecondInningsOpenersDialog(
                     }
                 }
 
-                HorizontalDivider(color = Color(0xFF262933))
+                HorizontalDivider(color = DividerDark)
 
                 // Section 2: Non-Striker
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(
                         text = "2. Opening Non-Striker ($battingTeamName)",
-                        color = Color.White,
+                        color = TextPrimary,
                         fontSize = 13.sp,
                         fontWeight = FontWeight.SemiBold
                     )
@@ -107,7 +111,10 @@ fun SecondInningsOpenersDialog(
                         FilterChip(
                             selected = isSelected,
                             enabled = !isStriker,
-                            onClick = { selectedNonStriker = player },
+                            onClick = {
+                                hapticManager?.tapUiClick()
+                                selectedNonStriker = player
+                            },
                             label = { Text(player.fullName, fontSize = 12.sp) },
                             colors = FilterChipDefaults.filterChipColors(
                                 selectedContainerColor = CrimsonPrimaryDark,
@@ -120,13 +127,13 @@ fun SecondInningsOpenersDialog(
                     }
                 }
 
-                HorizontalDivider(color = Color(0xFF262933))
+                HorizontalDivider(color = DividerDark)
 
                 // Section 3: Opening Bowler
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(
                         text = "3. Opening Bowler ($bowlingTeamName)",
-                        color = Color.White,
+                        color = TextPrimary,
                         fontSize = 13.sp,
                         fontWeight = FontWeight.SemiBold
                     )
@@ -134,7 +141,10 @@ fun SecondInningsOpenersDialog(
                         val isSelected = selectedBowler?.userId == player.userId
                         FilterChip(
                             selected = isSelected,
-                            onClick = { selectedBowler = player },
+                            onClick = {
+                                hapticManager?.tapUiClick()
+                                selectedBowler = player
+                            },
                             label = { Text(player.fullName, fontSize = 12.sp) },
                             colors = FilterChipDefaults.filterChipColors(
                                 selectedContainerColor = BoundaryAmber,
@@ -153,6 +163,7 @@ fun SecondInningsOpenersDialog(
             Button(
                 onClick = {
                     if (canStart) {
+                        hapticManager?.tapUiClick()
                         onConfirm(selectedStriker!!, selectedNonStriker!!, selectedBowler!!)
                     }
                 },

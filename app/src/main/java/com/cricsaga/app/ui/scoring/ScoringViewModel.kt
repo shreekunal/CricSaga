@@ -48,7 +48,9 @@ data class ScoringUiState(
     val playerOfTheMatchCandidates: List<UserEntity> = emptyList(),
     val selectedPlayerOfTheMatch: UserEntity? = null,
     val lastCompletedBowlerId: String = "",
-    val lastActionMessage: String = "Ready to score"
+    val lastActionMessage: String = "Ready to score",
+    val currentInningsDeliveries: List<DeliveryRecord> = emptyList(),
+    val innings1Deliveries: List<DeliveryRecord> = emptyList()
 )
 
 class ScoringViewModel(application: Application) : AndroidViewModel(application) {
@@ -451,7 +453,9 @@ class ScoringViewModel(application: Application) : AndroidViewModel(application)
                 scoreState = newEngine.state,
                 showSecondInningsOpenersDialog = false,
                 lastCompletedBowlerId = "",
-                lastActionMessage = "2nd Innings started! Target: $targetRuns runs from ${current.totalOvers} overs"
+                lastActionMessage = "2nd Innings started! Target: $targetRuns runs from ${current.totalOvers} overs",
+                innings1Deliveries = current.currentInningsDeliveries,
+                currentInningsDeliveries = newEngine.history
             )
         }
     }
@@ -521,6 +525,8 @@ class ScoringViewModel(application: Application) : AndroidViewModel(application)
                 scoreState = state,
                 innings1Score = state,
                 innings1BattingTeamName = _uiState.value.battingTeamName,
+                innings1Deliveries = eng.history,
+                currentInningsDeliveries = eng.history,
                 showInningsBreakDialog = true,
                 showBowlerDialog = false,
                 lastActionMessage = "1st Innings completed: ${state.totalRuns}/${state.totalWickets} (${state.oversFormatted} ov)"
@@ -586,7 +592,8 @@ class ScoringViewModel(application: Application) : AndroidViewModel(application)
             bowler = bowler ?: _uiState.value.bowler,
             showBowlerDialog = showBowlerDialog,
             lastCompletedBowlerId = lastCompletedBowlerId,
-            lastActionMessage = message
+            lastActionMessage = message,
+            currentInningsDeliveries = eng.history
         )
     }
 }

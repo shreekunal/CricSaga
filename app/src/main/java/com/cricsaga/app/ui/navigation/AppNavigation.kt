@@ -58,7 +58,8 @@ fun AppNavigation(
     proManager: ProManager,
     authManager: AuthManager,
     themeManager: ThemeManager,
-    hapticManager: HapticManager
+    hapticManager: HapticManager,
+    isDark: Boolean = false
 ) {
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
@@ -66,6 +67,13 @@ fun AppNavigation(
     val coroutineScope = rememberCoroutineScope()
     val subscriptionState by proManager.subscriptionState.collectAsState()
     val authState by authManager.authState.collectAsState()
+    val themeMode by themeManager.themeMode.collectAsState()
+    val isSystemDark = androidx.compose.foundation.isSystemInDarkTheme()
+    val currentDark = when (themeMode) {
+        ThemeMode.DARK -> true
+        ThemeMode.LIGHT -> false
+        ThemeMode.SYSTEM -> isSystemDark
+    }
     var tempAuthPhone by remember { mutableStateOf("") }
     var tempGoogleName by remember { mutableStateOf("") }
     var tempGoogleEmail by remember { mutableStateOf("") }
@@ -97,6 +105,7 @@ fun AppNavigation(
     var tempBowlingTeamName by remember { mutableStateOf("") }
 
     Scaffold(
+        containerColor = CharcoalBackgroundDark,
         bottomBar = {
             if (showBottomBar) {
                 NavigationBar(
@@ -108,6 +117,7 @@ fun AppNavigation(
                         NavigationBarItem(
                             selected = isSelected,
                             onClick = {
+                                hapticManager.tapUiClick()
                                 navController.navigate(screen.route) {
                                     popUpTo(navController.graph.findStartDestination().id) {
                                         saveState = true
@@ -220,21 +230,36 @@ fun AppNavigation(
             // Tab 1: Home Screen
             composable(Screen.Home.route) {
                 val matches by scoringViewModel.allMatches.collectAsState()
-                val isSystemDark = isSystemInDarkTheme()
                 HomeScreen(
                     isPro = subscriptionState.isActive,
                     matches = matches,
-                    isDarkTheme = themeManager.isDark(isSystemDark),
+                    isDarkTheme = currentDark,
                     onThemeToggleClick = {
                         hapticManager.tapUiClick()
-                        themeManager.toggleTheme()
+                        themeManager.toggleTheme(currentDark)
                     },
-                    onSettingsClick = { navController.navigate(Screen.Settings.route) },
-                    onStartMatchClick = { navController.navigate(Screen.MatchSetup.route) },
-                    onManageTeamsClick = { navController.navigate(Screen.Teams.route) },
-                    onExploreTournamentsClick = { navController.navigate(Screen.Tournaments.route) },
-                    onProBadgeClick = { navController.navigate(Screen.Redeem.route) },
+                    onSettingsClick = {
+                        hapticManager.tapUiClick()
+                        navController.navigate(Screen.Settings.route)
+                    },
+                    onStartMatchClick = {
+                        hapticManager.tapUiClick()
+                        navController.navigate(Screen.MatchSetup.route)
+                    },
+                    onManageTeamsClick = {
+                        hapticManager.tapUiClick()
+                        navController.navigate(Screen.Teams.route)
+                    },
+                    onExploreTournamentsClick = {
+                        hapticManager.tapUiClick()
+                        navController.navigate(Screen.Tournaments.route)
+                    },
+                    onProBadgeClick = {
+                        hapticManager.tapUiClick()
+                        navController.navigate(Screen.Redeem.route)
+                    },
                     onMatchClick = { matchId ->
+                        hapticManager.tapUiClick()
                         navController.navigate(Screen.LiveScoring.route)
                     }
                 )
@@ -245,8 +270,12 @@ fun AppNavigation(
                 val matches by scoringViewModel.allMatches.collectAsState()
                 MatchListScreen(
                     matches = matches,
-                    onStartNewMatchClick = { navController.navigate(Screen.MatchSetup.route) },
+                    onStartNewMatchClick = {
+                        hapticManager.tapUiClick()
+                        navController.navigate(Screen.MatchSetup.route)
+                    },
                     onMatchClick = { matchId ->
+                        hapticManager.tapUiClick()
                         navController.navigate(Screen.LiveScoring.route)
                     }
                 )
@@ -264,10 +293,18 @@ fun AppNavigation(
 
             // Tab 4: Tournaments & Points Table Center
             composable(Screen.Tournaments.route) {
+                val tournaments by scoringViewModel.repository.getAllTournaments().collectAsState(initial = emptyList())
                 TournamentListScreen(
                     isPro = subscriptionState.isActive,
-                    onCreateTournamentClick = {
-                        // Open create tournament flow
+                    tournaments = tournaments,
+                    onCreateTournament = { name, overs, teams ->
+                        coroutineScope.launch {
+                            scoringViewModel.repository.createTournament(name, overs, teams)
+                        }
+                    },
+                    onFixtureClick = { _, _, _ ->
+                        hapticManager.tapUiClick()
+                        navController.navigate(Screen.MatchSetup.route)
                     }
                 )
             }
@@ -281,13 +318,17 @@ fun AppNavigation(
                     proManager = proManager,
                     currentUser = currentUser,
                     playerStats = playerStats,
-                    onRedeemCodeClick = { navController.navigate(Screen.Redeem.route) },
+                    onRedeemCodeClick = {
+                        hapticManager.tapUiClick()
+                        navController.navigate(Screen.Redeem.route)
+                    },
                     onUpdateProfile = { updated ->
                         coroutineScope.launch {
                             scoringViewModel.repository.updateUser(updated)
                         }
                     },
                     onLogout = {
+                        hapticManager.tapUiClick()
                         authManager.logout()
                         navController.navigate(Screen.PhoneLogin.route) {
                             popUpTo(0) { inclusive = true }
@@ -302,6 +343,7 @@ fun AppNavigation(
                 TeamsListScreen(
                     teams = teams,
                     onTeamClick = { team ->
+                        hapticManager.tapUiClick()
                         selectedTeamForDetail = team
                         navController.navigate(Screen.TeamDetail.route)
                     },
@@ -325,14 +367,35 @@ fun AppNavigation(
                     TeamDetailScreen(
                         team = team,
                         squad = squad,
-                        onAddPlayerClick = {
-                            // Can add via dialog
+                        onAddPlayer = { name, jersey, role ->
+                            coroutineScope.launch {
+                                scoringViewModel.repository.addPlayerToTeam(
+                                    teamId = team.teamId,
+                                    name = name,
+                                    role = role,
+                                    jerseyNumber = jersey
+                                )
+                            }
+                        },
+                        onRemovePlayer = { player ->
+                            coroutineScope.launch {
+                                scoringViewModel.repository.removePlayerFromTeam(team.teamId, player.userId)
+                            }
+                        },
+                        onSetCaptain = { player ->
+                            coroutineScope.launch {
+                                scoringViewModel.repository.setTeamCaptain(team.teamId, player.userId)
+                            }
                         },
                         onPlayerClick = { player ->
+                            hapticManager.tapUiClick()
                             selectedUserForDetail = player
                             navController.navigate(Screen.PlayerDetail.route)
                         },
-                        onBackClick = { navController.popBackStack() }
+                        onBackClick = {
+                            hapticManager.tapUiClick()
+                            navController.popBackStack()
+                        }
                     )
                 }
             }
@@ -344,7 +407,10 @@ fun AppNavigation(
                     PlayerDetailScreen(
                         user = player,
                         stats = stats,
-                        onBackClick = { navController.popBackStack() }
+                        onBackClick = {
+                            hapticManager.tapUiClick()
+                            navController.popBackStack()
+                        }
                     )
                 }
             }
@@ -354,7 +420,10 @@ fun AppNavigation(
                 SettingsScreen(
                     themeManager = themeManager,
                     hapticManager = hapticManager,
-                    onBackClick = { navController.popBackStack() }
+                    onBackClick = {
+                        hapticManager.tapUiClick()
+                        navController.popBackStack()
+                    }
                 )
             }
 
@@ -368,7 +437,10 @@ fun AppNavigation(
                 val teams by scoringViewModel.allTeams.collectAsState()
                 MatchSetupScreen(
                     teams = teams,
-                    onBackClick = { navController.popBackStack() },
+                    onBackClick = {
+                        hapticManager.tapUiClick()
+                        navController.popBackStack()
+                    },
                     onProceedToOpeners = { title, teamA, teamB, overs, ballType, tossWinner, decision ->
                         tempTitle = title
                         tempTeamAId = teamA
@@ -471,7 +543,10 @@ fun AppNavigation(
                         hapticManager.tapUiClick()
                         scoringViewModel.rotateStrike()
                     },
-                    onViewScorecardClick = { navController.navigate(Screen.FullScorecard.route) }
+                    onViewScorecardClick = {
+                        hapticManager.tapUiClick()
+                        navController.navigate(Screen.FullScorecard.route)
+                    }
                 )
 
                 // Dismissal Modal Bottom Sheet
@@ -483,6 +558,7 @@ fun AppNavigation(
                         battingBench = uiState.battingBench,
                         onDismissRequest = { scoringViewModel.closeDismissalDialog() },
                         onConfirmWicket = { dismissal, incomingId ->
+                            hapticManager.tapWicket()
                             scoringViewModel.confirmDismissal(dismissal, incomingId)
                         }
                     )
@@ -494,6 +570,7 @@ fun AppNavigation(
                         lastBowlerId = uiState.lastCompletedBowlerId,
                         bowlingSquad = uiState.bowlingSquad,
                         onBowlerSelected = { nextBowler ->
+                            hapticManager.tapUiClick()
                             scoringViewModel.onNextBowlerSelected(nextBowler)
                         }
                     )
@@ -507,6 +584,7 @@ fun AppNavigation(
                         firstInningsState = uiState.innings1Score!!,
                         totalOvers = uiState.totalOvers,
                         onStartSecondInnings = {
+                            hapticManager.tapUiClick()
                             scoringViewModel.onStartSecondInningsClicked()
                         }
                     )
@@ -523,6 +601,7 @@ fun AppNavigation(
                         battingSquad = uiState.bowlingSquad,
                         bowlingSquad = uiState.battingSquad,
                         onConfirm = { striker, nonStriker, bowler ->
+                            hapticManager.tapUiClick()
                             scoringViewModel.confirmSecondInningsStart(striker, nonStriker, bowler)
                         }
                     )
@@ -540,13 +619,16 @@ fun AppNavigation(
                         candidates = uiState.playerOfTheMatchCandidates,
                         selectedPotm = uiState.selectedPlayerOfTheMatch,
                         onPotmSelected = { player ->
+                            hapticManager.tapUiClick()
                             scoringViewModel.setPlayerOfTheMatch(player)
                         },
                         onViewScorecard = {
+                            hapticManager.tapUiClick()
                             scoringViewModel.dismissMatchResultDialog()
                             navController.navigate(Screen.FullScorecard.route)
                         },
                         onShareToWhatsApp = {
+                            hapticManager.tapUiClick()
                             ShareUtils.generateAndSharePoster(
                                 context = context,
                                 matchTitle = uiState.matchTitle,
@@ -575,8 +657,16 @@ fun AppNavigation(
                     battingTeamName = uiState.battingTeamName,
                     bowlingTeamName = uiState.bowlingTeamName,
                     scoreState = uiState.scoreState,
-                    onBackClick = { navController.popBackStack() },
+                    innings1Score = uiState.innings1Score,
+                    innings1BattingTeamName = uiState.innings1BattingTeamName,
+                    currentInningsDeliveries = uiState.currentInningsDeliveries,
+                    innings1Deliveries = uiState.innings1Deliveries,
+                    onBackClick = {
+                        hapticManager.tapUiClick()
+                        navController.popBackStack()
+                    },
                     onSharePoster = {
+                        hapticManager.tapUiClick()
                         ShareUtils.generateAndSharePoster(
                             context = context,
                             matchTitle = uiState.matchTitle,

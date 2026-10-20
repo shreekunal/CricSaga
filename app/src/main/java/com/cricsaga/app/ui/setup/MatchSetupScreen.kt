@@ -10,6 +10,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -41,15 +42,23 @@ fun MatchSetupScreen(
     var selectedBallType by remember { mutableStateOf(BallType.TENNIS_LIGHT) }
     var tossWinnerId by remember { mutableStateOf(teams.getOrNull(0)?.teamId ?: "") }
     var tossDecision by remember { mutableStateOf(TossDecision.BAT) }
+    var venue by remember { mutableStateOf("Shivaji Park Ground #2, Dadar") }
+    var maxOversPerBowler by remember { mutableIntStateOf(4) }
+    var isBoxCricket by remember { mutableStateOf(false) }
     val scrollState = rememberScrollState()
+    val hapticManager = com.cricsaga.app.ui.utils.LocalHapticManager.current
 
     Scaffold(
+        containerColor = CharcoalBackgroundDark,
         topBar = {
             TopAppBar(
-                title = { Text("Match Setup", fontWeight = FontWeight.Bold, color = Color.White) },
+                title = { Text("Match Setup", fontWeight = FontWeight.Bold, color = TextPrimary) },
                 navigationIcon = {
-                    IconButton(onClick = onBackClick) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color.White)
+                    IconButton(onClick = {
+                        hapticManager?.tapUiClick()
+                        onBackClick()
+                    }) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = TextPrimary)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = CharcoalBackgroundDark)
@@ -79,6 +88,7 @@ fun MatchSetupScreen(
                             FilterChip(
                                 selected = teamA == t.teamId,
                                 onClick = {
+                                    hapticManager?.tapUiClick()
                                     teamA = t.teamId
                                     if (tossWinnerId.isEmpty()) tossWinnerId = t.teamId
                                 },
@@ -98,7 +108,10 @@ fun MatchSetupScreen(
                         items(teams.filter { it.teamId != teamA }) { t ->
                             FilterChip(
                                 selected = teamB == t.teamId,
-                                onClick = { teamB = t.teamId },
+                                onClick = {
+                                    hapticManager?.tapUiClick()
+                                    teamB = t.teamId
+                                },
                                 label = { Text(t.teamName) },
                                 colors = FilterChipDefaults.filterChipColors(
                                     selectedContainerColor = BoundaryGreen,
@@ -122,7 +135,10 @@ fun MatchSetupScreen(
                         items(listOf(5, 8, 10, 12, 15, 20)) { ov ->
                             FilterChip(
                                 selected = totalOvers == ov,
-                                onClick = { totalOvers = ov },
+                                onClick = {
+                                    hapticManager?.tapUiClick()
+                                    totalOvers = ov
+                                },
                                 label = { Text("$ov Overs") }
                             )
                         }
@@ -133,13 +149,74 @@ fun MatchSetupScreen(
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         FilterChip(
                             selected = selectedBallType == BallType.TENNIS_LIGHT,
-                            onClick = { selectedBallType = BallType.TENNIS_LIGHT },
+                            onClick = {
+                                hapticManager?.tapUiClick()
+                                selectedBallType = BallType.TENNIS_LIGHT
+                            },
                             label = { Text("Tennis Ball") }
                         )
                         FilterChip(
                             selected = selectedBallType == BallType.LEATHER,
-                            onClick = { selectedBallType = BallType.LEATHER },
+                            onClick = {
+                                hapticManager?.tapUiClick()
+                                selectedBallType = BallType.LEATHER
+                            },
                             label = { Text("Leather Ball") }
+                        )
+                    }
+                }
+            }
+
+            // Venue & Custom Grassroots Rules
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = SlateSurfaceDark),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("VENUE & CUSTOM RULES", color = BoundaryAmber, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+
+                    OutlinedTextField(
+                        value = venue,
+                        onValueChange = { venue = it },
+                        label = { Text("Ground / Turf Name") },
+                        placeholder = { Text("e.g. Shivaji Park Ground #2, Dadar") },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = TextPrimary,
+                            unfocusedTextColor = TextPrimary,
+                            focusedBorderColor = CrimsonPrimaryDark,
+                            unfocusedBorderColor = CardBorderDark
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    Text("Max Overs per Bowler:", color = MutedGrey, fontSize = 12.sp)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf(2, 3, 4, 5).forEach { quota ->
+                            FilterChip(
+                                selected = maxOversPerBowler == quota,
+                                onClick = {
+                                    hapticManager?.tapUiClick()
+                                    maxOversPerBowler = quota
+                                },
+                                label = { Text("$quota ov") }
+                            )
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("Box Cricket Mode (2-run Wide)", color = TextPrimary, fontSize = 12.sp)
+                        Switch(
+                            checked = isBoxCricket,
+                            onCheckedChange = {
+                                hapticManager?.tapUiClick()
+                                isBoxCricket = it
+                            },
+                            colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = CrimsonPrimaryDark)
                         )
                     }
                 }
@@ -161,12 +238,18 @@ fun MatchSetupScreen(
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         FilterChip(
                             selected = tossWinnerId == teamA,
-                            onClick = { tossWinnerId = teamA },
+                            onClick = {
+                                hapticManager?.tapUiClick()
+                                tossWinnerId = teamA
+                            },
                             label = { Text(teamAName) }
                         )
                         FilterChip(
                             selected = tossWinnerId == teamB,
-                            onClick = { tossWinnerId = teamB },
+                            onClick = {
+                                hapticManager?.tapUiClick()
+                                tossWinnerId = teamB
+                            },
                             label = { Text(teamBName) }
                         )
                     }
@@ -175,12 +258,18 @@ fun MatchSetupScreen(
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         FilterChip(
                             selected = tossDecision == TossDecision.BAT,
-                            onClick = { tossDecision = TossDecision.BAT },
+                            onClick = {
+                                hapticManager?.tapUiClick()
+                                tossDecision = TossDecision.BAT
+                            },
                             label = { Text("BAT FIRST") }
                         )
                         FilterChip(
                             selected = tossDecision == TossDecision.BOWL,
-                            onClick = { tossDecision = TossDecision.BOWL },
+                            onClick = {
+                                hapticManager?.tapUiClick()
+                                tossDecision = TossDecision.BOWL
+                            },
                             label = { Text("BOWL FIRST") }
                         )
                     }
@@ -189,6 +278,7 @@ fun MatchSetupScreen(
 
             Button(
                 onClick = {
+                    hapticManager?.tapUiClick()
                     val teamAName = teams.find { it.teamId == teamA }?.teamName ?: "Team A"
                     val teamBName = teams.find { it.teamId == teamB }?.teamName ?: "Team B"
                     val title = "$teamAName vs $teamBName"

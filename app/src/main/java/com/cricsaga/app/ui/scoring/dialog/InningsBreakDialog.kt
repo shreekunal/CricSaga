@@ -46,7 +46,7 @@ fun InningsBreakDialog(
                 Text(
                     text = "1st Innings Concluded",
                     style = MaterialTheme.typography.titleMedium,
-                    color = Color.White,
+                    color = TextPrimary,
                     fontWeight = FontWeight.Bold
                 )
             }
@@ -75,7 +75,7 @@ fun InningsBreakDialog(
                             text = "${firstInningsState.totalRuns} / ${firstInningsState.totalWickets}",
                             fontSize = 32.sp,
                             fontWeight = FontWeight.ExtraBold,
-                            color = Color.White
+                            color = TextPrimary
                         )
                         Text(
                             text = "${firstInningsState.oversFormatted} ov • CRR: ${String.format("%.2f", firstInningsState.currentRunRate)}",
@@ -89,7 +89,7 @@ fun InningsBreakDialog(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(Color(0xFF1E2128), RoundedCornerShape(10.dp))
+                        .background(ElevatedSurfaceDark, RoundedCornerShape(10.dp))
                         .padding(14.dp)
                 ) {
                     Column(
@@ -107,13 +107,13 @@ fun InningsBreakDialog(
                             text = "$targetRuns Runs",
                             fontSize = 24.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color.White
+                            color = TextPrimary
                         )
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
                             text = "$bowlingTeamName needs $targetRuns runs from $totalOvers overs",
                             fontSize = 12.sp,
-                            color = Color(0xFFD1D5DB),
+                            color = TextSecondary,
                             textAlign = TextAlign.Center
                         )
                         Text(

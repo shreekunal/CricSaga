@@ -24,18 +24,9 @@ import com.cricsaga.app.R
 // preloaded via AndroidManifest.xml — zero APK size cost.
 // ---------------------------------------------------------------------------
 
-val BarlowCondensed = FontFamily(
-    Font(R.font.barlow_condensed, FontWeight.Normal),
-    Font(R.font.barlow_condensed, FontWeight.Bold),
-    Font(R.font.barlow_condensed, FontWeight.ExtraBold)
-)
+val BarlowCondensed = FontFamily.SansSerif
 
-val DmSans = FontFamily(
-    Font(R.font.dm_sans, FontWeight.Normal),
-    Font(R.font.dm_sans, FontWeight.Medium),
-    Font(R.font.dm_sans, FontWeight.SemiBold),
-    Font(R.font.dm_sans, FontWeight.Bold)
-)
+val DmSans = FontFamily.Default
 
 // ---------------------------------------------------------------------------
 // Material3 Typography Binding

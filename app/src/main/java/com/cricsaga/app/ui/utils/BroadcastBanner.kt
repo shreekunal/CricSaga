@@ -108,7 +108,7 @@ fun BroadcastBannerHost(modifier: Modifier = Modifier) {
         currentEvent?.let { event ->
             Surface(
                 shape = RoundedCornerShape(10.dp),
-                color = DarkSurfaceCard,
+                color = SlateSurfaceDark,
                 modifier = Modifier
                     .fillMaxWidth()
                     .border(1.dp, event.accentColor.copy(alpha = 0.6f), RoundedCornerShape(10.dp)),
@@ -147,13 +147,13 @@ fun BroadcastBannerHost(modifier: Modifier = Modifier) {
                         Text(
                             text = event.title,
                             style = PlayerNameSecondary,
-                            color = Color.White
+                            color = TextPrimary
                         )
                         if (event.detail.isNotEmpty()) {
                             Text(
                                 text = event.detail,
                                 style = BodyCaption,
-                                color = DarkTextSecondary
+                                color = TextSecondary
                             )
                         }
                     }

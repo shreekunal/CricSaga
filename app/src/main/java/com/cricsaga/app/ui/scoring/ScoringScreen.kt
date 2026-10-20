@@ -47,7 +47,7 @@ fun ScoringScreen(
                         Text(
                             text = state.matchTitle,
                             style = PlayerNamePrimary,
-                            color = Color.White
+                            color = TextPrimary
                         )
                         Text(
                             text = if (state.inningsNumber == 1) "1st Innings • ${state.totalOvers} Overs" else "2nd Innings • Target: ${state.scoreState.targetRuns ?: 0}",
@@ -134,7 +134,7 @@ fun ScoringScreen(
                         Text(
                             text = "${state.scoreState.totalRuns} / ${state.scoreState.totalWickets}",
                             style = ScoreBig,
-                            color = Color.White
+                            color = TextPrimary
                         )
 
                         Spacer(modifier = Modifier.height(2.dp))
@@ -227,7 +227,7 @@ fun ScoringScreen(
                             Text(
                                 text = "BOWL: " + (bowler?.bowlerName ?: state.bowler?.fullName ?: "Bowler"),
                                 style = PlayerNameSecondary,
-                                color = Color.White
+                                color = TextPrimary
                             )
                             Text(
                                 text = "${bowler?.oversFormatted ?: "0.0"}-${bowler?.maidens ?: 0}-${bowler?.runsConceded ?: 0}-${bowler?.wickets ?: 0}  (Econ: ${String.format("%.2f", bowler?.economyRate ?: 0.0)})",
@@ -320,10 +320,10 @@ fun ScoringScreen(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        KeypadButton("0", ElevatedSurfaceDark, Color.White, Modifier.weight(1f)) { onBallTapped(0) }
-                        KeypadButton("1", ElevatedSurfaceDark, Color.White, Modifier.weight(1f)) { onBallTapped(1) }
-                        KeypadButton("2", ElevatedSurfaceDark, Color.White, Modifier.weight(1f)) { onBallTapped(2) }
-                        KeypadButton("3", ElevatedSurfaceDark, Color.White, Modifier.weight(1f)) { onBallTapped(3) }
+                        KeypadButton("0", ElevatedSurfaceDark, TextPrimary, Modifier.weight(1f)) { onBallTapped(0) }
+                        KeypadButton("1", ElevatedSurfaceDark, TextPrimary, Modifier.weight(1f)) { onBallTapped(1) }
+                        KeypadButton("2", ElevatedSurfaceDark, TextPrimary, Modifier.weight(1f)) { onBallTapped(2) }
+                        KeypadButton("3", ElevatedSurfaceDark, TextPrimary, Modifier.weight(1f)) { onBallTapped(3) }
                     }
 
                     // Row 2: 4, 6, Wide, No Ball
@@ -342,8 +342,8 @@ fun ScoringScreen(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        KeypadButton("BYE", ElevatedSurfaceDark, Color.White, Modifier.weight(1f)) { onExtraTapped(ExtraType.BYE) }
-                        KeypadButton("LB", ElevatedSurfaceDark, Color.White, Modifier.weight(1f)) { onExtraTapped(ExtraType.LEG_BYE) }
+                        KeypadButton("BYE", ElevatedSurfaceDark, TextPrimary, Modifier.weight(1f)) { onExtraTapped(ExtraType.BYE) }
+                        KeypadButton("LB", ElevatedSurfaceDark, TextPrimary, Modifier.weight(1f)) { onExtraTapped(ExtraType.LEG_BYE) }
                         KeypadButton("OUT / W", DismissalRed, Color.White, Modifier.weight(1f)) { onWicketTapped() }
                         KeypadButton("UNDO", ElevatedSurfaceDark, BoundaryAmber, Modifier.weight(1f)) { onUndoTapped() }
                     }
@@ -526,7 +526,7 @@ fun ChasePressureBarCard(
                 Text(
                     text = if (isTargetAchieved) "Target of $targetRuns runs achieved!" else "Need $runsNeeded runs from $ballsRemaining balls",
                     style = PlayerNameSecondary,
-                    color = Color.White
+                    color = TextPrimary
                 )
                 Text(
                     text = "RRR: ${String.format("%.2f", rrr)}",
@@ -571,14 +571,14 @@ fun BatsmanRow(
             Text(
                 text = name,
                 style = if (isStriker) PlayerNameSecondary else BodyCaption,
-                color = if (isStriker) Color.White else TextSecondary
+                color = if (isStriker) TextPrimary else TextSecondary
             )
         }
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(
                 text = "$runs",
                 style = ScoreSmall,
-                color = Color.White,
+                color = TextPrimary,
                 modifier = Modifier.width(24.dp),
                 textAlign = TextAlign.End
             )

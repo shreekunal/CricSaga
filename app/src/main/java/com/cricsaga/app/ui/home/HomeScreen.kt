@@ -49,7 +49,8 @@ data class LiveRadarItem(
     val scoreText: String,
     val oversText: String,
     val crrText: String,
-    val equationText: String
+    val equationText: String,
+    val isLive: Boolean = true
 )
 
 data class GrassrootsHeroItem(
@@ -84,7 +85,8 @@ fun HomeScreen(
             scoreText = "142/4",
             oversText = "16.2 ov",
             crrText = "CRR 8.7",
-            equationText = "Tigers need 28 runs in 22 balls"
+            equationText = "Tigers need 28 runs in 22 balls",
+            isLive = true
         ),
         LiveRadarItem(
             matchId = "live_2",
@@ -93,9 +95,33 @@ fun HomeScreen(
             scoreText = "86/2",
             oversText = "9.4 ov",
             crrText = "CRR 8.9",
-            equationText = "1st Innings • 15 Overs Match"
+            equationText = "1st Innings • 15 Overs Match",
+            isLive = true
         )
     )
+
+    val activeRadarMatches = androidx.compose.runtime.remember(matches) {
+        val liveOrRecent = matches.filter { it.matchStatus == MatchStatus.LIVE || it.matchStatus == MatchStatus.COMPLETED }
+        if (liveOrRecent.isNotEmpty()) {
+            liveOrRecent.map { m ->
+                val parts = m.matchTitle.split(" vs ")
+                val teamA = parts.getOrNull(0) ?: "Team A"
+                val teamB = parts.getOrNull(1) ?: "Team B"
+                LiveRadarItem(
+                    matchId = m.matchId,
+                    teamA = teamA,
+                    teamB = teamB,
+                    scoreText = if (m.matchStatus == MatchStatus.COMPLETED) m.resultSummary?.take(18) ?: "Final" else "Live",
+                    oversText = "${m.totalOvers} ov",
+                    crrText = m.ballType.name.replace("_", " "),
+                    equationText = m.resultSummary ?: "${m.totalOvers} overs match",
+                    isLive = m.matchStatus == MatchStatus.LIVE
+                )
+            }
+        } else {
+            demoRadarMatches
+        }
+    }
 
     val topPerformers = listOf(
         GrassrootsHeroItem(
@@ -115,6 +141,7 @@ fun HomeScreen(
     )
 
     Scaffold(
+        containerColor = CharcoalBackgroundDark,
         topBar = {
             TopAppBar(
                 title = {
@@ -216,7 +243,7 @@ fun HomeScreen(
                 LazyRow(
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    items(demoRadarMatches) { radar ->
+                    items(activeRadarMatches) { radar ->
                         Card(
                             modifier = Modifier
                                 .width(280.dp)
@@ -261,15 +288,15 @@ fun HomeScreen(
                                         )
                                     }
 
-                                    // LIVE micro-tag
+                                    // LIVE / FINAL micro-tag
                                     Surface(
-                                        color = Color(0x22DC2626),
+                                        color = if (radar.isLive) Color(0x22DC2626) else ElevatedSurfaceDark,
                                         shape = RoundedCornerShape(4.dp)
                                     ) {
                                         Text(
-                                            text = "LIVE",
+                                            text = if (radar.isLive) "LIVE" else "FINAL",
                                             style = MicroTag,
-                                            color = DismissalRed,
+                                            color = if (radar.isLive) DismissalRed else TextSecondary,
                                             modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
                                         )
                                     }

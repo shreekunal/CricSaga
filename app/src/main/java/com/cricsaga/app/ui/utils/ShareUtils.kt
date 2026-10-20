@@ -200,7 +200,8 @@ object ShareUtils {
         matches: Int,
         runs: Int,
         wickets: Int,
-        average: String
+        average: String,
+        profilePhotoPath: String? = null
     ) {
         val width = 1080
         val height = 1350
@@ -239,6 +240,31 @@ object ShareUtils {
             isAntiAlias = true
         }
         canvas.drawText("#$jerseyNumber", (width - 100).toFloat(), 420f, watermarkPaint)
+
+        // Optional circular athlete photo avatar
+        val photoBitmap = ImageUtils.loadAndroidBitmapFromPath(profilePhotoPath)
+        if (photoBitmap != null) {
+            val avatarRadius = 75f
+            val avatarCenterX = (width - 200).toFloat()
+            val avatarCenterY = 240f
+            val clipPath = android.graphics.Path().apply {
+                addCircle(avatarCenterX, avatarCenterY, avatarRadius, android.graphics.Path.Direction.CCW)
+            }
+            canvas.save()
+            canvas.clipPath(clipPath)
+            val srcRect = android.graphics.Rect(0, 0, photoBitmap.width, photoBitmap.height)
+            val dstRect = RectF(avatarCenterX - avatarRadius, avatarCenterY - avatarRadius, avatarCenterX + avatarRadius, avatarCenterY + avatarRadius)
+            canvas.drawBitmap(photoBitmap, srcRect, dstRect, null)
+            canvas.restore()
+
+            val photoRingPaint = Paint().apply {
+                color = Color.rgb(229, 57, 53)
+                style = Paint.Style.STROKE
+                strokeWidth = 4f
+                isAntiAlias = true
+            }
+            canvas.drawCircle(avatarCenterX, avatarCenterY, avatarRadius, photoRingPaint)
+        }
 
         // Brand Title
         val brandPaint = Paint().apply {

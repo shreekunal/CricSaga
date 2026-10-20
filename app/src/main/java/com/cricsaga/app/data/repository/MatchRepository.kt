@@ -22,6 +22,7 @@ class MatchRepository(private val database: CricSagaDatabase) {
     private val matchDao = database.matchDao()
     private val inningsDao = database.inningsDao()
     private val deliveryDao = database.deliveryDao()
+    private val tournamentDao = database.tournamentDao()
 
     fun getAllMatches(): Flow<List<MatchEntity>> = matchDao.getAllMatches()
 
@@ -39,6 +40,47 @@ class MatchRepository(private val database: CricSagaDatabase) {
 
     fun getDeliveries(inningsId: String): Flow<List<DeliveryEntity>> = deliveryDao.getDeliveriesForInnings(inningsId)
 
+    fun getAllTournaments(): Flow<List<TournamentEntity>> = tournamentDao.getAllTournaments()
+
+    fun getTournamentFixtures(tournamentId: String): Flow<List<TournamentFixtureEntity>> = tournamentDao.getFixturesForTournament(tournamentId)
+
+    suspend fun createTournament(
+        name: String,
+        overs: Int = 20,
+        teams: List<String>,
+        city: String = "Mumbai"
+    ): String = withContext(Dispatchers.IO) {
+        val tournamentId = UUID.randomUUID().toString()
+        val tournament = TournamentEntity(
+            tournamentId = tournamentId,
+            name = name,
+            overs = overs,
+            city = city,
+            teamNamesCsv = teams.joinToString(", ")
+        )
+        tournamentDao.insertTournament(tournament)
+
+        val fixtures = mutableListOf<TournamentFixtureEntity>()
+        for (i in teams.indices) {
+            for (j in i + 1 until teams.size) {
+                fixtures.add(
+                    TournamentFixtureEntity(
+                        fixtureId = UUID.randomUUID().toString(),
+                        tournamentId = tournamentId,
+                        stage = "Match ${fixtures.size + 1}",
+                        teamAName = teams[i],
+                        teamBName = teams[j],
+                        scheduledTime = "Scheduled"
+                    )
+                )
+            }
+        }
+        if (fixtures.isNotEmpty()) {
+            tournamentDao.insertFixtures(fixtures)
+        }
+        tournamentId
+    }
+
     suspend fun createTeam(name: String, shortCode: String, city: String): String = withContext(Dispatchers.IO) {
         val teamId = UUID.randomUUID().toString()
         val team = TeamEntity(teamId = teamId, teamName = name, shortCode = shortCode, city = city)
@@ -52,7 +94,8 @@ class MatchRepository(private val database: CricSagaDatabase) {
         phone: String = "0000000000",
         role: PlayingRole = PlayingRole.ALL_ROUNDER,
         battingStyle: BattingStyle = BattingStyle.RIGHT_HAND,
-        bowlingStyle: BowlingStyle = BowlingStyle.RIGHT_ARM_MEDIUM
+        bowlingStyle: BowlingStyle = BowlingStyle.RIGHT_ARM_MEDIUM,
+        jerseyNumber: String = "00"
     ): String = withContext(Dispatchers.IO) {
         val userId = UUID.randomUUID().toString()
         val user = UserEntity(
@@ -61,11 +104,20 @@ class MatchRepository(private val database: CricSagaDatabase) {
             fullName = name,
             playingRole = role,
             battingStyle = battingStyle,
-            bowlingStyle = bowlingStyle
+            bowlingStyle = bowlingStyle,
+            jerseyNumber = jerseyNumber
         )
         userDao.insertUser(user)
         teamDao.insertTeamMember(TeamMemberEntity(teamId = teamId, userId = userId))
         userId
+    }
+
+    suspend fun removePlayerFromTeam(teamId: String, userId: String) = withContext(Dispatchers.IO) {
+        teamDao.removeTeamMember(teamId, userId)
+    }
+
+    suspend fun setTeamCaptain(teamId: String, captainId: String) = withContext(Dispatchers.IO) {
+        teamDao.updateTeamCaptain(teamId, captainId)
     }
 
     suspend fun createMatch(
