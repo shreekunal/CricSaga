@@ -1,7 +1,0 @@
-R_DEF: Internal format may change without notice
-local
-color charcoal_bg
-color primary_red
-string app_name
-string tagline
-style Theme.CricSaga
