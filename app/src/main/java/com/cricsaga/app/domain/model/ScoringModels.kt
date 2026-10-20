@@ -80,6 +80,7 @@ data class InningsScoreState(
     val currentOverBalls: List<OverTimelineBall> = emptyList(),
     val targetRuns: Int? = null,
     val isCompleted: Boolean = false,
+    val completionReason: InningsCompletionReason? = null,
     val statusMessage: String = ""
 ) {
     val completedOvers: Int get() = totalLegalDeliveries / 6
@@ -91,13 +92,38 @@ data class InningsScoreState(
             (totalRuns.toDouble() / (totalLegalDeliveries.toDouble() / 6.0))
         } else 0.0
 
+    val runsNeeded: Int?
+        get() = targetRuns?.let { (it - totalRuns).coerceAtLeast(0) }
+
+    val ballsRemaining: Int?
+        get() = if (targetRuns != null) {
+            ((totalOversAllotted * 6) - totalLegalDeliveries).coerceAtLeast(0)
+        } else null
+
     val requiredRunRate: Double?
         get() {
             if (targetRuns == null) return null
-            val runsNeeded = targetRuns - totalRuns
-            val ballsRemaining = (totalOversAllotted * 6) - totalLegalDeliveries
-            return if (ballsRemaining > 0 && runsNeeded > 0) {
-                (runsNeeded.toDouble() / (ballsRemaining.toDouble() / 6.0))
+            val runs = runsNeeded ?: 0
+            val balls = ballsRemaining ?: 0
+            return if (balls > 0 && runs > 0) {
+                (runs.toDouble() / (balls.toDouble() / 6.0))
             } else 0.0
         }
 }
+
+enum class InningsCompletionReason {
+    OVERS_COMPLETED,
+    ALL_OUT,
+    TARGET_CHASED
+}
+
+data class MatchResult(
+    val isCompleted: Boolean = false,
+    val winnerTeamId: String? = null,
+    val winnerTeamName: String? = null,
+    val winMarginText: String = "",
+    val resultSummary: String = "",
+    val isTie: Boolean = false,
+    val playerOfTheMatchId: String? = null,
+    val playerOfTheMatchName: String? = null
+)

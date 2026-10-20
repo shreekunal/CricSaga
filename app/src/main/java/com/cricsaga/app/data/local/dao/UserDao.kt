@@ -15,8 +15,17 @@ interface UserDao {
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertUsers(users: List<UserEntity>)
 
+    @androidx.room.Update
+    suspend fun updateUser(user: UserEntity)
+
     @Query("SELECT * FROM users WHERE userId = :userId")
     suspend fun getUserById(userId: String): UserEntity?
+
+    @Query("SELECT * FROM users WHERE userId = :userId")
+    fun getUserFlowById(userId: String): Flow<UserEntity?>
+
+    @Query("SELECT * FROM users WHERE phoneNumber = :phoneNumber LIMIT 1")
+    suspend fun getUserByPhone(phoneNumber: String): UserEntity?
 
     @Query("SELECT * FROM users ORDER BY fullName ASC")
     fun getAllUsers(): Flow<List<UserEntity>>

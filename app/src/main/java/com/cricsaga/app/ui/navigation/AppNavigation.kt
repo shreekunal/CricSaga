@@ -1,22 +1,28 @@
 package com.cricsaga.app.ui.navigation
 
+import android.content.Intent
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.*
+import com.cricsaga.app.data.local.AuthManager
+import com.cricsaga.app.data.local.AuthState
 import com.cricsaga.app.data.local.ProManager
 import com.cricsaga.app.data.local.entity.UserEntity
 import com.cricsaga.app.domain.model.BallType
 import com.cricsaga.app.domain.model.ExtraType
 import com.cricsaga.app.domain.model.PlayingRole
 import com.cricsaga.app.domain.model.TossDecision
+import com.cricsaga.app.ui.auth.PhoneLoginScreen
+import com.cricsaga.app.ui.auth.ProfileSetupScreen
 import com.cricsaga.app.ui.discover.DiscoverScreen
 import com.cricsaga.app.ui.home.HomeScreen
 import com.cricsaga.app.ui.matches.MatchListScreen
@@ -27,6 +33,10 @@ import com.cricsaga.app.ui.scoring.ScoringScreen
 import com.cricsaga.app.ui.scoring.ScoringViewModel
 import com.cricsaga.app.ui.scoring.dialog.BowlerSelectionDialog
 import com.cricsaga.app.ui.scoring.dialog.DismissalBottomSheet
+import com.cricsaga.app.ui.scoring.dialog.InningsBreakDialog
+import com.cricsaga.app.ui.scoring.dialog.MatchResultDialog
+import com.cricsaga.app.ui.scoring.dialog.SecondInningsOpenersDialog
+import com.cricsaga.app.ui.utils.ShareUtils
 import com.cricsaga.app.ui.setup.MatchSetupScreen
 import com.cricsaga.app.ui.setup.OpenersSelectionScreen
 import com.cricsaga.app.ui.teams.TeamsListScreen
@@ -37,13 +47,16 @@ import kotlinx.coroutines.launch
 @Composable
 fun AppNavigation(
     scoringViewModel: ScoringViewModel,
-    proManager: ProManager
+    proManager: ProManager,
+    authManager: AuthManager
 ) {
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
     val coroutineScope = rememberCoroutineScope()
     val subscriptionState by proManager.subscriptionState.collectAsState()
+    val authState by authManager.authState.collectAsState()
+    var tempAuthPhone by remember { mutableStateOf("") }
 
     // 5 Primary Bottom Navigation Bar Tabs
     val bottomBarScreens = listOf(
@@ -53,7 +66,7 @@ fun AppNavigation(
         Screen.Tournaments,
         Screen.Profile
     )
-    val showBottomBar = currentRoute in bottomBarScreens.map { it.route }
+    val showBottomBar = currentRoute in bottomBarScreens.map { it.route } && authState !is AuthState.Unauthenticated
 
     // Transient Match Setup State across screens
     var tempTitle by remember { mutableStateOf("") }
@@ -123,9 +136,51 @@ fun AppNavigation(
     ) { paddingValues ->
         NavHost(
             navController = navController,
-            startDestination = Screen.Home.route,
+            startDestination = if (authState is AuthState.Unauthenticated) Screen.PhoneLogin.route else Screen.Home.route,
             modifier = Modifier.padding(paddingValues)
         ) {
+            // Auth Flow: Phone Login
+            composable(Screen.PhoneLogin.route) {
+                PhoneLoginScreen(
+                    onPhoneVerified = { phone ->
+                        coroutineScope.launch {
+                            val existingUser = scoringViewModel.repository.getUserByPhone(phone)
+                            if (existingUser != null) {
+                                authManager.setLoggedIn(existingUser.userId, phone)
+                                navController.navigate(Screen.Home.route) {
+                                    popUpTo(0) { inclusive = true }
+                                }
+                            } else {
+                                tempAuthPhone = phone
+                                navController.navigate(Screen.ProfileSetup.route)
+                            }
+                        }
+                    },
+                    onContinueAsGuest = {
+                        authManager.setGuestMode()
+                        navController.navigate(Screen.Home.route) {
+                            popUpTo(0) { inclusive = true }
+                        }
+                    }
+                )
+            }
+
+            // Auth Flow: Profile Setup
+            composable(Screen.ProfileSetup.route) {
+                ProfileSetupScreen(
+                    phoneNumber = tempAuthPhone,
+                    onProfileCreated = { newUser ->
+                        coroutineScope.launch {
+                            scoringViewModel.repository.insertUser(newUser)
+                            authManager.setLoggedIn(newUser.userId, newUser.phoneNumber)
+                            navController.navigate(Screen.Home.route) {
+                                popUpTo(0) { inclusive = true }
+                            }
+                        }
+                    }
+                )
+            }
+
             // Tab 1: Home Screen
             composable(Screen.Home.route) {
                 val matches by scoringViewModel.allMatches.collectAsState()
@@ -176,9 +231,25 @@ fun AppNavigation(
 
             // Tab 5: My Career Player Profile
             composable(Screen.Profile.route) {
+                val currentUserId = authManager.getCurrentUserId()
+                val currentUser by scoringViewModel.repository.getUserFlowById(currentUserId).collectAsState(initial = null)
+                val playerStats by scoringViewModel.repository.getPlayerStatsFlow(currentUserId).collectAsState(initial = null)
                 PlayerProfileScreen(
                     proManager = proManager,
-                    onRedeemCodeClick = { navController.navigate(Screen.Redeem.route) }
+                    currentUser = currentUser,
+                    playerStats = playerStats,
+                    onRedeemCodeClick = { navController.navigate(Screen.Redeem.route) },
+                    onUpdateProfile = { updated ->
+                        coroutineScope.launch {
+                            scoringViewModel.repository.updateUser(updated)
+                        }
+                    },
+                    onLogout = {
+                        authManager.logout()
+                        navController.navigate(Screen.PhoneLogin.route) {
+                            popUpTo(0) { inclusive = true }
+                        }
+                    }
                 )
             }
 
@@ -320,11 +391,77 @@ fun AppNavigation(
                         }
                     )
                 }
+
+                // 1st Innings Break Dialog
+                if (uiState.showInningsBreakDialog && uiState.innings1Score != null) {
+                    InningsBreakDialog(
+                        battingTeamName = uiState.innings1BattingTeamName,
+                        bowlingTeamName = uiState.bowlingTeamName,
+                        firstInningsState = uiState.innings1Score!!,
+                        totalOvers = uiState.totalOvers,
+                        onStartSecondInnings = {
+                            scoringViewModel.onStartSecondInningsClicked()
+                        }
+                    )
+                }
+
+                // 2nd Innings Openers Picker Dialog
+                if (uiState.showSecondInningsOpenersDialog) {
+                    val targetRuns = (uiState.innings1Score?.totalRuns ?: 0) + 1
+                    SecondInningsOpenersDialog(
+                        battingTeamName = uiState.bowlingTeamName,
+                        bowlingTeamName = uiState.battingTeamName,
+                        targetRuns = targetRuns,
+                        totalOvers = uiState.totalOvers,
+                        battingSquad = uiState.bowlingSquad,
+                        bowlingSquad = uiState.battingSquad,
+                        onConfirm = { striker, nonStriker, bowler ->
+                            scoringViewModel.confirmSecondInningsStart(striker, nonStriker, bowler)
+                        }
+                    )
+                }
+
+                // Match Result Celebration Dialog
+                if (uiState.showMatchResultDialog && uiState.matchResult != null) {
+                    val context = LocalContext.current
+                    MatchResultDialog(
+                        matchResult = uiState.matchResult!!,
+                        innings1TeamName = uiState.innings1BattingTeamName.ifEmpty { "1st Innings" },
+                        innings1Score = uiState.innings1Score,
+                        innings2TeamName = uiState.battingTeamName,
+                        innings2Score = uiState.scoreState,
+                        candidates = uiState.playerOfTheMatchCandidates,
+                        selectedPotm = uiState.selectedPlayerOfTheMatch,
+                        onPotmSelected = { player ->
+                            scoringViewModel.setPlayerOfTheMatch(player)
+                        },
+                        onViewScorecard = {
+                            scoringViewModel.dismissMatchResultDialog()
+                            navController.navigate(Screen.FullScorecard.route)
+                        },
+                        onShareToWhatsApp = {
+                            ShareUtils.generateAndSharePoster(
+                                context = context,
+                                matchTitle = uiState.matchTitle,
+                                battingTeamName = uiState.battingTeamName,
+                                bowlingTeamName = uiState.bowlingTeamName,
+                                scoreState = uiState.scoreState,
+                                firstInningsScore = uiState.innings1Score,
+                                firstInningsTeamName = uiState.innings1BattingTeamName,
+                                matchResult = uiState.matchResult
+                            )
+                        },
+                        onDismiss = {
+                            scoringViewModel.dismissMatchResultDialog()
+                        }
+                    )
+                }
             }
 
             // Flow: Full Match Scorecard Center
             composable(Screen.FullScorecard.route) {
                 val uiState by scoringViewModel.uiState.collectAsState()
+                val context = LocalContext.current
 
                 FullScorecardScreen(
                     matchTitle = uiState.matchTitle,
@@ -333,7 +470,16 @@ fun AppNavigation(
                     scoreState = uiState.scoreState,
                     onBackClick = { navController.popBackStack() },
                     onSharePoster = {
-                        // Triggers share action
+                        ShareUtils.generateAndSharePoster(
+                            context = context,
+                            matchTitle = uiState.matchTitle,
+                            battingTeamName = uiState.battingTeamName,
+                            bowlingTeamName = uiState.bowlingTeamName,
+                            scoreState = uiState.scoreState,
+                            firstInningsScore = uiState.innings1Score,
+                            firstInningsTeamName = uiState.innings1BattingTeamName,
+                            matchResult = uiState.matchResult
+                        )
                     }
                 )
             }

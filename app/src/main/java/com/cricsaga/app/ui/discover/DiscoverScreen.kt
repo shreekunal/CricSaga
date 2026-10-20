@@ -65,7 +65,7 @@ fun DiscoverScreen(
     var selectedTab by remember { mutableIntStateOf(0) }
     val tabs = listOf("Looking For", "Grounds & Turfs", "Tournaments")
 
-    val lookingForList = listOf(
+    val initialLookingForList = listOf(
         LookingForItem(
             id = "lf_1",
             type = "Opponent",
@@ -97,6 +97,9 @@ fun DiscoverScreen(
             contactPhone = "9820555777"
         )
     )
+
+    var lookingForList by remember { mutableStateOf(initialLookingForList) }
+    var showPostDialog by remember { mutableStateOf(false) }
 
     val turfsList = listOf(
         TurfItem(
@@ -245,7 +248,7 @@ fun DiscoverScreen(
                                         )
                                     }
                                     Button(
-                                        onClick = { /* Post requirement */ },
+                                        onClick = { showPostDialog = true },
                                         colors = ButtonDefaults.buttonColors(containerColor = ElevatedSurfaceDark),
                                         shape = RoundedCornerShape(6.dp),
                                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
@@ -502,5 +505,150 @@ fun DiscoverScreen(
                 }
             }
         }
+    }
+
+    if (showPostDialog) {
+        var selectedType by remember { mutableStateOf("Opponent") }
+        var titleText by remember { mutableStateOf("") }
+        var organizerText by remember { mutableStateOf("Warriors CC") }
+        var timingText by remember { mutableStateOf("Sunday • 7:00 AM - 10:00 AM") }
+        var locationText by remember { mutableStateOf("Shivaji Park Ground #4") }
+        var contactPhoneText by remember { mutableStateOf("9820123456") }
+        var noteText by remember { mutableStateOf("Friendly match, 50/50 cost split") }
+
+        val typeOptions = listOf("Opponent", "Players", "Scorer", "Umpire")
+
+        AlertDialog(
+            onDismissRequest = { showPostDialog = false },
+            containerColor = SlateSurfaceDark,
+            shape = RoundedCornerShape(16.dp),
+            title = {
+                Text(
+                    text = "Post Grassroots Requirement",
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp
+                )
+            },
+            text = {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    // Type Selector Chips
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        typeOptions.forEach { type ->
+                            FilterChip(
+                                selected = selectedType == type,
+                                onClick = { selectedType = type },
+                                label = { Text(type, fontSize = 11.sp) },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = CrimsonPrimaryDark,
+                                    selectedLabelColor = Color.White,
+                                    containerColor = ElevatedSurfaceDark,
+                                    labelColor = MutedGrey
+                                )
+                            )
+                        }
+                    }
+
+                    OutlinedTextField(
+                        value = titleText,
+                        onValueChange = { titleText = it },
+                        label = { Text("Title / Purpose", color = MutedGrey) },
+                        placeholder = { Text("e.g. Weekend Match • 16 Overs", color = Color.Gray) },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White,
+                            focusedBorderColor = CrimsonPrimaryDark,
+                            unfocusedBorderColor = CardBorderDark
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    OutlinedTextField(
+                        value = organizerText,
+                        onValueChange = { organizerText = it },
+                        label = { Text("Team / Organizer Name", color = MutedGrey) },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White,
+                            focusedBorderColor = CrimsonPrimaryDark,
+                            unfocusedBorderColor = CardBorderDark
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    OutlinedTextField(
+                        value = timingText,
+                        onValueChange = { timingText = it },
+                        label = { Text("Date & Timing", color = MutedGrey) },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White,
+                            focusedBorderColor = CrimsonPrimaryDark,
+                            unfocusedBorderColor = CardBorderDark
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    OutlinedTextField(
+                        value = locationText,
+                        onValueChange = { locationText = it },
+                        label = { Text("Ground / Location", color = MutedGrey) },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White,
+                            focusedBorderColor = CrimsonPrimaryDark,
+                            unfocusedBorderColor = CardBorderDark
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    OutlinedTextField(
+                        value = contactPhoneText,
+                        onValueChange = { contactPhoneText = it },
+                        label = { Text("WhatsApp Contact Number", color = MutedGrey) },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White,
+                            focusedBorderColor = CrimsonPrimaryDark,
+                            unfocusedBorderColor = CardBorderDark
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val newItem = LookingForItem(
+                            id = "lf_${System.currentTimeMillis()}",
+                            type = selectedType,
+                            title = titleText.trim().ifEmpty { "Cricket Requirement • $selectedType" },
+                            teamOrOrganizer = organizerText.trim().ifEmpty { "Cricket Team" },
+                            timing = timingText.trim(),
+                            location = locationText.trim(),
+                            note = noteText.trim(),
+                            contactPhone = contactPhoneText.trim().ifEmpty { "9820000000" }
+                        )
+                        lookingForList = listOf(newItem) + lookingForList
+                        showPostDialog = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = CrimsonPrimaryDark),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text("POST REQUIREMENT", fontWeight = FontWeight.Bold, color = Color.White)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showPostDialog = false }) {
+                    Text("CANCEL", color = MutedGrey)
+                }
+            }
+        )
     }
 }

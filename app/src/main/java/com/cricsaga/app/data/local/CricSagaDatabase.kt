@@ -19,7 +19,7 @@ import com.cricsaga.app.data.local.entity.*
         PlayerStatsEntity::class,
         RedeemCodeEntity::class
     ],
-    version = 3,
+    version = 5,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -31,6 +31,7 @@ abstract class CricSagaDatabase : RoomDatabase() {
     abstract fun inningsDao(): InningsDao
     abstract fun deliveryDao(): DeliveryDao
     abstract fun redeemCodeDao(): RedeemCodeDao
+    abstract fun playerStatsDao(): PlayerStatsDao
 
     companion object {
         @Volatile

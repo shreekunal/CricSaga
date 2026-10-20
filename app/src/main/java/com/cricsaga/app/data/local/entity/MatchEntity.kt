@@ -41,6 +41,8 @@ data class MatchEntity(
     val isFreeHitEnabled: Boolean = true,
     val matchStatus: MatchStatus = MatchStatus.SCHEDULED,
     val winnerTeamId: String? = null,
+    val resultSummary: String? = null,
+    val playerOfTheMatchId: String? = null,
     val createdAt: Long = System.currentTimeMillis()
 )
 

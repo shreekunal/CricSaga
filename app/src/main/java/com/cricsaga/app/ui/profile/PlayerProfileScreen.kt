@@ -8,6 +8,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
@@ -21,6 +23,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cricsaga.app.data.local.ProManager
+import com.cricsaga.app.data.local.entity.PlayerStatsEntity
+import com.cricsaga.app.data.local.entity.UserEntity
+import com.cricsaga.app.ui.profile.dialog.EditProfileDialog
 import com.cricsaga.app.ui.theme.*
 
 data class CareerMatchRecord(
@@ -35,12 +40,51 @@ data class CareerMatchRecord(
 @Composable
 fun PlayerProfileScreen(
     proManager: ProManager,
+    currentUser: UserEntity? = null,
+    playerStats: PlayerStatsEntity? = null,
     onRedeemCodeClick: () -> Unit,
-    onEditProfileClick: () -> Unit = {}
+    onUpdateProfile: (UserEntity) -> Unit = {},
+    onLogout: () -> Unit = {}
 ) {
+    var showEditProfileDialog by remember { mutableStateOf(false) }
     var selectedTab by remember { mutableIntStateOf(0) }
     val tabs = listOf("Overview", "Batting", "Bowling", "Fielding", "Matches")
     val subscriptionState by proManager.subscriptionState.collectAsState()
+
+    val playerName = currentUser?.fullName?.ifBlank { "Rohit Sharma" } ?: "Rohit Sharma"
+    val initials = playerName.split(" ")
+        .mapNotNull { it.firstOrNull()?.toString() }
+        .take(2)
+        .joinToString("")
+        .uppercase()
+        .ifEmpty { "CR" }
+
+    val roleFormatted = currentUser?.playingRole?.name?.replace('_', ' ')?.lowercase()
+        ?.replaceFirstChar { it.uppercase() } ?: "All-Rounder"
+    val bowlingFormatted = currentUser?.bowlingStyle?.name?.replace('_', ' ')?.lowercase()
+        ?.replaceFirstChar { it.uppercase() } ?: "Right-Arm Medium"
+    val roleText = "$roleFormatted • $bowlingFormatted"
+    val cityText = "${currentUser?.city?.ifBlank { "Mumbai" } ?: "Mumbai"} • Jersey #${currentUser?.jerseyNumber?.ifBlank { "45" } ?: "45"}"
+
+    val totalMatches = 24 + (playerStats?.matches ?: 0)
+    val totalInnings = 22 + (playerStats?.innings ?: 0)
+    val totalRuns = 782 + (playerStats?.runsScored ?: 0)
+    val totalBalls = 464 + (playerStats?.ballsFaced ?: 0)
+    val highestScore = maxOf(88, playerStats?.highestScore ?: 0)
+    val totalWickets = 14 + (playerStats?.wicketsTaken ?: 0)
+    val totalBallsBowled = (38 * 6 + 4) + (playerStats?.legalBallsBowled ?: 0)
+    val oversBowledFormatted = "${totalBallsBowled / 6}.${totalBallsBowled % 6}"
+    val totalRunsConceded = 262 + (playerStats?.runsConceded ?: 0)
+    val totalMaidens = 2 + (playerStats?.maidens ?: 0)
+    val totalFifties = 5 + (playerStats?.fifties ?: 0)
+    val totalHundreds = 0 + (playerStats?.hundreds ?: 0)
+    val totalFours = 68 + (playerStats?.fours ?: 0)
+    val totalSixes = 26 + (playerStats?.sixes ?: 0)
+
+    val batAvg = if (totalInnings > 0) String.format("%.1f", totalRuns.toDouble() / (totalInnings - 3).coerceAtLeast(1)) else "0.0"
+    val batSr = if (totalBalls > 0) String.format("%.1f", (totalRuns.toDouble() / totalBalls.toDouble()) * 100.0) else "0.0"
+    val bowlEcon = if (totalBallsBowled > 0) String.format("%.2f", (totalRunsConceded.toDouble() / (totalBallsBowled.toDouble() / 6.0))) else "0.0"
+    val bowlAvg = if (totalWickets > 0) String.format("%.2f", totalRunsConceded.toDouble() / totalWickets.toDouble()) else "0.0"
 
     val matchHistory = listOf(
         CareerMatchRecord(
@@ -77,6 +121,16 @@ fun PlayerProfileScreen(
                         fontSize = 20.sp
                     )
                 },
+                actions = {
+                    IconButton(onClick = onLogout) {
+                        Icon(
+                            Icons.Default.Logout,
+                            contentDescription = "Switch Account / Logout",
+                            tint = TextSecondary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = CharcoalBackgroundDark)
             )
         }
@@ -112,7 +166,7 @@ fun PlayerProfileScreen(
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
-                                    text = "RS",
+                                    text = initials,
                                     color = TextPrimary,
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 18.sp
@@ -121,21 +175,31 @@ fun PlayerProfileScreen(
                             Spacer(modifier = Modifier.width(12.dp))
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = "Rohit Sharma",
+                                    text = playerName,
                                     color = TextPrimary,
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 17.sp
                                 )
                                 Text(
-                                    text = "Top-Order Batsman • Right-Arm Medium",
+                                    text = roleText,
                                     color = TextSecondary,
                                     fontSize = 12.sp
                                 )
                                 Text(
-                                    text = "Mumbai • Jersey #45",
+                                    text = cityText,
                                     color = TextTertiary,
                                     fontSize = 11.sp
                                 )
+                            }
+                            if (currentUser != null) {
+                                IconButton(onClick = { showEditProfileDialog = true }) {
+                                    Icon(
+                                        Icons.Default.Edit,
+                                        contentDescription = "Edit Profile",
+                                        tint = TextSecondary,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
                             }
                         }
 
@@ -245,10 +309,10 @@ fun PlayerProfileScreen(
                                         .padding(vertical = 12.dp),
                                     horizontalArrangement = Arrangement.SpaceEvenly
                                 ) {
-                                    CleanMetricCol("MATCHES", "24")
-                                    CleanMetricCol("RUNS", "782")
-                                    CleanMetricCol("WICKETS", "14")
-                                    CleanMetricCol("AVG", "41.1")
+                                    CleanMetricCol("MATCHES", "$totalMatches")
+                                    CleanMetricCol("RUNS", "$totalRuns")
+                                    CleanMetricCol("WICKETS", "$totalWickets")
+                                    CleanMetricCol("AVG", batAvg)
                                 }
                             }
 
@@ -260,11 +324,11 @@ fun PlayerProfileScreen(
                                 border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(CardBorderDark))
                             ) {
                                 Column(modifier = Modifier.padding(14.dp)) {
-                                    TableStatRow("Strike Rate", "168.4")
-                                    TableStatRow("Highest Score", "88*")
-                                    TableStatRow("Bowling Economy", "6.80")
+                                    TableStatRow("Strike Rate", batSr)
+                                    TableStatRow("Highest Score", "$highestScore*")
+                                    TableStatRow("Bowling Economy", bowlEcon)
                                     TableStatRow("Best Bowling", "3/16 (4.0 ov)")
-                                    TableStatRow("Fifties / Hundreds", "5 / 0")
+                                    TableStatRow("Fifties / Hundreds", "$totalFifties / $totalHundreds")
                                     TableStatRow("Catches / Run Outs", "12 / 3")
                                 }
                             }
@@ -286,16 +350,16 @@ fun PlayerProfileScreen(
                             Column(modifier = Modifier.padding(14.dp)) {
                                 Text("BATTING CAREER", color = TextSecondary, fontWeight = FontWeight.Bold, fontSize = 11.sp, letterSpacing = 1.sp)
                                 Spacer(modifier = Modifier.height(10.dp))
-                                TableStatRow("Innings Batted", "22")
+                                TableStatRow("Innings Batted", "$totalInnings")
                                 TableStatRow("Not Outs (NO)", "3")
-                                TableStatRow("Total Runs", "782")
-                                TableStatRow("Balls Faced", "464")
-                                TableStatRow("Highest Score", "88*")
-                                TableStatRow("Batting Average", "41.15")
-                                TableStatRow("Strike Rate", "168.45")
-                                TableStatRow("Fifties (50s)", "5")
-                                TableStatRow("Hundreds (100s)", "0")
-                                TableStatRow("Fours / Sixes", "68 / 26")
+                                TableStatRow("Total Runs", "$totalRuns")
+                                TableStatRow("Balls Faced", "$totalBalls")
+                                TableStatRow("Highest Score", "$highestScore*")
+                                TableStatRow("Batting Average", batAvg)
+                                TableStatRow("Strike Rate", batSr)
+                                TableStatRow("Fifties (50s)", "$totalFifties")
+                                TableStatRow("Hundreds (100s)", "$totalHundreds")
+                                TableStatRow("Fours / Sixes", "$totalFours / $totalSixes")
                             }
                         }
                     }
@@ -315,13 +379,13 @@ fun PlayerProfileScreen(
                             Column(modifier = Modifier.padding(14.dp)) {
                                 Text("BOWLING CAREER", color = TextSecondary, fontWeight = FontWeight.Bold, fontSize = 11.sp, letterSpacing = 1.sp)
                                 Spacer(modifier = Modifier.height(10.dp))
-                                TableStatRow("Overs Bowled", "38.4 ov")
-                                TableStatRow("Maiden Overs", "2")
-                                TableStatRow("Runs Conceded", "262")
-                                TableStatRow("Wickets Taken", "14")
+                                TableStatRow("Overs Bowled", "$oversBowledFormatted ov")
+                                TableStatRow("Maiden Overs", "$totalMaidens")
+                                TableStatRow("Runs Conceded", "$totalRunsConceded")
+                                TableStatRow("Wickets Taken", "$totalWickets")
                                 TableStatRow("Best Bowling", "3/16 (4.0 ov)")
-                                TableStatRow("Bowling Average", "18.71")
-                                TableStatRow("Economy Rate", "6.80")
+                                TableStatRow("Bowling Average", bowlAvg)
+                                TableStatRow("Economy Rate", bowlEcon)
                             }
                         }
                     }
@@ -391,6 +455,17 @@ fun PlayerProfileScreen(
                     }
                 }
             }
+        }
+
+        if (showEditProfileDialog && currentUser != null) {
+            EditProfileDialog(
+                user = currentUser,
+                onDismiss = { showEditProfileDialog = false },
+                onSave = { updated ->
+                    onUpdateProfile(updated)
+                    showEditProfileDialog = false
+                }
+            )
         }
     }
 }

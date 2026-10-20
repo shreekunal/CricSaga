@@ -43,7 +43,7 @@ fun ScoringScreen(
                             color = Color.White
                         )
                         Text(
-                            text = "1st Innings • 20 Overs • Local-First Room DB",
+                            text = if (state.inningsNumber == 1) "1st Innings • ${state.totalOvers} Overs" else "2nd Innings • Target: ${state.scoreState.targetRuns ?: 0}",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MutedGrey
                         )
@@ -73,6 +73,48 @@ fun ScoringScreen(
                 .verticalScroll(scrollState),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
+            // Chase Equation Banner (2nd Innings Only)
+            if (state.inningsNumber == 2) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF1E2128)),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "1st Inn: ${state.innings1BattingTeamName} ${state.innings1Score?.totalRuns ?: 0}/${state.innings1Score?.totalWickets ?: 0} (${state.innings1Score?.oversFormatted ?: "0.0"})",
+                                color = MutedGrey,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Text(
+                                text = "TARGET: ${state.scoreState.targetRuns ?: 0}",
+                                color = BoundaryAmber,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        val runsNeeded = state.scoreState.runsNeeded ?: 0
+                        val ballsRemaining = state.scoreState.ballsRemaining ?: 0
+                        val rrr = state.scoreState.requiredRunRate ?: 0.0
+                        Text(
+                            text = "Need $runsNeeded runs from $ballsRemaining balls  •  RRR: ${String.format("%.2f", rrr)}",
+                            color = Color.White,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+
             // 1. Live Match Scoreboard Banner
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -98,7 +140,7 @@ fun ScoringScreen(
                         color = Color.White
                     )
                     Text(
-                        text = "Overs: ${state.scoreState.oversFormatted} / 20.0  •  CRR: ${String.format("%.2f", state.scoreState.currentRunRate)}",
+                        text = "Overs: ${state.scoreState.oversFormatted} / ${state.totalOvers}.0  •  CRR: ${String.format("%.2f", state.scoreState.currentRunRate)}",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MutedGrey
                     )

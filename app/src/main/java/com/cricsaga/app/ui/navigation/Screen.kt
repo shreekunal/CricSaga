@@ -18,6 +18,10 @@ sealed class Screen(val route: String, val title: String, val icon: ImageVector?
     object Tournaments : Screen("tournaments", "Tournaments", Icons.Default.EmojiEvents)
     object Profile : Screen("profile", "My Career", Icons.Default.Person)
 
+    // Authentication & Onboarding
+    object PhoneLogin : Screen("phone_login", "Sign In")
+    object ProfileSetup : Screen("profile_setup", "Create Profile")
+
     // Secondary / Nested Flow Screens
     object Teams : Screen("teams", "Teams", Icons.Default.Groups)
     object Redeem : Screen("redeem", "Redeem Pro", Icons.Default.Star)

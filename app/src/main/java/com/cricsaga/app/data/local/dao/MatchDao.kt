@@ -21,6 +21,15 @@ interface MatchDao {
     @Query("UPDATE matches SET matchStatus = :status WHERE matchId = :matchId")
     suspend fun updateMatchStatus(matchId: String, status: MatchStatus)
 
+    @Query("UPDATE matches SET matchStatus = :status, winnerTeamId = :winnerTeamId, resultSummary = :resultSummary, playerOfTheMatchId = :playerOfTheMatchId WHERE matchId = :matchId")
+    suspend fun completeMatch(
+        matchId: String,
+        status: MatchStatus = MatchStatus.COMPLETED,
+        winnerTeamId: String?,
+        resultSummary: String?,
+        playerOfTheMatchId: String?
+    )
+
     @Query("SELECT * FROM matches WHERE matchId = :matchId")
     suspend fun getMatchById(matchId: String): MatchEntity?
 
@@ -38,6 +47,9 @@ interface InningsDao {
 
     @Query("SELECT * FROM innings WHERE inningsId = :inningsId")
     suspend fun getInningsById(inningsId: String): InningsEntity?
+
+    @Query("UPDATE innings SET isCompleted = 1 WHERE inningsId = :inningsId")
+    suspend fun completeInnings(inningsId: String)
 
     @Query("SELECT * FROM innings WHERE matchId = :matchId ORDER BY inningsNumber ASC")
     fun getInningsForMatch(matchId: String): Flow<List<InningsEntity>>

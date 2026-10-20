@@ -165,6 +165,137 @@ class MatchRepository(private val database: CricSagaDatabase) {
         }
     }
 
+    suspend fun startSecondInnings(
+        matchId: String,
+        battingTeamId: String,
+        bowlingTeamId: String,
+        targetRuns: Int
+    ): String = withContext(Dispatchers.IO) {
+        val inningsId = UUID.randomUUID().toString()
+        val innings = InningsEntity(
+            inningsId = inningsId,
+            matchId = matchId,
+            inningsNumber = 2,
+            battingTeamId = battingTeamId,
+            bowlingTeamId = bowlingTeamId,
+            totalRuns = 0,
+            totalWickets = 0,
+            totalLegalDeliveries = 0,
+            targetRuns = targetRuns,
+            isCompleted = false
+        )
+        inningsDao.insertInnings(innings)
+        inningsId
+    }
+
+    suspend fun completeInnings(inningsId: String) = withContext(Dispatchers.IO) {
+        inningsDao.completeInnings(inningsId)
+    }
+
+    suspend fun completeMatch(
+        matchId: String,
+        winnerTeamId: String?,
+        resultSummary: String?,
+        playerOfTheMatchId: String?
+    ) = withContext(Dispatchers.IO) {
+        matchDao.completeMatch(
+            matchId = matchId,
+            winnerTeamId = winnerTeamId,
+            resultSummary = resultSummary,
+            playerOfTheMatchId = playerOfTheMatchId
+        )
+    }
+
+    fun getInningsForMatch(matchId: String): Flow<List<InningsEntity>> = inningsDao.getInningsForMatch(matchId)
+
+    fun getPlayerStatsFlow(userId: String): Flow<PlayerStatsEntity?> = database.playerStatsDao().getStatsFlowForUser(userId)
+
+    suspend fun insertUser(user: UserEntity) = withContext(Dispatchers.IO) {
+        userDao.insertUser(user)
+    }
+
+    suspend fun updateUser(user: UserEntity) = withContext(Dispatchers.IO) {
+        userDao.updateUser(user)
+    }
+
+    suspend fun getUserById(userId: String): UserEntity? = withContext(Dispatchers.IO) {
+        userDao.getUserById(userId)
+    }
+
+    fun getUserFlowById(userId: String): Flow<UserEntity?> = userDao.getUserFlowById(userId)
+
+    suspend fun getUserByPhone(phoneNumber: String): UserEntity? = withContext(Dispatchers.IO) {
+        userDao.getUserByPhone(phoneNumber)
+    }
+
+    suspend fun recordMatchPlayerStats(
+        innings1: InningsScoreState?,
+        innings2: InningsScoreState
+    ) = withContext(Dispatchers.IO) {
+        val playerStatsDao = database.playerStatsDao()
+        val allPlayerIds = mutableSetOf<String>()
+        listOfNotNull(innings1, innings2).forEach { inn ->
+            allPlayerIds.addAll(inn.batsmen.keys)
+            allPlayerIds.addAll(inn.bowlers.keys)
+        }
+
+        allPlayerIds.forEach { playerId ->
+            val existing = playerStatsDao.getStatsForUser(playerId) ?: PlayerStatsEntity(userId = playerId)
+
+            var addedRuns = 0
+            var addedBalls = 0
+            var addedFours = 0
+            var addedSixes = 0
+            var battedInMatch = false
+
+            var addedBallsBowled = 0
+            var addedRunsConceded = 0
+            var addedWickets = 0
+            var addedMaidens = 0
+
+            listOfNotNull(innings1, innings2).forEach { inn ->
+                inn.batsmen[playerId]?.let { b ->
+                    if (b.ballsFaced > 0 || b.isOut) {
+                        battedInMatch = true
+                        addedRuns += b.runs
+                        addedBalls += b.ballsFaced
+                        addedFours += b.fours
+                        addedSixes += b.sixes
+                    }
+                }
+                inn.bowlers[playerId]?.let { bow ->
+                    if (bow.legalBalls > 0) {
+                        addedBallsBowled += bow.legalBalls
+                        addedRunsConceded += bow.runsConceded
+                        addedWickets += bow.wickets
+                        addedMaidens += bow.maidens
+                    }
+                }
+            }
+
+            val highest = maxOf(existing.highestScore, addedRuns)
+            val fifties = existing.fifties + (if (addedRuns in 50..99) 1 else 0)
+            val hundreds = existing.hundreds + (if (addedRuns >= 100) 1 else 0)
+
+            val updated = existing.copy(
+                matches = existing.matches + 1,
+                innings = existing.innings + (if (battedInMatch) 1 else 0),
+                runsScored = existing.runsScored + addedRuns,
+                ballsFaced = existing.ballsFaced + addedBalls,
+                highestScore = highest,
+                fifties = fifties,
+                hundreds = hundreds,
+                fours = existing.fours + addedFours,
+                sixes = existing.sixes + addedSixes,
+                legalBallsBowled = existing.legalBallsBowled + addedBallsBowled,
+                runsConceded = existing.runsConceded + addedRunsConceded,
+                wicketsTaken = existing.wicketsTaken + addedWickets,
+                maidens = existing.maidens + addedMaidens
+            )
+            playerStatsDao.insertOrUpdate(updated)
+        }
+    }
+
     suspend fun seedInitialDataIfEmpty(): SeededMatchData = withContext(Dispatchers.IO) {
         val teamAId = "team_warriors"
         val teamBId = "team_tigers"

@@ -10,6 +10,7 @@ import com.cricsaga.app.data.local.entity.TeamEntity
 import com.cricsaga.app.data.local.entity.UserEntity
 import com.cricsaga.app.data.repository.MatchRepository
 import com.cricsaga.app.data.repository.SeededMatchData
+import com.cricsaga.app.domain.engine.MatchResultCalculator
 import com.cricsaga.app.domain.engine.ScoringEngine
 import com.cricsaga.app.domain.model.*
 import kotlinx.coroutines.flow.*
@@ -20,10 +21,18 @@ data class ScoringUiState(
     val isLoading: Boolean = true,
     val matchId: String = "",
     val inningsId: String = "",
+    val inningsNumber: Int = 1,
     val matchTitle: String = "Loading...",
+    val teamAId: String = "",
+    val teamBId: String = "",
+    val battingTeamId: String = "",
+    val bowlingTeamId: String = "",
     val battingTeamName: String = "",
     val bowlingTeamName: String = "",
+    val totalOvers: Int = 20,
     val scoreState: InningsScoreState = InningsScoreState(),
+    val innings1Score: InningsScoreState? = null,
+    val innings1BattingTeamName: String = "",
     val striker: UserEntity? = null,
     val nonStriker: UserEntity? = null,
     val bowler: UserEntity? = null,
@@ -32,6 +41,12 @@ data class ScoringUiState(
     val battingBench: List<UserEntity> = emptyList(),
     val showDismissalDialog: Boolean = false,
     val showBowlerDialog: Boolean = false,
+    val showInningsBreakDialog: Boolean = false,
+    val showSecondInningsOpenersDialog: Boolean = false,
+    val showMatchResultDialog: Boolean = false,
+    val matchResult: MatchResult? = null,
+    val playerOfTheMatchCandidates: List<UserEntity> = emptyList(),
+    val selectedPlayerOfTheMatch: UserEntity? = null,
     val lastCompletedBowlerId: String = "",
     val lastActionMessage: String = "Ready to score"
 )
@@ -105,9 +120,15 @@ class ScoringViewModel(application: Application) : AndroidViewModel(application)
                 isLoading = false,
                 matchId = data.matchId,
                 inningsId = data.inningsId,
+                inningsNumber = 1,
                 matchTitle = "Warriors vs Tigers",
+                teamAId = "team_warriors",
+                teamBId = "team_tigers",
+                battingTeamId = "team_warriors",
+                bowlingTeamId = "team_tigers",
                 battingTeamName = data.teamAName,
                 bowlingTeamName = data.teamBName,
+                totalOvers = 20,
                 scoreState = scoringEngine.state,
                 striker = data.striker,
                 nonStriker = data.nonStriker,
@@ -171,9 +192,15 @@ class ScoringViewModel(application: Application) : AndroidViewModel(application)
                 isLoading = false,
                 matchId = result.matchId,
                 inningsId = result.inningsId,
+                inningsNumber = 1,
                 matchTitle = title,
+                teamAId = teamAId,
+                teamBId = teamBId,
+                battingTeamId = result.battingTeamId,
+                bowlingTeamId = result.bowlingTeamId,
                 battingTeamName = battingTeamName,
                 bowlingTeamName = bowlingTeamName,
+                totalOvers = totalOvers,
                 scoreState = scoringEngine.state,
                 striker = striker,
                 nonStriker = nonStriker,
@@ -359,6 +386,120 @@ class ScoringViewModel(application: Application) : AndroidViewModel(application)
         updateUiState("Strike rotated manually")
     }
 
+    fun onStartSecondInningsClicked() {
+        _uiState.value = _uiState.value.copy(
+            showInningsBreakDialog = false,
+            showSecondInningsOpenersDialog = true
+        )
+    }
+
+    fun confirmSecondInningsStart(
+        striker: UserEntity,
+        nonStriker: UserEntity,
+        openingBowler: UserEntity
+    ) {
+        val current = _uiState.value
+        val innings1Runs = current.innings1Score?.totalRuns ?: current.scoreState.totalRuns
+        val targetRuns = innings1Runs + 1
+
+        val newBattingTeamId = current.bowlingTeamId
+        val newBowlingTeamId = current.battingTeamId
+        val newBattingTeamName = current.bowlingTeamName
+        val newBowlingTeamName = current.battingTeamName
+        val newBattingSquad = current.bowlingSquad
+        val newBowlingSquad = current.battingSquad
+
+        viewModelScope.launch {
+            val newInningsId = repository.startSecondInnings(
+                matchId = current.matchId,
+                battingTeamId = newBattingTeamId,
+                bowlingTeamId = newBowlingTeamId,
+                targetRuns = targetRuns
+            )
+
+            val playerNames = (newBattingSquad + newBowlingSquad).associate { it.userId to it.fullName }
+            val newEngine = ScoringEngine(
+                matchId = current.matchId,
+                inningsNumber = 2,
+                totalOversAllotted = current.totalOvers,
+                targetRuns = targetRuns,
+                maxWickets = (newBattingSquad.size - 1).coerceAtLeast(1),
+                playerNames = playerNames
+            )
+            newEngine.startInnings(
+                strikerId = striker.userId,
+                nonStrikerId = nonStriker.userId,
+                openingBowlerId = openingBowler.userId
+            )
+            engine = newEngine
+
+            val bench = newBattingSquad.filter { it.userId != striker.userId && it.userId != nonStriker.userId }
+
+            _uiState.value = current.copy(
+                inningsId = newInningsId,
+                inningsNumber = 2,
+                battingTeamId = newBattingTeamId,
+                bowlingTeamId = newBowlingTeamId,
+                battingTeamName = newBattingTeamName,
+                bowlingTeamName = newBowlingTeamName,
+                battingSquad = newBattingSquad,
+                bowlingSquad = newBowlingSquad,
+                battingBench = bench,
+                striker = striker,
+                nonStriker = nonStriker,
+                bowler = openingBowler,
+                scoreState = newEngine.state,
+                showSecondInningsOpenersDialog = false,
+                lastCompletedBowlerId = "",
+                lastActionMessage = "2nd Innings started! Target: $targetRuns runs from ${current.totalOvers} overs"
+            )
+        }
+    }
+
+    fun setPlayerOfTheMatch(player: UserEntity) {
+        _uiState.value = _uiState.value.copy(
+            selectedPlayerOfTheMatch = player,
+            matchResult = _uiState.value.matchResult?.copy(
+                playerOfTheMatchId = player.userId,
+                playerOfTheMatchName = player.fullName
+            )
+        )
+        viewModelScope.launch {
+            repository.completeMatch(
+                matchId = _uiState.value.matchId,
+                winnerTeamId = _uiState.value.matchResult?.winnerTeamId,
+                resultSummary = _uiState.value.matchResult?.resultSummary,
+                playerOfTheMatchId = player.userId
+            )
+        }
+    }
+
+    fun dismissMatchResultDialog() {
+        _uiState.value = _uiState.value.copy(showMatchResultDialog = false)
+    }
+
+    private fun determinePlayerOfTheMatch(
+        allPlayers: List<UserEntity>,
+        innings1: InningsScoreState?,
+        innings2: InningsScoreState
+    ): UserEntity? {
+        val scores = mutableMapOf<String, Int>()
+
+        listOfNotNull(innings1, innings2).forEach { inn ->
+            inn.batsmen.forEach { (id, bat) ->
+                val current = scores.getOrDefault(id, 0)
+                scores[id] = current + bat.runs + (bat.fours * 1) + (bat.sixes * 2)
+            }
+            inn.bowlers.forEach { (id, bowl) ->
+                val current = scores.getOrDefault(id, 0)
+                scores[id] = current + (bowl.wickets * 25) + (bowl.maidens * 10) - (bowl.runsConceded / 2)
+            }
+        }
+
+        val bestPlayerId = scores.maxByOrNull { it.value }?.key
+        return allPlayers.find { it.userId == bestPlayerId } ?: allPlayers.firstOrNull()
+    }
+
     private fun updateUiState(
         message: String,
         showBowlerDialog: Boolean = false,
@@ -370,6 +511,73 @@ class ScoringViewModel(application: Application) : AndroidViewModel(application)
         val striker = _uiState.value.battingSquad.find { it.userId == state.strikerId }
         val nonStriker = _uiState.value.battingSquad.find { it.userId == state.nonStrikerId }
         val bowler = _uiState.value.bowlingSquad.find { it.userId == state.currentBowlerId }
+
+        // 1. Check if Innings 1 just completed
+        if (_uiState.value.inningsNumber == 1 && state.isCompleted) {
+            viewModelScope.launch {
+                repository.completeInnings(_uiState.value.inningsId)
+            }
+            _uiState.value = _uiState.value.copy(
+                scoreState = state,
+                innings1Score = state,
+                innings1BattingTeamName = _uiState.value.battingTeamName,
+                showInningsBreakDialog = true,
+                showBowlerDialog = false,
+                lastActionMessage = "1st Innings completed: ${state.totalRuns}/${state.totalWickets} (${state.oversFormatted} ov)"
+            )
+            return
+        }
+
+        // 2. Check if Innings 2 is completed or in progress
+        if (_uiState.value.inningsNumber == 2) {
+            val result = MatchResultCalculator.calculateResult(
+                teamAId = _uiState.value.teamAId,
+                teamAName = if (_uiState.value.battingTeamId == _uiState.value.teamAId) _uiState.value.battingTeamName else _uiState.value.bowlingTeamName,
+                teamBId = _uiState.value.teamBId,
+                teamBName = if (_uiState.value.battingTeamId == _uiState.value.teamBId) _uiState.value.battingTeamName else _uiState.value.bowlingTeamName,
+                innings1BattingTeamId = _uiState.value.bowlingTeamId,
+                innings1State = _uiState.value.innings1Score ?: InningsScoreState(totalRuns = 0),
+                innings2State = state,
+                maxWickets = (_uiState.value.battingSquad.size - 1).coerceAtLeast(1)
+            )
+
+            if (result.isCompleted) {
+                val allPlayers = _uiState.value.battingSquad + _uiState.value.bowlingSquad
+                val candidatePOTM = determinePlayerOfTheMatch(
+                    allPlayers = allPlayers,
+                    innings1 = _uiState.value.innings1Score,
+                    innings2 = state
+                )
+
+                viewModelScope.launch {
+                    repository.completeInnings(_uiState.value.inningsId)
+                    repository.completeMatch(
+                        matchId = _uiState.value.matchId,
+                        winnerTeamId = result.winnerTeamId,
+                        resultSummary = result.resultSummary,
+                        playerOfTheMatchId = candidatePOTM?.userId
+                    )
+                    repository.recordMatchPlayerStats(
+                        innings1 = _uiState.value.innings1Score,
+                        innings2 = state
+                    )
+                }
+
+                _uiState.value = _uiState.value.copy(
+                    scoreState = state,
+                    showMatchResultDialog = true,
+                    showBowlerDialog = false,
+                    matchResult = result.copy(
+                        playerOfTheMatchId = candidatePOTM?.userId,
+                        playerOfTheMatchName = candidatePOTM?.fullName
+                    ),
+                    playerOfTheMatchCandidates = allPlayers,
+                    selectedPlayerOfTheMatch = candidatePOTM,
+                    lastActionMessage = result.resultSummary
+                )
+                return
+            }
+        }
 
         _uiState.value = _uiState.value.copy(
             scoreState = state,

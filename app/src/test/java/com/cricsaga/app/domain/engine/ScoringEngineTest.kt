@@ -201,4 +201,93 @@ class ScoringEngineTest {
         assertEquals(0, engine.state.totalLegalDeliveries)
         assertEquals(emptyList<DeliveryRecord>(), engine.history)
     }
+
+    @Test
+    fun inningsCompletesWhenAllOversFinished() {
+        val shortEngine = ScoringEngine(
+            matchId = "match_short",
+            inningsNumber = 1,
+            totalOversAllotted = 1,
+            playerNames = mapOf(strikerId to "Rohit", nonStrikerId to "Virat", bowlerId to "Bumrah")
+        )
+        shortEngine.startInnings(strikerId, nonStrikerId, bowlerId)
+
+        repeat(5) {
+            shortEngine.recordDelivery(runsOffBat = 1)
+        }
+        assertFalse(shortEngine.state.isCompleted)
+
+        // 6th legal delivery completes the 1 allotted over
+        shortEngine.recordDelivery(runsOffBat = 1)
+        assertTrue(shortEngine.state.isCompleted)
+        assertEquals(com.cricsaga.app.domain.model.InningsCompletionReason.OVERS_COMPLETED, shortEngine.state.completionReason)
+    }
+
+    @Test
+    fun inningsCompletesWhenAllOut() {
+        val allOutEngine = ScoringEngine(
+            matchId = "match_allout",
+            inningsNumber = 1,
+            totalOversAllotted = 10,
+            maxWickets = 2,
+            playerNames = mapOf(strikerId to "Rohit", nonStrikerId to "Virat", bowlerId to "Bumrah", incomingBatsmanId to "Surya")
+        )
+        allOutEngine.startInnings(strikerId, nonStrikerId, bowlerId)
+
+        // Wicket 1
+        allOutEngine.recordDelivery(
+            dismissal = DismissalDetails(DismissalType.BOWLED, strikerId),
+            incomingBatsmanId = incomingBatsmanId,
+            nextStrikerIdAfterDismissal = incomingBatsmanId
+        )
+        assertEquals(1, allOutEngine.state.totalWickets)
+        assertFalse(allOutEngine.state.isCompleted)
+
+        // Wicket 2 (All out)
+        allOutEngine.recordDelivery(
+            dismissal = DismissalDetails(DismissalType.CAUGHT, incomingBatsmanId)
+        )
+        assertEquals(2, allOutEngine.state.totalWickets)
+        assertTrue(allOutEngine.state.isCompleted)
+        assertEquals(com.cricsaga.app.domain.model.InningsCompletionReason.ALL_OUT, allOutEngine.state.completionReason)
+    }
+
+    @Test
+    fun secondInningsTargetChaseCalculation() {
+        // Target 11 runs in 2 overs
+        val chaseEngine = ScoringEngine(
+            matchId = "match_chase",
+            inningsNumber = 2,
+            totalOversAllotted = 2,
+            targetRuns = 11,
+            playerNames = mapOf(strikerId to "Rohit", nonStrikerId to "Virat", bowlerId to "Bumrah")
+        )
+        chaseEngine.startInnings(strikerId, nonStrikerId, bowlerId)
+
+        chaseEngine.recordDelivery(runsOffBat = 6)
+        assertEquals(5, chaseEngine.state.runsNeeded)
+        assertEquals(11, chaseEngine.state.ballsRemaining)
+        assertFalse(chaseEngine.state.isCompleted)
+
+        // Hit a 6 -> reaches 12 runs (>= target 11)
+        chaseEngine.recordDelivery(runsOffBat = 6)
+        assertTrue(chaseEngine.state.isCompleted)
+        assertEquals(com.cricsaga.app.domain.model.InningsCompletionReason.TARGET_CHASED, chaseEngine.state.completionReason)
+
+        // Verify MatchResultCalculator detects win by 10 wickets
+        val result = MatchResultCalculator.calculateResult(
+            teamAId = "team_warriors",
+            teamAName = "Warriors",
+            teamBId = "team_tigers",
+            teamBName = "Tigers",
+            innings1BattingTeamId = "team_warriors",
+            innings1State = com.cricsaga.app.domain.model.InningsScoreState(totalRuns = 10, totalOversAllotted = 2),
+            innings2State = chaseEngine.state,
+            maxWickets = 10
+        )
+
+        assertTrue(result.isCompleted)
+        assertEquals("team_tigers", result.winnerTeamId)
+        assertTrue(result.resultSummary.contains("Tigers won by 10 wickets"))
+    }
 }

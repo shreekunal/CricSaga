@@ -1,0 +1,193 @@
+package com.cricsaga.app.ui.utils
+
+import android.content.Context
+import android.content.Intent
+import android.graphics.*
+import androidx.core.content.FileProvider
+import com.cricsaga.app.domain.model.InningsScoreState
+import com.cricsaga.app.domain.model.MatchResult
+import java.io.File
+import java.io.FileOutputStream
+
+object ShareUtils {
+
+    fun generateAndSharePoster(
+        context: Context,
+        matchTitle: String,
+        battingTeamName: String,
+        bowlingTeamName: String,
+        scoreState: InningsScoreState,
+        firstInningsScore: InningsScoreState? = null,
+        firstInningsTeamName: String? = null,
+        matchResult: MatchResult? = null
+    ) {
+        val width = 1080
+        val height = 1350
+        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+
+        // Background
+        val bgPaint = Paint().apply {
+            color = Color.rgb(15, 16, 19)
+            style = Paint.Style.FILL
+        }
+        canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), bgPaint)
+
+        // Card container
+        val cardPaint = Paint().apply {
+            color = Color.rgb(23, 25, 30)
+            style = Paint.Style.FILL
+        }
+        val cardRect = RectF(60f, 60f, (width - 60).toFloat(), (height - 60).toFloat())
+        canvas.drawRoundRect(cardRect, 32f, 32f, cardPaint)
+
+        // Border
+        val borderPaint = Paint().apply {
+            color = Color.rgb(38, 41, 51)
+            style = Paint.Style.STROKE
+            strokeWidth = 3f
+        }
+        canvas.drawRoundRect(cardRect, 32f, 32f, borderPaint)
+
+        // Header Title: CRICSAGA
+        val brandPaint = Paint().apply {
+            color = Color.rgb(229, 57, 53)
+            textSize = 34f
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            textAlign = Paint.Align.CENTER
+            isAntiAlias = true
+        }
+        canvas.drawText("CRICSAGA • HAR RUN KI KAHANI", width / 2f, 150f, brandPaint)
+
+        // Match Title
+        val matchTitlePaint = Paint().apply {
+            color = Color.WHITE
+            textSize = 52f
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            textAlign = Paint.Align.CENTER
+            isAntiAlias = true
+        }
+        canvas.drawText(matchTitle, width / 2f, 240f, matchTitlePaint)
+
+        // Result Banner or Live Banner
+        val resultText = matchResult?.resultSummary?.ifEmpty { "MATCH SUMMARY" } ?: "MATCH SUMMARY"
+        val bannerPaint = Paint().apply {
+            color = Color.rgb(255, 179, 0)
+            textSize = 38f
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            textAlign = Paint.Align.CENTER
+            isAntiAlias = true
+        }
+        canvas.drawText(resultText, width / 2f, 320f, bannerPaint)
+
+        // Divider
+        val dividerPaint = Paint().apply {
+            color = Color.rgb(38, 41, 51)
+            strokeWidth = 2f
+        }
+        canvas.drawLine(120f, 380f, (width - 120).toFloat(), 380f, dividerPaint)
+
+        // Innings 1 Section
+        val inn1Name = firstInningsTeamName ?: battingTeamName
+        val inn1Score = firstInningsScore ?: scoreState
+
+        val teamNamePaint = Paint().apply {
+            color = Color.rgb(209, 213, 219)
+            textSize = 42f
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            isAntiAlias = true
+        }
+        canvas.drawText(inn1Name.uppercase(), 120f, 470f, teamNamePaint)
+
+        val scorePaint = Paint().apply {
+            color = Color.WHITE
+            textSize = 72f
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            isAntiAlias = true
+        }
+        canvas.drawText("${inn1Score.totalRuns}/${inn1Score.totalWickets}", 120f, 560f, scorePaint)
+
+        val oversPaint = Paint().apply {
+            color = Color.rgb(156, 163, 175)
+            textSize = 34f
+            isAntiAlias = true
+        }
+        canvas.drawText("${inn1Score.oversFormatted} ov • CRR: ${String.format("%.2f", inn1Score.currentRunRate)}", 120f, 620f, oversPaint)
+
+        // Innings 2 Section (if available)
+        if (firstInningsScore != null) {
+            canvas.drawLine(120f, 690f, (width - 120).toFloat(), 690f, dividerPaint)
+
+            canvas.drawText(battingTeamName.uppercase(), 120f, 780f, teamNamePaint)
+            canvas.drawText("${scoreState.totalRuns}/${scoreState.totalWickets}", 120f, 870f, scorePaint)
+            canvas.drawText("${scoreState.oversFormatted} ov • CRR: ${String.format("%.2f", scoreState.currentRunRate)}", 120f, 930f, oversPaint)
+        }
+
+        // Top Performers section
+        val topBatter = scoreState.batsmen.values.maxByOrNull { it.runs }
+        val topBowler = scoreState.bowlers.values.maxByOrNull { it.wickets }
+
+        canvas.drawLine(120f, 1010f, (width - 120).toFloat(), 1010f, dividerPaint)
+
+        val statHeaderPaint = Paint().apply {
+            color = Color.rgb(255, 179, 0)
+            textSize = 30f
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            isAntiAlias = true
+        }
+        canvas.drawText("TOP PERFORMERS", 120f, 1070f, statHeaderPaint)
+
+        val statValuePaint = Paint().apply {
+            color = Color.WHITE
+            textSize = 34f
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+            isAntiAlias = true
+        }
+
+        val batterText = topBatter?.let { "${it.playerName}: ${it.runs} (${it.ballsFaced}b) • ${it.fours}x4 ${it.sixes}x6" } ?: "Batted with flair"
+        canvas.drawText("🏏  $batterText", 120f, 1130f, statValuePaint)
+
+        val bowlerText = topBowler?.let { "${it.bowlerName}: ${it.wickets}/${it.runsConceded} (${it.oversFormatted} ov)" } ?: "Bowled with discipline"
+        canvas.drawText("🎯  $bowlerText", 120f, 1190f, statValuePaint)
+
+        // Footer
+        val footerPaint = Paint().apply {
+            color = Color.rgb(156, 163, 175)
+            textSize = 26f
+            textAlign = Paint.Align.CENTER
+            isAntiAlias = true
+        }
+        canvas.drawText("Scored with CricSaga — Grassroots Cricket Platform", width / 2f, 1280f, footerPaint)
+
+        // Save bitmap to cache and dispatch Intent
+        try {
+            val imagesFolder = File(context.cacheDir, "images")
+            imagesFolder.mkdirs()
+            val file = File(imagesFolder, "match_poster.png")
+            val stream = FileOutputStream(file)
+            bitmap.compress(Bitmap.CompressFormat.PNG, 100, stream)
+            stream.flush()
+            stream.close()
+
+            val contentUri = FileProvider.getUriForFile(
+                context,
+                "${context.packageName}.fileprovider",
+                file
+            )
+
+            val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                type = "image/png"
+                putExtra(Intent.EXTRA_STREAM, contentUri)
+                putExtra(Intent.EXTRA_TEXT, "$matchTitle\n$resultText\n\nScored on CricSaga 🏏")
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            context.startActivity(Intent.createChooser(shareIntent, "Share Match Poster"))
+        } catch (e: Exception) {
+            val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                type = "text/plain"
+                putExtra(Intent.EXTRA_TEXT, "$matchTitle\n$resultText\n\nScored on CricSaga 🏏")
+            }
+            context.startActivity(Intent.createChooser(shareIntent, "Share Match Result"))
+        }
+    }
+}

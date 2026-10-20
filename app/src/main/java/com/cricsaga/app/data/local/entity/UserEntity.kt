@@ -17,5 +17,6 @@ data class UserEntity(
     val battingStyle: BattingStyle = BattingStyle.RIGHT_HAND,
     val bowlingStyle: BowlingStyle = BowlingStyle.RIGHT_ARM_MEDIUM,
     val city: String = "",
+    val jerseyNumber: String = "18",
     val createdAt: Long = System.currentTimeMillis()
 )

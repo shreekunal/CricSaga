@@ -11,6 +11,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import com.cricsaga.app.data.local.AuthManager
 import com.cricsaga.app.data.local.ProManager
 import com.cricsaga.app.ui.navigation.AppNavigation
 import com.cricsaga.app.ui.scoring.ScoringViewModel
@@ -24,6 +25,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val proManager = ProManager(applicationContext)
+        val authManager = AuthManager(applicationContext)
         setContent {
             CricSagaTheme {
                 Surface(
@@ -44,7 +46,8 @@ class MainActivity : ComponentActivity() {
                         } else {
                             AppNavigation(
                                 scoringViewModel = viewModel,
-                                proManager = proManager
+                                proManager = proManager,
+                                authManager = authManager
                             )
                         }
                     }

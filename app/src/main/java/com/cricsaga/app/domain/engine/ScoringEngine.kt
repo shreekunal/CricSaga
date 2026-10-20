@@ -15,6 +15,7 @@ class ScoringEngine(
     val inningsNumber: Int,
     val totalOversAllotted: Int = 20,
     val targetRuns: Int? = null,
+    val maxWickets: Int = 10,
     val playerNames: Map<String, String> = emptyMap()
 ) {
     private val deliveryHistory = mutableListOf<DeliveryRecord>()
@@ -77,6 +78,9 @@ class ScoringEngine(
         incomingBatsmanId: String? = null,
         nextStrikerIdAfterDismissal: String? = null
     ): InningsScoreState {
+        if (currentState.isCompleted) {
+            return currentState
+        }
         val isLegal = (extraType != ExtraType.WIDE && extraType != ExtraType.NO_BALL)
         val overNum = currentState.totalLegalDeliveries / 6
         val ballInOver = (currentState.totalLegalDeliveries % 6) + if (isLegal) 1 else 0
@@ -304,13 +308,22 @@ class ScoringEngine(
 
         // Check Innings Completion
         val isTargetReached = (targetRuns != null && totalRuns >= targetRuns)
+        val isAllOut = (totalWickets >= maxWickets)
         val isAllOversCompleted = (totalLegalDeliveries >= totalOversAllotted * 6)
-        val isCompleted = isTargetReached || isAllOversCompleted
+        val isCompleted = isTargetReached || isAllOut || isAllOversCompleted
 
-        val statusMessage = when {
-            isTargetReached -> "Target reached! Innings complete."
-            isAllOversCompleted -> "Overs completed."
-            else -> "Live"
+        val completionReason = when {
+            isTargetReached -> InningsCompletionReason.TARGET_CHASED
+            isAllOut -> InningsCompletionReason.ALL_OUT
+            isAllOversCompleted -> InningsCompletionReason.OVERS_COMPLETED
+            else -> null
+        }
+
+        val statusMessage = when (completionReason) {
+            InningsCompletionReason.TARGET_CHASED -> "Target reached! Innings complete."
+            InningsCompletionReason.ALL_OUT -> "All out! Innings complete."
+            InningsCompletionReason.OVERS_COMPLETED -> "Overs completed."
+            null -> "Live"
         }
 
         currentState = currentState.copy(
@@ -324,6 +337,7 @@ class ScoringEngine(
             bowlers = bowlersMap,
             currentOverBalls = currentOverTimeline,
             isCompleted = isCompleted,
+            completionReason = completionReason,
             statusMessage = statusMessage
         )
     }

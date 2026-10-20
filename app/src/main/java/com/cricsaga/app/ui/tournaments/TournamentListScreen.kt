@@ -54,6 +54,10 @@ fun TournamentListScreen(
         PointsTableRow(4, "Shivaji Park Champions", "SPC", 4, 0, 4, 0, "-2.390")
     )
 
+    var showCreateDialog by remember { mutableStateOf(false) }
+    var activeTournamentTitle by remember { mutableStateOf("Mumbai Champions Trophy 2026") }
+    var pointsTableData by remember { mutableStateOf(samplePointsTable) }
+
     val mostRuns = listOf(
         LeaderboardPlayer(1, "Rohit Verma", "Warriors CC", "324", "Avg 64.8 • SR 184.2"),
         LeaderboardPlayer(2, "Virat Sharma", "Royal Tigers", "289", "Avg 57.8 • SR 172.0"),
@@ -79,7 +83,7 @@ fun TournamentListScreen(
                                 fontSize = 20.sp
                             )
                             Text(
-                                text = "Mumbai Champions Trophy 2026",
+                                text = activeTournamentTitle,
                                 fontSize = 11.sp,
                                 color = TextTertiary
                             )
@@ -119,7 +123,7 @@ fun TournamentListScreen(
         },
         floatingActionButton = {
             FloatingActionButton(
-                onClick = onCreateTournamentClick,
+                onClick = { showCreateDialog = true },
                 containerColor = CrimsonPrimaryDark,
                 contentColor = Color.White
             ) {
@@ -167,7 +171,7 @@ fun TournamentListScreen(
 
                                     HorizontalDivider(color = DividerDark, thickness = 0.5.dp)
 
-                                    samplePointsTable.forEach { row ->
+                                    pointsTableData.forEach { row ->
                                         Row(
                                             modifier = Modifier
                                                 .fillMaxWidth()
@@ -341,5 +345,108 @@ fun TournamentListScreen(
                 }
             }
         }
+    }
+
+    if (showCreateDialog) {
+        var tourneyName by remember { mutableStateOf("") }
+        var oversText by remember { mutableStateOf("20") }
+        var teamsInput by remember { mutableStateOf("Warriors CC, Royal Tigers, Metro Strikers, Dadar Dynamos") }
+
+        AlertDialog(
+            onDismissRequest = { showCreateDialog = false },
+            containerColor = SlateSurfaceDark,
+            shape = RoundedCornerShape(16.dp),
+            title = {
+                Text(
+                    text = "Create Grassroots Tournament",
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp
+                )
+            },
+            text = {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    OutlinedTextField(
+                        value = tourneyName,
+                        onValueChange = { tourneyName = it },
+                        label = { Text("Tournament Name", color = MutedGrey) },
+                        placeholder = { Text("e.g. Gully Premier League 2026", color = Color.Gray) },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White,
+                            focusedBorderColor = CrimsonPrimaryDark,
+                            unfocusedBorderColor = CardBorderDark
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    OutlinedTextField(
+                        value = oversText,
+                        onValueChange = { oversText = it },
+                        label = { Text("Overs per side", color = MutedGrey) },
+                        placeholder = { Text("10, 15, or 20", color = Color.Gray) },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White,
+                            focusedBorderColor = CrimsonPrimaryDark,
+                            unfocusedBorderColor = CardBorderDark
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    OutlinedTextField(
+                        value = teamsInput,
+                        onValueChange = { teamsInput = it },
+                        label = { Text("Participating Teams (comma-separated)", color = MutedGrey) },
+                        placeholder = { Text("Team 1, Team 2, Team 3", color = Color.Gray) },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White,
+                            focusedBorderColor = CrimsonPrimaryDark,
+                            unfocusedBorderColor = CardBorderDark
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val trimmedName = tourneyName.trim().ifEmpty { "Gully Championship 2026" }
+                        val teams = teamsInput.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+                        if (teams.isNotEmpty()) {
+                            val newRows = teams.mapIndexed { index, name ->
+                                val code = name.split(" ").mapNotNull { it.firstOrNull() }.joinToString("").take(3).uppercase().ifEmpty { "TM${index + 1}" }
+                                PointsTableRow(
+                                    rank = index + 1,
+                                    teamName = name,
+                                    shortCode = code,
+                                    played = 0,
+                                    won = 0,
+                                    lost = 0,
+                                    points = 0,
+                                    nrr = "0.000"
+                                )
+                            }
+                            pointsTableData = newRows
+                        }
+                        activeTournamentTitle = trimmedName
+                        showCreateDialog = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = CrimsonPrimaryDark),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text("CREATE & INITIALIZE", fontWeight = FontWeight.Bold, color = Color.White)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showCreateDialog = false }) {
+                    Text("CANCEL", color = MutedGrey)
+                }
+            }
+        )
     }
 }
