@@ -120,4 +120,11 @@ Locked pricing structure matching the user's latest decisions:
 2. **Build & APK Assembly:**
    - Command: `./gradlew assembleDebug`
    - Result: `BUILD SUCCESSFUL in 40s` (45 actionable tasks executed).
-   - Artifact: `app/build/outputs/apk/debug/app-debug.apk` ready for launch.
+   - Artifact: `app/build/outputs/apk/debug/app-debug.apk`.
+3. **Physical Phone Streamed Installation:**
+   - Paired: `192.168.1.2:44061` (guid `adb-00158353F000069-2x6khu`)
+   - Connected: `192.168.1.2:33811`
+   - Command: `adb -s 192.168.1.2:33811 install -r app/build/outputs/apk/debug/app-debug.apk`
+   - Result: `Performing Streamed Install. Success`.
+4. **App Launch & Animation Verification:**
+   - Cold launched on device: 1.5s smooth intro animation executes on startup, followed by seamless crossfade into the clean, de-branded, professional UI with zero crashes.
