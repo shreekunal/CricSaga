@@ -7,9 +7,9 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Undo
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -73,7 +73,7 @@ object BroadcastNotifier {
             tag = "REVERTED",
             title = message,
             detail = "Scorecard adjusted",
-            icon = Icons.Default.Undo,
+            icon = Icons.AutoMirrored.Filled.Undo,
             accentColor = DarkAlertWicket
         )
     }

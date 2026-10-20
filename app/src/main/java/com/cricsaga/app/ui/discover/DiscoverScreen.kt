@@ -61,45 +61,13 @@ data class OpenTourneyItem(
 @Composable
 fun DiscoverScreen(
     isPro: Boolean,
+    lookingForList: List<LookingForItem> = emptyList(),
+    onPostRequirement: (type: String, title: String, organizer: String, timing: String, location: String, note: String, phone: String) -> Unit = { _, _, _, _, _, _, _ -> },
     onContactWhatsApp: (String, String) -> Unit = { _, _ -> }
 ) {
     var selectedTab by remember { mutableIntStateOf(0) }
     val tabs = listOf("Looking For", "Grounds & Turfs", "Tournaments")
 
-    val initialLookingForList = listOf(
-        LookingForItem(
-            id = "lf_1",
-            type = "Opponent",
-            title = "Weekend Match • 16 Overs",
-            teamOrOrganizer = "Warriors CC",
-            timing = "Sunday • 7:00 AM - 11:00 AM",
-            location = "Shivaji Park Ground #3, Dadar",
-            note = "Leather ball. Umpire and pitch fees split 50/50.",
-            contactPhone = "9820123456"
-        ),
-        LookingForItem(
-            id = "lf_2",
-            type = "Players",
-            title = "Need 2 Batsmen for Tonight",
-            teamOrOrganizer = "Metro Knights",
-            timing = "Tonight • 9:30 PM - 11:00 PM",
-            location = "Champions Turf, Andheri East",
-            note = "8 overs box cricket under floodlights.",
-            contactPhone = "9820987654"
-        ),
-        LookingForItem(
-            id = "lf_3",
-            type = "Scorer",
-            title = "Certified Scorer for Corporate League",
-            teamOrOrganizer = "Corporate Cup Committee",
-            timing = "Saturday & Sunday • Full Day",
-            location = "Oval Maidan, Churchgate",
-            note = "₹1,200 per match. Digital scoring on CricSaga.",
-            contactPhone = "9820555777"
-        )
-    )
-
-    var lookingForList by remember { mutableStateOf(initialLookingForList) }
     var showPostDialog by remember { mutableStateOf(false) }
 
     val turfsList = listOf(
@@ -266,7 +234,37 @@ fun DiscoverScreen(
                             }
                         }
 
-                        items(lookingForList) { item ->
+                        if (lookingForList.isEmpty()) {
+                            item {
+                                Card(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = CardDefaults.cardColors(containerColor = SlateSurfaceDark),
+                                    shape = RoundedCornerShape(10.dp),
+                                    border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(CardBorderDark))
+                                ) {
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(24.dp),
+                                        horizontalAlignment = Alignment.CenterHorizontally
+                                    ) {
+                                        Text(
+                                            text = "No Grassroots Requests Posted",
+                                            style = PlayerNameSecondary,
+                                            color = TextPrimary
+                                        )
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Text(
+                                            text = "Need an opponent for the weekend or short on players? Tap 'Post' above.",
+                                            style = BodyCaption,
+                                            color = TextSecondary,
+                                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                                        )
+                                    }
+                                }
+                            }
+                        } else {
+                            items(lookingForList) { item ->
                             Card(
                                 modifier = Modifier.fillMaxWidth(),
                                 colors = CardDefaults.cardColors(containerColor = SlateSurfaceDark),
@@ -344,6 +342,7 @@ fun DiscoverScreen(
                         }
                     }
                 }
+            }
 
                 1 -> {
                     // Grounds & Turfs
@@ -645,17 +644,15 @@ fun DiscoverScreen(
                 Button(
                     onClick = {
                         hapticManager?.tapUiClick()
-                        val newItem = LookingForItem(
-                            id = "lf_${System.currentTimeMillis()}",
-                            type = selectedType,
-                            title = titleText.trim().ifEmpty { "Cricket Requirement • $selectedType" },
-                            teamOrOrganizer = organizerText.trim().ifEmpty { "Cricket Team" },
-                            timing = timingText.trim(),
-                            location = locationText.trim(),
-                            note = noteText.trim(),
-                            contactPhone = contactPhoneText.trim().ifEmpty { "9820000000" }
+                        onPostRequirement(
+                            selectedType,
+                            titleText.trim().ifEmpty { "Cricket Requirement • $selectedType" },
+                            organizerText.trim().ifEmpty { "Cricket Team" },
+                            timingText.trim(),
+                            locationText.trim(),
+                            noteText.trim(),
+                            contactPhoneText.trim().ifEmpty { "9820000000" }
                         )
-                        lookingForList = listOf(newItem) + lookingForList
                         showPostDialog = false
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = CrimsonPrimaryDark),

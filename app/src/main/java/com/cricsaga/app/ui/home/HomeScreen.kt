@@ -189,7 +189,7 @@ fun HomeScreen(
                         color = TextSecondary
                     )
                     Text(
-                        text = "${demoRadarMatches.size} Active",
+                        text = "${activeRadarMatches.size} Active",
                         color = TextTertiary,
                         fontSize = 11.sp
                     )
@@ -197,9 +197,37 @@ fun HomeScreen(
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
+                if (activeRadarMatches.isEmpty()) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = SlateSurfaceDark),
+                        shape = RoundedCornerShape(10.dp),
+                        border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(CardBorderDark))
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                text = "No active matches on radar",
+                                style = PlayerNameSecondary,
+                                color = TextPrimary
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "Live and recent matches will appear here with instant ball-by-ball updates.",
+                                style = BodyCaption,
+                                color = TextSecondary,
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                            )
+                        }
+                    }
+                } else {
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
                     items(activeRadarMatches) { radar ->
                         Card(
                             modifier = Modifier
@@ -315,6 +343,7 @@ fun HomeScreen(
                     }
                 }
             }
+        }
 
             // 2. Action Strip
             Column(modifier = Modifier.padding(horizontal = 16.dp)) {
@@ -395,50 +424,59 @@ fun HomeScreen(
                     border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(CardBorderDark))
                 ) {
                     Column(modifier = Modifier.padding(12.dp)) {
-                        topPerformers.forEachIndexed { index, hero ->
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 6.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Box(
+                        if (topPerformers.isEmpty()) {
+                            Text(
+                                text = "No player milestones recorded yet. Scored matches and Player of the Match awards will appear here.",
+                                style = BodyCaption,
+                                color = TextTertiary,
+                                modifier = Modifier.padding(vertical = 8.dp)
+                            )
+                        } else {
+                            topPerformers.forEachIndexed { index, hero ->
+                                Row(
                                     modifier = Modifier
-                                        .size(34.dp)
-                                        .clip(CircleShape)
-                                        .background(ElevatedSurfaceDark),
-                                    contentAlignment = Alignment.Center
+                                        .fillMaxWidth()
+                                        .padding(vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(34.dp)
+                                            .clip(CircleShape)
+                                            .background(ElevatedSurfaceDark),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = hero.initials,
+                                            color = TextPrimary,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 11.sp
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = hero.playerName,
+                                            color = TextPrimary,
+                                            fontWeight = FontWeight.SemiBold,
+                                            fontSize = 13.sp
+                                        )
+                                        Text(
+                                            text = hero.context,
+                                            color = TextTertiary,
+                                            fontSize = 11.sp
+                                        )
+                                    }
                                     Text(
-                                        text = hero.initials,
+                                        text = hero.performance,
                                         color = TextPrimary,
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 11.sp
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Medium
                                     )
                                 }
-                                Spacer(modifier = Modifier.width(10.dp))
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = hero.playerName,
-                                        color = TextPrimary,
-                                        fontWeight = FontWeight.SemiBold,
-                                        fontSize = 13.sp
-                                    )
-                                    Text(
-                                        text = hero.context,
-                                        color = TextTertiary,
-                                        fontSize = 11.sp
-                                    )
+                                if (index < topPerformers.size - 1) {
+                                    HorizontalDivider(color = DividerDark, thickness = 0.5.dp, modifier = Modifier.padding(vertical = 4.dp))
                                 }
-                                Text(
-                                    text = hero.performance,
-                                    color = TextPrimary,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Medium
-                                )
-                            }
-                            if (index < topPerformers.size - 1) {
-                                HorizontalDivider(color = DividerDark, thickness = 0.5.dp, modifier = Modifier.padding(vertical = 4.dp))
                             }
                         }
                     }

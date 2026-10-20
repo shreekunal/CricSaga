@@ -5,6 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.cricsaga.app.data.local.CricSagaDatabase
 import com.cricsaga.app.data.local.entity.DeliveryEntity
+import com.cricsaga.app.data.local.entity.LookingForEntity
 import com.cricsaga.app.data.local.entity.MatchEntity
 import com.cricsaga.app.data.local.entity.TeamEntity
 import com.cricsaga.app.data.local.entity.UserEntity
@@ -63,6 +64,7 @@ class ScoringViewModel(application: Application) : AndroidViewModel(application)
     val allMatches: StateFlow<List<MatchEntity>>
     val allTeams: StateFlow<List<TeamEntity>>
     val topPerformers: StateFlow<List<GrassrootsHeroItem>>
+    val lookingForPosts: StateFlow<List<LookingForEntity>>
 
     private val _uiState = MutableStateFlow(ScoringUiState())
     val uiState: StateFlow<ScoringUiState> = _uiState.asStateFlow()
@@ -119,7 +121,31 @@ class ScoringViewModel(application: Application) : AndroidViewModel(application)
                 emptyList()
             )
 
+        lookingForPosts = repository.getAllLookingForPosts().stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(5000),
+            emptyList()
+        )
+
+        viewModelScope.launch {
+            repository.seedInitialLookingForPostsIfEmpty()
+        }
+
         loadActiveMatch()
+    }
+
+    fun createLookingForPost(
+        type: String,
+        title: String,
+        teamOrOrganizer: String,
+        timing: String,
+        location: String,
+        note: String,
+        contactPhone: String
+    ) {
+        viewModelScope.launch {
+            repository.createLookingForPost(type, title, teamOrOrganizer, timing, location, note, contactPhone)
+        }
     }
 
     private fun loadActiveMatch() {
@@ -632,6 +658,169 @@ class ScoringViewModel(application: Application) : AndroidViewModel(application)
             lastCompletedBowlerId = lastCompletedBowlerId,
             lastActionMessage = message,
             currentInningsDeliveries = eng.history
+        )
+    }
+
+    fun loadMatchById(matchId: String, onLoaded: (isLive: Boolean) -> Unit) {
+        viewModelScope.launch {
+            val match = repository.getMatch(matchId) ?: return@launch
+            val inningsList = repository.getInningsListForMatch(matchId)
+            val teamA = repository.getTeam(match.teamAId)
+            val teamB = repository.getTeam(match.teamBId)
+            val teamAName = teamA?.teamName ?: "Team A"
+            val teamBName = teamB?.teamName ?: "Team B"
+
+            val teamASquad = repository.getTeamMembersList(match.teamAId)
+            val teamBSquad = repository.getTeamMembersList(match.teamBId)
+            val allPlayers = teamASquad + teamBSquad
+            val playerNames = allPlayers.associate { it.userId to it.fullName }
+
+            val inn1 = inningsList.getOrNull(0)
+            val inn2 = inningsList.getOrNull(1)
+
+            val inn1Entities = inn1?.let { repository.getDeliveriesList(it.inningsId) } ?: emptyList()
+            val inn2Entities = inn2?.let { repository.getDeliveriesList(it.inningsId) } ?: emptyList()
+
+            val inn1Records = inn1Entities.map { it.toRecord() }
+            val inn2Records = inn2Entities.map { it.toRecord() }
+
+            val inn1BattingName = if (inn1?.battingTeamId == match.teamAId) teamAName else teamBName
+            val inn1BowlingName = if (inn1?.battingTeamId == match.teamAId) teamBName else teamAName
+            val inn2BattingName = if (inn2?.battingTeamId == match.teamAId) teamAName else teamBName
+            val inn2BowlingName = if (inn2?.battingTeamId == match.teamAId) teamBName else teamAName
+
+            // Replay Innings 1
+            val eng1 = inn1?.let {
+                val e = ScoringEngine(
+                    matchId = matchId,
+                    inningsNumber = 1,
+                    totalOversAllotted = match.totalOvers,
+                    playerNames = playerNames
+                )
+                val firstDel = inn1Records.firstOrNull()
+                val striker = firstDel?.strikerId ?: teamASquad.firstOrNull()?.userId ?: ""
+                val nonStriker = firstDel?.nonStrikerId ?: teamASquad.getOrNull(1)?.userId ?: ""
+                val bowler = firstDel?.bowlerId ?: teamBSquad.firstOrNull()?.userId ?: ""
+                if (striker.isNotEmpty() && nonStriker.isNotEmpty() && bowler.isNotEmpty()) {
+                    e.startInnings(striker, nonStriker, bowler)
+                    inn1Records.forEach { r ->
+                        e.recordDelivery(
+                            runsOffBat = r.runsOffBat,
+                            extraType = r.extraType,
+                            extraRuns = r.extraRuns,
+                            dismissal = r.dismissal,
+                            incomingBatsmanId = r.nextStrikerIdAfterDismissal,
+                            nextStrikerIdAfterDismissal = r.nextStrikerIdAfterDismissal
+                        )
+                    }
+                }
+                e
+            }
+
+            // Replay Innings 2 if present
+            val eng2 = inn2?.let {
+                val target = (inn1?.totalRuns ?: eng1?.state?.totalRuns ?: 0) + 1
+                val e = ScoringEngine(
+                    matchId = matchId,
+                    inningsNumber = 2,
+                    totalOversAllotted = match.totalOvers,
+                    targetRuns = target,
+                    playerNames = playerNames
+                )
+                val firstDel = inn2Records.firstOrNull()
+                val striker = firstDel?.strikerId ?: teamBSquad.firstOrNull()?.userId ?: ""
+                val nonStriker = firstDel?.nonStrikerId ?: teamBSquad.getOrNull(1)?.userId ?: ""
+                val bowler = firstDel?.bowlerId ?: teamASquad.firstOrNull()?.userId ?: ""
+                if (striker.isNotEmpty() && nonStriker.isNotEmpty() && bowler.isNotEmpty()) {
+                    e.startInnings(striker, nonStriker, bowler)
+                    inn2Records.forEach { r ->
+                        e.recordDelivery(
+                            runsOffBat = r.runsOffBat,
+                            extraType = r.extraType,
+                            extraRuns = r.extraRuns,
+                            dismissal = r.dismissal,
+                            incomingBatsmanId = r.nextStrikerIdAfterDismissal,
+                            nextStrikerIdAfterDismissal = r.nextStrikerIdAfterDismissal
+                        )
+                    }
+                }
+                e
+            }
+
+            val isMatchLive = match.matchStatus == MatchStatus.LIVE
+            val activeEng = if (inn2 != null) eng2 else eng1
+            engine = activeEng
+
+            val activeBattingTeamName = if (inn2 != null) inn2BattingName else inn1BattingName
+            val activeBowlingTeamName = if (inn2 != null) inn2BowlingName else inn1BowlingName
+
+            val currentStriker = allPlayers.find { it.userId == activeEng?.state?.strikerId }
+            val currentNonStriker = allPlayers.find { it.userId == activeEng?.state?.nonStrikerId }
+            val currentBowler = allPlayers.find { it.userId == activeEng?.state?.currentBowlerId }
+
+            _uiState.value = _uiState.value.copy(
+                isLoading = false,
+                matchId = match.matchId,
+                inningsId = inn2?.inningsId ?: inn1?.inningsId ?: "",
+                inningsNumber = if (inn2 != null) 2 else 1,
+                matchTitle = match.matchTitle,
+                teamAId = match.teamAId,
+                teamBId = match.teamBId,
+                battingTeamName = activeBattingTeamName,
+                bowlingTeamName = activeBowlingTeamName,
+                totalOvers = match.totalOvers,
+                scoreState = activeEng?.state ?: InningsScoreState(),
+                innings1Score = eng1?.state,
+                innings1BattingTeamName = inn1BattingName,
+                striker = currentStriker,
+                nonStriker = currentNonStriker,
+                bowler = currentBowler,
+                battingSquad = if (activeBattingTeamName == teamAName) teamASquad else teamBSquad,
+                bowlingSquad = if (activeBattingTeamName == teamAName) teamBSquad else teamASquad,
+                currentInningsDeliveries = activeEng?.history ?: emptyList(),
+                innings1Deliveries = eng1?.history ?: emptyList(),
+                matchResult = if (match.matchStatus == MatchStatus.COMPLETED) {
+                    MatchResult(
+                        isCompleted = true,
+                        winnerTeamId = match.winnerTeamId,
+                        winnerTeamName = if (match.winnerTeamId == match.teamAId) teamAName else if (match.winnerTeamId == match.teamBId) teamBName else "Match Drawn",
+                        resultSummary = match.resultSummary ?: "Completed",
+                        playerOfTheMatchId = match.playerOfTheMatchId,
+                        playerOfTheMatchName = playerNames[match.playerOfTheMatchId]
+                    )
+                } else null,
+                lastActionMessage = if (isMatchLive) "Resumed match: ${match.matchTitle}" else (match.resultSummary ?: "Match Final")
+            )
+
+            onLoaded(isMatchLive)
+        }
+    }
+
+    private fun DeliveryEntity.toRecord(): DeliveryRecord {
+        val dismissalDetails = if (isWicket && dismissalType != null && dismissedPlayerId != null) {
+            DismissalDetails(
+                dismissalType = dismissalType,
+                dismissedPlayerId = dismissedPlayerId,
+                primaryFielderId = primaryFielderId,
+                secondaryFielderId = secondaryFielderId,
+                runsCompletedBeforeDismissal = runsCompletedBeforeDismissal
+            )
+        } else null
+
+        return DeliveryRecord(
+            deliveryIndex = deliveryIndex,
+            overNumber = overNumber,
+            ballInOver = ballInOver,
+            strikerId = strikerId,
+            nonStrikerId = nonStrikerId,
+            bowlerId = bowlerId,
+            runsOffBat = runsOffBat,
+            extraType = extraType,
+            extraRuns = extraRuns,
+            isLegalDelivery = isLegalDelivery,
+            dismissal = dismissalDetails,
+            nextStrikerIdAfterDismissal = nextStrikerIdAfterDismissal,
+            timestamp = timestamp
         )
     }
 }

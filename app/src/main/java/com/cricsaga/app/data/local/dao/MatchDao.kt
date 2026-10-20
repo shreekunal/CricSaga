@@ -53,4 +53,7 @@ interface InningsDao {
 
     @Query("SELECT * FROM innings WHERE matchId = :matchId ORDER BY inningsNumber ASC")
     fun getInningsForMatch(matchId: String): Flow<List<InningsEntity>>
+
+    @Query("SELECT * FROM innings WHERE matchId = :matchId ORDER BY inningsNumber ASC")
+    suspend fun getInningsListForMatch(matchId: String): List<InningsEntity>
 }

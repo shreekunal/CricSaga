@@ -35,7 +35,7 @@ fun SplashScreen(
         onAnimationFinish()
     }
 
-    val transition = updateTransition(transitionState, label = "SplashTransition")
+    val transition = rememberTransition(transitionState, label = "SplashTransition")
 
     // Logo scale: smooth spring from 0.82f to 1.0f
     val logoScale by transition.animateFloat(

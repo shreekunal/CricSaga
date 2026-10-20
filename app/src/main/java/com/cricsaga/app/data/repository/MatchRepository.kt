@@ -23,6 +23,7 @@ class MatchRepository(private val database: CricSagaDatabase) {
     private val inningsDao = database.inningsDao()
     private val deliveryDao = database.deliveryDao()
     private val tournamentDao = database.tournamentDao()
+    private val discoverDao = database.discoverDao()
 
     fun getAllMatches(): Flow<List<MatchEntity>> = matchDao.getAllMatches()
 
@@ -38,11 +39,81 @@ class MatchRepository(private val database: CricSagaDatabase) {
 
     fun getTeamMembers(teamId: String): Flow<List<UserEntity>> = teamDao.getTeamMembers(teamId)
 
+    suspend fun getTeamMembersList(teamId: String): List<UserEntity> = withContext(Dispatchers.IO) {
+        teamDao.getTeamMembersList(teamId)
+    }
+
     fun getDeliveries(inningsId: String): Flow<List<DeliveryEntity>> = deliveryDao.getDeliveriesForInnings(inningsId)
+
+    suspend fun getDeliveriesList(inningsId: String): List<DeliveryEntity> = withContext(Dispatchers.IO) {
+        deliveryDao.getDeliveriesListForInnings(inningsId)
+    }
 
     fun getAllTournaments(): Flow<List<TournamentEntity>> = tournamentDao.getAllTournaments()
 
     fun getTournamentFixtures(tournamentId: String): Flow<List<TournamentFixtureEntity>> = tournamentDao.getFixturesForTournament(tournamentId)
+
+    fun getAllLookingForPosts(): Flow<List<LookingForEntity>> = discoverDao.getAllPosts()
+
+    suspend fun createLookingForPost(
+        type: String,
+        title: String,
+        teamOrOrganizer: String,
+        timing: String,
+        location: String,
+        note: String,
+        contactPhone: String
+    ) = withContext(Dispatchers.IO) {
+        val post = LookingForEntity(
+            id = "lf_${System.currentTimeMillis()}_${UUID.randomUUID().toString().take(6)}",
+            type = type,
+            title = title,
+            teamOrOrganizer = teamOrOrganizer,
+            timing = timing,
+            location = location,
+            note = note,
+            contactPhone = contactPhone
+        )
+        discoverDao.insertPost(post)
+    }
+
+    suspend fun seedInitialLookingForPostsIfEmpty() = withContext(Dispatchers.IO) {
+        if (discoverDao.getPostCount() == 0) {
+            val initial = listOf(
+                LookingForEntity(
+                    id = "lf_1",
+                    type = "Opponent",
+                    title = "Weekend Match • 16 Overs",
+                    teamOrOrganizer = "Warriors CC",
+                    timing = "Sunday • 7:00 AM - 11:00 AM",
+                    location = "Shivaji Park Ground #3, Dadar",
+                    note = "Leather ball. Umpire and pitch fees split 50/50.",
+                    contactPhone = "9820123456"
+                ),
+                LookingForEntity(
+                    id = "lf_2",
+                    type = "Players",
+                    title = "Need 2 Batsmen for Tonight",
+                    teamOrOrganizer = "Metro Knights",
+                    timing = "Tonight • 9:30 PM - 11:00 PM",
+                    location = "Champions Turf, Andheri East",
+                    note = "8 overs box cricket under floodlights.",
+                    contactPhone = "9820987654"
+                ),
+                LookingForEntity(
+                    id = "lf_3",
+                    type = "Scorer",
+                    title = "Certified Scorer for Corporate League",
+                    teamOrOrganizer = "Corporate Cup Committee",
+                    timing = "Saturday & Sunday • Full Day",
+                    location = "Oval Maidan, Churchgate",
+                    note = "₹1,200 per match. Digital scoring on CricSaga.",
+                    contactPhone = "9820555777"
+                )
+            )
+            discoverDao.insertPosts(initial)
+        }
+    }
 
     suspend fun createTournament(
         name: String,
@@ -259,6 +330,10 @@ class MatchRepository(private val database: CricSagaDatabase) {
     }
 
     fun getInningsForMatch(matchId: String): Flow<List<InningsEntity>> = inningsDao.getInningsForMatch(matchId)
+
+    suspend fun getInningsListForMatch(matchId: String): List<InningsEntity> = withContext(Dispatchers.IO) {
+        inningsDao.getInningsListForMatch(matchId)
+    }
 
     fun getPlayerStatsFlow(userId: String): Flow<PlayerStatsEntity?> = database.playerStatsDao().getStatsFlowForUser(userId)
 

@@ -19,6 +19,7 @@ import androidx.navigation.compose.*
 import com.cricsaga.app.data.local.AuthManager
 import com.cricsaga.app.data.local.AuthState
 import com.cricsaga.app.data.local.ProManager
+import com.cricsaga.app.data.local.entity.LookingForEntity
 import com.cricsaga.app.data.local.entity.TeamEntity
 import com.cricsaga.app.data.local.entity.UserEntity
 import com.cricsaga.app.domain.model.BallType
@@ -28,6 +29,7 @@ import com.cricsaga.app.domain.model.TossDecision
 import com.cricsaga.app.ui.auth.PhoneLoginScreen
 import com.cricsaga.app.ui.auth.ProfileSetupScreen
 import com.cricsaga.app.ui.discover.DiscoverScreen
+import com.cricsaga.app.ui.discover.LookingForItem
 import com.cricsaga.app.ui.home.HomeScreen
 import com.cricsaga.app.ui.matches.MatchListScreen
 import com.cricsaga.app.ui.profile.PlayerDetailScreen
@@ -232,9 +234,11 @@ fun AppNavigation(
             // Tab 1: Home Screen
             composable(Screen.Home.route) {
                 val matches by scoringViewModel.allMatches.collectAsState()
+                val topPerformers by scoringViewModel.topPerformers.collectAsState()
                 HomeScreen(
                     isPro = subscriptionState.isActive,
                     matches = matches,
+                    topPerformers = topPerformers,
                     isDarkTheme = currentDark,
                     onThemeToggleClick = {
                         hapticManager.tapUiClick()
@@ -262,7 +266,13 @@ fun AppNavigation(
                     },
                     onMatchClick = { matchId ->
                         hapticManager.tapUiClick()
-                        navController.navigate(Screen.LiveScoring.route)
+                        scoringViewModel.loadMatchById(matchId) { isLive ->
+                            if (isLive) {
+                                navController.navigate(Screen.LiveScoring.route)
+                            } else {
+                                navController.navigate(Screen.FullScorecard.route)
+                            }
+                        }
                     }
                 )
             }
@@ -278,7 +288,13 @@ fun AppNavigation(
                     },
                     onMatchClick = { matchId ->
                         hapticManager.tapUiClick()
-                        navController.navigate(Screen.LiveScoring.route)
+                        scoringViewModel.loadMatchById(matchId) { isLive ->
+                            if (isLive) {
+                                navController.navigate(Screen.LiveScoring.route)
+                            } else {
+                                navController.navigate(Screen.FullScorecard.route)
+                            }
+                        }
                     }
                 )
             }
@@ -286,8 +302,35 @@ fun AppNavigation(
             // Tab 3: Discover Grassroots Cricket Hub
             composable(Screen.Discover.route) {
                 val context = LocalContext.current
+                val lookingForEntities by scoringViewModel.lookingForPosts.collectAsState()
+                val lookingForItems = remember(lookingForEntities) {
+                    lookingForEntities.map { entity ->
+                        LookingForItem(
+                            id = entity.id,
+                            type = entity.type,
+                            title = entity.title,
+                            teamOrOrganizer = entity.teamOrOrganizer,
+                            timing = entity.timing,
+                            location = entity.location,
+                            note = entity.note,
+                            contactPhone = entity.contactPhone
+                        )
+                    }
+                }
                 DiscoverScreen(
                     isPro = subscriptionState.isActive,
+                    lookingForList = lookingForItems,
+                    onPostRequirement = { type, title, organizer, timing, location, note, phone ->
+                        scoringViewModel.createLookingForPost(
+                            type = type,
+                            title = title,
+                            teamOrOrganizer = organizer,
+                            timing = timing,
+                            location = location,
+                            note = note,
+                            contactPhone = phone
+                        )
+                    },
                     onContactWhatsApp = { phone, message ->
                         hapticManager.tapUiClick()
                         val digits = phone.filter { it.isDigit() }
@@ -317,9 +360,11 @@ fun AppNavigation(
             // Tab 4: Tournaments & Points Table Center
             composable(Screen.Tournaments.route) {
                 val tournaments by scoringViewModel.repository.getAllTournaments().collectAsState(initial = emptyList())
+                val matches by scoringViewModel.allMatches.collectAsState()
                 TournamentListScreen(
                     isPro = subscriptionState.isActive,
                     tournaments = tournaments,
+                    matches = matches,
                     onCreateTournament = { name, overs, teams ->
                         coroutineScope.launch {
                             scoringViewModel.repository.createTournament(name, overs, teams)
@@ -463,6 +508,11 @@ fun AppNavigation(
                     onBackClick = {
                         hapticManager.tapUiClick()
                         navController.popBackStack()
+                    },
+                    onCreateTeam = { name, code ->
+                        coroutineScope.launch {
+                            scoringViewModel.repository.createTeam(name, code, "Mumbai")
+                        }
                     },
                     onProceedToOpeners = { title, teamA, teamB, overs, ballType, tossWinner, decision ->
                         tempTitle = title

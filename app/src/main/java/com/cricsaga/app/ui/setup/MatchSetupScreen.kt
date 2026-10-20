@@ -7,7 +7,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -26,6 +27,7 @@ import com.cricsaga.app.ui.theme.*
 fun MatchSetupScreen(
     teams: List<TeamEntity>,
     onBackClick: () -> Unit,
+    onCreateTeam: (name: String, code: String) -> Unit = { _, _ -> },
     onProceedToOpeners: (
         title: String,
         teamAId: String,
@@ -45,8 +47,18 @@ fun MatchSetupScreen(
     var venue by remember { mutableStateOf("Shivaji Park Ground #2, Dadar") }
     var maxOversPerBowler by remember { mutableIntStateOf(4) }
     var isBoxCricket by remember { mutableStateOf(false) }
+    var showQuickAddTeamDialog by remember { mutableStateOf(false) }
     val scrollState = rememberScrollState()
     val hapticManager = com.cricsaga.app.ui.utils.LocalHapticManager.current
+
+    LaunchedEffect(teams) {
+        if (teamA.isEmpty() && teams.isNotEmpty()) {
+            teamA = teams[0].teamId
+        }
+        if (teamB.isEmpty() && teams.size > 1) {
+            teamB = teams[1].teamId
+        }
+    }
 
     Scaffold(
         containerColor = CharcoalBackgroundDark,
@@ -58,7 +70,7 @@ fun MatchSetupScreen(
                         hapticManager?.tapUiClick()
                         onBackClick()
                     }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = TextPrimary)
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = TextPrimary)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = CharcoalBackgroundDark)
@@ -80,44 +92,70 @@ fun MatchSetupScreen(
                 shape = RoundedCornerShape(12.dp)
             ) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("SELECT COMPETING TEAMS", color = BoundaryAmber, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-
-                    Text("Team A (Home):", color = MutedGrey, fontSize = 12.sp)
-                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        items(teams) { t ->
-                            FilterChip(
-                                selected = teamA == t.teamId,
-                                onClick = {
-                                    hapticManager?.tapUiClick()
-                                    teamA = t.teamId
-                                    if (tossWinnerId.isEmpty()) tossWinnerId = t.teamId
-                                },
-                                label = { Text(t.teamName) },
-                                colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = CrimsonPrimaryDark,
-                                    selectedLabelColor = Color.White
-                                )
-                            )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("SELECT COMPETING TEAMS", color = BoundaryAmber, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        TextButton(
+                            onClick = {
+                                hapticManager?.tapUiClick()
+                                showQuickAddTeamDialog = true
+                            },
+                            contentPadding = PaddingValues(0.dp)
+                        ) {
+                            Icon(Icons.Default.Add, contentDescription = null, tint = BoundaryAmber, modifier = Modifier.size(14.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("+ Quick Add", style = MicroTag, color = BoundaryAmber)
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(4.dp))
-
-                    Text("Team B (Away):", color = MutedGrey, fontSize = 12.sp)
-                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        items(teams.filter { it.teamId != teamA }) { t ->
-                            FilterChip(
-                                selected = teamB == t.teamId,
-                                onClick = {
-                                    hapticManager?.tapUiClick()
-                                    teamB = t.teamId
-                                },
-                                label = { Text(t.teamName) },
-                                colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = BoundaryGreen,
-                                    selectedLabelColor = Color.Black
+                    if (teams.isEmpty()) {
+                        Text(
+                            text = "No teams available. Tap '+ Quick Add' above to create teams.",
+                            style = BodyCaption,
+                            color = TextTertiary,
+                            modifier = Modifier.padding(vertical = 4.dp)
+                        )
+                    } else {
+                        Text("Team A (Home):", color = MutedGrey, fontSize = 12.sp)
+                        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            items(teams) { t ->
+                                FilterChip(
+                                    selected = teamA == t.teamId,
+                                    onClick = {
+                                        hapticManager?.tapUiClick()
+                                        teamA = t.teamId
+                                        if (tossWinnerId.isEmpty()) tossWinnerId = t.teamId
+                                    },
+                                    label = { Text(t.teamName) },
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        selectedContainerColor = CrimsonPrimaryDark,
+                                        selectedLabelColor = Color.White
+                                    )
                                 )
-                            )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(4.dp))
+
+                        Text("Team B (Away):", color = MutedGrey, fontSize = 12.sp)
+                        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            items(teams.filter { it.teamId != teamA }) { t ->
+                                FilterChip(
+                                    selected = teamB == t.teamId,
+                                    onClick = {
+                                        hapticManager?.tapUiClick()
+                                        teamB = t.teamId
+                                    },
+                                    label = { Text(t.teamName) },
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        selectedContainerColor = BoundaryGreen,
+                                        selectedLabelColor = Color.Black
+                                    )
+                                )
+                            }
                         }
                     }
                 }
@@ -294,5 +332,83 @@ fun MatchSetupScreen(
                 Text("SELECT OPENERS & START", fontWeight = FontWeight.Bold, color = Color.White)
             }
         }
+    }
+
+    if (showQuickAddTeamDialog) {
+        var newTeamName by remember { mutableStateOf("") }
+        var newTeamCode by remember { mutableStateOf("") }
+
+        AlertDialog(
+            onDismissRequest = { showQuickAddTeamDialog = false },
+            containerColor = SlateSurfaceDark,
+            shape = RoundedCornerShape(16.dp),
+            title = {
+                Text(
+                    text = "Quick Add Team",
+                    color = TextPrimary,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp
+                )
+            },
+            text = {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    OutlinedTextField(
+                        value = newTeamName,
+                        onValueChange = {
+                            newTeamName = it
+                            if (newTeamCode.isEmpty() && it.isNotEmpty()) {
+                                newTeamCode = it.split(" ").mapNotNull { part -> part.firstOrNull() }.joinToString("").take(3).uppercase()
+                            }
+                        },
+                        label = { Text("Team Name", color = TextTertiary) },
+                        placeholder = { Text("e.g. Shivaji Park XI", color = TextTertiary) },
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = TextPrimary,
+                            unfocusedTextColor = TextPrimary,
+                            focusedBorderColor = CrimsonPrimaryDark,
+                            unfocusedBorderColor = CardBorderDark
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedTextField(
+                        value = newTeamCode,
+                        onValueChange = { if (it.length <= 4) newTeamCode = it.uppercase() },
+                        label = { Text("Short Code (e.g. SPX)", color = TextTertiary) },
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = TextPrimary,
+                            unfocusedTextColor = TextPrimary,
+                            focusedBorderColor = CrimsonPrimaryDark,
+                            unfocusedBorderColor = CardBorderDark
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (newTeamName.isNotBlank()) {
+                            val code = newTeamCode.ifBlank { newTeamName.take(3).uppercase() }
+                            onCreateTeam(newTeamName.trim(), code)
+                            showQuickAddTeamDialog = false
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = CrimsonPrimaryDark),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text("CREATE", color = Color.White, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showQuickAddTeamDialog = false }) {
+                    Text("CANCEL", color = TextSecondary)
+                }
+            }
+        )
     }
 }

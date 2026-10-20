@@ -37,6 +37,14 @@ interface TeamDao {
     """)
     fun getTeamMembers(teamId: String): Flow<List<UserEntity>>
 
+    @Query("""
+        SELECT u.* FROM users u
+        INNER JOIN team_members tm ON u.userId = tm.userId
+        WHERE tm.teamId = :teamId
+        ORDER BY u.fullName ASC
+    """)
+    suspend fun getTeamMembersList(teamId: String): List<UserEntity>
+
     @Query("DELETE FROM team_members WHERE teamId = :teamId AND userId = :userId")
     suspend fun removeTeamMember(teamId: String, userId: String)
 

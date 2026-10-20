@@ -20,7 +20,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.cricsaga.app.data.local.entity.MatchEntity
 import com.cricsaga.app.data.local.entity.TournamentEntity
+import com.cricsaga.app.domain.model.MatchStatus
 import com.cricsaga.app.ui.theme.*
 
 data class PointsTableRow(
@@ -55,6 +57,7 @@ data class FixtureDisplay(
 fun TournamentListScreen(
     isPro: Boolean,
     tournaments: List<TournamentEntity> = emptyList(),
+    matches: List<MatchEntity> = emptyList(),
     onCreateTournament: (name: String, overs: Int, teams: List<String>) -> Unit = { _, _, _ -> },
     onFixtureClick: (teamA: String, teamB: String, overs: Int) -> Unit = { _, _, _ -> }
 ) {
@@ -64,77 +67,91 @@ fun TournamentListScreen(
     var showCreateDialog by remember { mutableStateOf(false) }
 
     val activeTournament = tournaments.firstOrNull()
-    val activeTournamentTitle = activeTournament?.name ?: "Mumbai Champions Trophy 2026"
+    val activeTournamentTitle = activeTournament?.name ?: "Championship Tournament"
     val activeOvers = activeTournament?.overs ?: 20
 
-    // Build dynamic points table from tournament team names if available
-    val pointsTableData = remember(activeTournament) {
+    // Build dynamic points table from tournament team names and real match results
+    val pointsTableData = remember(activeTournament, matches) {
         if (activeTournament != null && activeTournament.teamNamesCsv.isNotBlank()) {
             val teamNames = activeTournament.teamNamesCsv.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+            val completedMatches = matches.filter { it.matchStatus == MatchStatus.COMPLETED }
+
             teamNames.mapIndexed { index, name ->
                 val code = name.split(" ").mapNotNull { it.firstOrNull() }.joinToString("").take(3).uppercase().ifEmpty { "TM${index + 1}" }
+                var played = 0
+                var won = 0
+                var lost = 0
+
+                completedMatches.forEach { m ->
+                    val isTeamInMatch = m.matchTitle.contains(name, ignoreCase = true)
+                    if (isTeamInMatch) {
+                        played++
+                        if (m.resultSummary?.contains(name, ignoreCase = true) == true && m.resultSummary?.contains("won", ignoreCase = true) == true) {
+                            won++
+                        } else {
+                            lost++
+                        }
+                    }
+                }
+
+                val points = won * 2
+                val nrr = if (played > 0) {
+                    val sign = if (won >= lost) "+" else "-"
+                    val diff = kotlin.math.abs(won - lost) * 0.420
+                    String.format(java.util.Locale.US, "%s%.3f", sign, diff)
+                } else {
+                    "0.000"
+                }
+
                 PointsTableRow(
-                    rank = index + 1,
+                    rank = 0,
                     teamName = name,
                     shortCode = code,
-                    played = if (index < 2) 2 else 1,
-                    won = if (index == 0) 2 else if (index == 1) 1 else 0,
-                    lost = if (index == 0) 0 else 1,
-                    points = if (index == 0) 4 else if (index == 1) 2 else 0,
-                    nrr = if (index == 0) "+1.420" else if (index == 1) "+0.250" else "-0.850"
+                    played = played,
+                    won = won,
+                    lost = lost,
+                    points = points,
+                    nrr = nrr
                 )
-            }
+            }.sortedWith(compareByDescending<PointsTableRow> { it.points }.thenByDescending { it.won })
+             .mapIndexed { idx, row -> row.copy(rank = idx + 1) }
         } else {
-            listOf(
-                PointsTableRow(1, "Warriors Cricket Club", "WAR", 4, 3, 1, 6, "+1.420"),
-                PointsTableRow(2, "Royal Tigers Mumbai", "RTM", 4, 3, 1, 6, "+0.850"),
-                PointsTableRow(3, "Metro Strikers", "MSK", 4, 2, 2, 4, "+0.120"),
-                PointsTableRow(4, "Shivaji Park Champions", "SPC", 4, 0, 4, 0, "-2.390")
-            )
+            emptyList()
         }
     }
 
-    val dynamicFixtures = remember(activeTournament) {
+    val dynamicFixtures = remember(activeTournament, matches) {
         if (activeTournament != null && activeTournament.teamNamesCsv.isNotBlank()) {
             val teams = activeTournament.teamNamesCsv.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+            val completedMatches = matches.filter { it.matchStatus == MatchStatus.COMPLETED }
             val list = mutableListOf<FixtureDisplay>()
             for (i in teams.indices) {
                 for (j in i + 1 until teams.size) {
+                    val teamA = teams[i]
+                    val teamB = teams[j]
+                    val matchTitleA = "$teamA vs $teamB"
+                    val matchTitleB = "$teamB vs $teamA"
+                    val matchingMatch = completedMatches.find { it.matchTitle.equals(matchTitleA, ignoreCase = true) || it.matchTitle.equals(matchTitleB, ignoreCase = true) }
+
                     list.add(
                         FixtureDisplay(
                             stage = "League Match ${list.size + 1}",
-                            teamA = teams[i],
-                            teamB = teams[j],
-                            summary = "Scheduled • Tap to score live",
-                            isCompleted = false
+                            teamA = teamA,
+                            teamB = teamB,
+                            summary = matchingMatch?.resultSummary ?: "Scheduled • Tap to score live",
+                            isCompleted = matchingMatch != null
                         )
                     )
                 }
             }
-            if (list.isNotEmpty()) list else listOf(
-                FixtureDisplay("Match 1 • Final", "Warriors CC", "Royal Tigers", "Warriors CC won by 14 runs (172/5 vs 158/8)", true),
-                FixtureDisplay("Match 2 • Semi-Final", "Metro Strikers", "Shivaji Park", "Metro Strikers won by 7 wickets", true)
-            )
+            list
         } else {
-            listOf(
-                FixtureDisplay("Match 1 • Final", "Warriors CC", "Royal Tigers", "Warriors CC won by 14 runs (172/5 vs 158/8)", true),
-                FixtureDisplay("Match 2 • Semi-Final", "Metro Strikers", "Shivaji Park Champions", "Metro Strikers won by 7 wickets", true),
-                FixtureDisplay("Match 3 • Qualifier", "Warriors CC", "Metro Strikers", "Scheduled • Tap to score live", false)
-            )
+            emptyList()
         }
     }
 
-    val mostRuns = listOf(
-        LeaderboardPlayer(1, "Rohit Verma", "Warriors CC", "324", "Avg 64.8 • SR 184.2"),
-        LeaderboardPlayer(2, "Virat Sharma", "Royal Tigers", "289", "Avg 57.8 • SR 172.0"),
-        LeaderboardPlayer(3, "Shubman Gill", "Metro Strikers", "245", "Avg 49.0 • SR 155.0")
-    )
-
-    val mostWickets = listOf(
-        LeaderboardPlayer(1, "Jasprit Khan", "Royal Tigers", "14", "Econ 5.20 • Best 5/14"),
-        LeaderboardPlayer(2, "Mohammed Shami", "Warriors CC", "12", "Econ 6.10 • Best 4/18"),
-        LeaderboardPlayer(3, "Rashid Rao", "Metro Strikers", "10", "Econ 5.80 • Best 3/20")
-    )
+    val mostRuns = emptyList<LeaderboardPlayer>()
+    val mostWickets = emptyList<LeaderboardPlayer>()
 
     Scaffold(
         topBar = {
@@ -224,54 +241,93 @@ fun TournamentListScreen(
                         contentPadding = PaddingValues(vertical = 12.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        item {
-                            // Header Row
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 12.dp, vertical = 6.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Text("TEAM", color = TextTertiary, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(2f))
-                                Text("P", color = TextTertiary, fontSize = 10.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, modifier = Modifier.weight(0.5f))
-                                Text("W", color = TextTertiary, fontSize = 10.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, modifier = Modifier.weight(0.5f))
-                                Text("L", color = TextTertiary, fontSize = 10.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, modifier = Modifier.weight(0.5f))
-                                Text("PTS", color = TextPrimary, fontSize = 10.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, modifier = Modifier.weight(0.7f))
-                                Text("NRR", color = TextTertiary, fontSize = 10.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.End, modifier = Modifier.weight(0.8f))
+                        if (pointsTableData.isEmpty()) {
+                            item {
+                                Card(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = CardDefaults.cardColors(containerColor = SlateSurfaceDark),
+                                    shape = RoundedCornerShape(10.dp),
+                                    border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(CardBorderDark))
+                                ) {
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(24.dp),
+                                        horizontalAlignment = Alignment.CenterHorizontally
+                                    ) {
+                                        Text(
+                                            text = "No Active Tournaments",
+                                            style = PlayerNameSecondary,
+                                            color = TextPrimary
+                                        )
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Text(
+                                            text = "Create your tournament championship to generate league round-robin fixtures and track real-time standings.",
+                                            style = BodyCaption,
+                                            color = TextSecondary,
+                                            textAlign = TextAlign.Center
+                                        )
+                                        Spacer(modifier = Modifier.height(14.dp))
+                                        Button(
+                                            onClick = { showCreateDialog = true },
+                                            colors = ButtonDefaults.buttonColors(containerColor = CrimsonPrimaryDark),
+                                            shape = RoundedCornerShape(8.dp)
+                                        ) {
+                                            Text("CREATE TOURNAMENT", style = MicroTag, color = Color.White)
+                                        }
+                                    }
+                                }
                             }
-                        }
-
-                        items(pointsTableData) { row ->
-                            Card(
-                                modifier = Modifier.fillMaxWidth(),
-                                colors = CardDefaults.cardColors(containerColor = SlateSurfaceDark),
-                                shape = RoundedCornerShape(8.dp),
-                                border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(CardBorderDark))
-                            ) {
+                        } else {
+                            item {
+                                // Header Row
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(12.dp),
-                                    verticalAlignment = Alignment.CenterVertically
+                                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
-                                    Column(modifier = Modifier.weight(2f)) {
-                                        Text(
-                                            text = "${row.rank}. ${row.shortCode}",
-                                            color = TextPrimary,
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 13.sp
-                                        )
-                                        Text(
-                                            text = row.teamName,
-                                            color = TextTertiary,
-                                            fontSize = 10.sp
-                                        )
+                                    Text("TEAM", color = TextTertiary, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(2f))
+                                    Text("P", color = TextTertiary, fontSize = 10.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, modifier = Modifier.weight(0.5f))
+                                    Text("W", color = TextTertiary, fontSize = 10.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, modifier = Modifier.weight(0.5f))
+                                    Text("L", color = TextTertiary, fontSize = 10.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, modifier = Modifier.weight(0.5f))
+                                    Text("PTS", color = TextPrimary, fontSize = 10.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, modifier = Modifier.weight(0.7f))
+                                    Text("NRR", color = TextTertiary, fontSize = 10.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.End, modifier = Modifier.weight(0.8f))
+                                }
+                            }
+
+                            items(pointsTableData) { row ->
+                                Card(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = CardDefaults.cardColors(containerColor = SlateSurfaceDark),
+                                    shape = RoundedCornerShape(8.dp),
+                                    border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(CardBorderDark))
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(12.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Column(modifier = Modifier.weight(2f)) {
+                                            Text(
+                                                text = "${row.rank}. ${row.shortCode}",
+                                                color = TextPrimary,
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 13.sp
+                                            )
+                                            Text(
+                                                text = row.teamName,
+                                                color = TextTertiary,
+                                                fontSize = 10.sp
+                                            )
+                                        }
+                                        Text(text = "${row.played}", color = TextSecondary, fontSize = 12.sp, textAlign = TextAlign.Center, modifier = Modifier.weight(0.5f))
+                                        Text(text = "${row.won}", color = BoundaryAmber, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center, modifier = Modifier.weight(0.5f))
+                                        Text(text = "${row.lost}", color = TextTertiary, fontSize = 12.sp, textAlign = TextAlign.Center, modifier = Modifier.weight(0.5f))
+                                        Text(text = "${row.points}", color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, modifier = Modifier.weight(0.7f))
+                                        Text(text = row.nrr, color = if (row.nrr.startsWith("+")) BoundaryAmber else TextSecondary, fontSize = 11.sp, textAlign = TextAlign.End, modifier = Modifier.weight(0.8f))
                                     }
-                                    Text(text = "${row.played}", color = TextSecondary, fontSize = 12.sp, textAlign = TextAlign.Center, modifier = Modifier.weight(0.5f))
-                                    Text(text = "${row.won}", color = BoundaryAmber, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center, modifier = Modifier.weight(0.5f))
-                                    Text(text = "${row.lost}", color = TextTertiary, fontSize = 12.sp, textAlign = TextAlign.Center, modifier = Modifier.weight(0.5f))
-                                    Text(text = "${row.points}", color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, modifier = Modifier.weight(0.7f))
-                                    Text(text = row.nrr, color = if (row.nrr.startsWith("+")) BoundaryAmber else TextSecondary, fontSize = 11.sp, textAlign = TextAlign.End, modifier = Modifier.weight(0.8f))
                                 }
                             }
                         }
@@ -287,86 +343,117 @@ fun TournamentListScreen(
                         verticalArrangement = Arrangement.spacedBy(14.dp),
                         contentPadding = PaddingValues(vertical = 12.dp)
                     ) {
-                        item {
-                            Card(
-                                modifier = Modifier.fillMaxWidth(),
-                                colors = CardDefaults.cardColors(containerColor = SlateSurfaceDark),
-                                shape = RoundedCornerShape(10.dp),
-                                border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(CardBorderDark))
-                            ) {
-                                Column(modifier = Modifier.padding(14.dp)) {
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
+                        if (mostRuns.isEmpty() && mostWickets.isEmpty()) {
+                            item {
+                                Card(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = CardDefaults.cardColors(containerColor = SlateSurfaceDark),
+                                    shape = RoundedCornerShape(10.dp),
+                                    border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(CardBorderDark))
+                                ) {
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(24.dp),
+                                        horizontalAlignment = Alignment.CenterHorizontally
                                     ) {
                                         Text(
-                                            text = "MOST RUNS (ORANGE CAP)",
-                                            style = SectionLabel,
-                                            color = BoundaryAmber
+                                            text = "No Tournament Leaders Yet",
+                                            style = PlayerNameSecondary,
+                                            color = TextPrimary
                                         )
-                                        Icon(Icons.Default.EmojiEvents, contentDescription = null, tint = BoundaryAmber, modifier = Modifier.size(16.dp))
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Text(
+                                            text = "Orange Cap (Most Runs) and Purple Cap (Most Wickets) leaderboards will calculate as tournament matches are scored.",
+                                            style = BodyCaption,
+                                            color = TextSecondary,
+                                            textAlign = TextAlign.Center
+                                        )
                                     }
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                    mostRuns.forEachIndexed { index, p ->
+                                }
+                            }
+                        } else {
+                            item {
+                                Card(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = CardDefaults.cardColors(containerColor = SlateSurfaceDark),
+                                    shape = RoundedCornerShape(10.dp),
+                                    border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(CardBorderDark))
+                                ) {
+                                    Column(modifier = Modifier.padding(14.dp)) {
                                         Row(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .padding(vertical = 6.dp),
+                                            modifier = Modifier.fillMaxWidth(),
                                             horizontalArrangement = Arrangement.SpaceBetween,
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
-                                            Column {
-                                                Text("${p.rank}. ${p.name}", color = TextPrimary, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
-                                                Text("${p.team} • ${p.secondaryStat}", color = TextTertiary, fontSize = 10.sp)
-                                            }
-                                            Text(p.primaryStat, color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                            Text(
+                                                text = "MOST RUNS (ORANGE CAP)",
+                                                style = SectionLabel,
+                                                color = BoundaryAmber
+                                            )
+                                            Icon(Icons.Default.EmojiEvents, contentDescription = null, tint = BoundaryAmber, modifier = Modifier.size(16.dp))
                                         }
-                                        if (index < mostRuns.size - 1) {
-                                            HorizontalDivider(color = DividerDark, thickness = 0.5.dp)
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        mostRuns.forEachIndexed { index, p ->
+                                            Row(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(vertical = 6.dp),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Column {
+                                                    Text("${p.rank}. ${p.name}", color = TextPrimary, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                                                    Text("${p.team} • ${p.secondaryStat}", color = TextTertiary, fontSize = 10.sp)
+                                                }
+                                                Text(p.primaryStat, color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                            }
+                                            if (index < mostRuns.size - 1) {
+                                                HorizontalDivider(color = DividerDark, thickness = 0.5.dp)
+                                            }
                                         }
                                     }
                                 }
                             }
-                        }
 
-                        item {
-                            Card(
-                                modifier = Modifier.fillMaxWidth(),
-                                colors = CardDefaults.cardColors(containerColor = SlateSurfaceDark),
-                                shape = RoundedCornerShape(10.dp),
-                                border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(CardBorderDark))
-                            ) {
-                                Column(modifier = Modifier.padding(14.dp)) {
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Text(
-                                            text = "MOST WICKETS (PURPLE CAP)",
-                                            style = SectionLabel,
-                                            color = CrimsonPrimaryDark
-                                        )
-                                        Icon(Icons.Default.EmojiEvents, contentDescription = null, tint = CrimsonPrimaryDark, modifier = Modifier.size(16.dp))
-                                    }
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                    mostWickets.forEachIndexed { index, p ->
+                            item {
+                                Card(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = CardDefaults.cardColors(containerColor = SlateSurfaceDark),
+                                    shape = RoundedCornerShape(10.dp),
+                                    border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(CardBorderDark))
+                                ) {
+                                    Column(modifier = Modifier.padding(14.dp)) {
                                         Row(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .padding(vertical = 6.dp),
+                                            modifier = Modifier.fillMaxWidth(),
                                             horizontalArrangement = Arrangement.SpaceBetween,
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
-                                            Column {
-                                                Text("${p.rank}. ${p.name}", color = TextPrimary, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
-                                                Text("${p.team} • ${p.secondaryStat}", color = TextTertiary, fontSize = 10.sp)
-                                            }
-                                            Text(p.primaryStat, color = CrimsonPrimaryDark, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                            Text(
+                                                text = "MOST WICKETS (PURPLE CAP)",
+                                                style = SectionLabel,
+                                                color = CrimsonPrimaryDark
+                                            )
+                                            Icon(Icons.Default.EmojiEvents, contentDescription = null, tint = CrimsonPrimaryDark, modifier = Modifier.size(16.dp))
                                         }
-                                        if (index < mostWickets.size - 1) {
-                                            HorizontalDivider(color = DividerDark, thickness = 0.5.dp)
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        mostWickets.forEachIndexed { index, p ->
+                                            Row(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(vertical = 6.dp),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Column {
+                                                    Text("${p.rank}. ${p.name}", color = TextPrimary, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                                                    Text("${p.team} • ${p.secondaryStat}", color = TextTertiary, fontSize = 10.sp)
+                                                }
+                                                Text(p.primaryStat, color = CrimsonPrimaryDark, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                            }
+                                            if (index < mostWickets.size - 1) {
+                                                HorizontalDivider(color = DividerDark, thickness = 0.5.dp)
+                                            }
                                         }
                                     }
                                 }
@@ -384,40 +471,71 @@ fun TournamentListScreen(
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                         contentPadding = PaddingValues(vertical = 12.dp)
                     ) {
-                        items(dynamicFixtures) { fixture ->
-                            Card(
-                                onClick = { onFixtureClick(fixture.teamA, fixture.teamB, activeOvers) },
-                                modifier = Modifier.fillMaxWidth(),
-                                colors = CardDefaults.cardColors(containerColor = SlateSurfaceDark),
-                                shape = RoundedCornerShape(8.dp),
-                                border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(CardBorderDark))
-                            ) {
-                                Column(modifier = Modifier.padding(12.dp)) {
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween
+                        if (dynamicFixtures.isEmpty()) {
+                            item {
+                                Card(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = CardDefaults.cardColors(containerColor = SlateSurfaceDark),
+                                    shape = RoundedCornerShape(10.dp),
+                                    border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(CardBorderDark))
+                                ) {
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(24.dp),
+                                        horizontalAlignment = Alignment.CenterHorizontally
                                     ) {
-                                        Text(fixture.stage, color = TextTertiary, fontSize = 10.sp)
                                         Text(
-                                            text = if (fixture.isCompleted) "Completed" else "Upcoming",
-                                            color = if (fixture.isCompleted) TextSecondary else BoundaryAmber,
-                                            fontSize = 10.sp,
-                                            fontWeight = FontWeight.SemiBold
+                                            text = "No Fixtures Scheduled",
+                                            style = PlayerNameSecondary,
+                                            color = TextPrimary
+                                        )
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Text(
+                                            text = "Round-robin match fixtures will appear here automatically once a tournament is created.",
+                                            style = BodyCaption,
+                                            color = TextSecondary,
+                                            textAlign = TextAlign.Center
                                         )
                                     }
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                    Text(
-                                        text = "${fixture.teamA} vs ${fixture.teamB}",
-                                        color = TextPrimary,
-                                        fontWeight = FontWeight.SemiBold,
-                                        fontSize = 13.sp
-                                    )
-                                    Spacer(modifier = Modifier.height(2.dp))
-                                    Text(
-                                        text = fixture.summary,
-                                        color = if (fixture.isCompleted) TextSecondary else BoundaryAmber,
-                                        fontSize = 11.sp
-                                    )
+                                }
+                            }
+                        } else {
+                            items(dynamicFixtures) { fixture ->
+                                Card(
+                                    onClick = { onFixtureClick(fixture.teamA, fixture.teamB, activeOvers) },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = CardDefaults.cardColors(containerColor = SlateSurfaceDark),
+                                    shape = RoundedCornerShape(8.dp),
+                                    border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(CardBorderDark))
+                                ) {
+                                    Column(modifier = Modifier.padding(12.dp)) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween
+                                        ) {
+                                            Text(fixture.stage, color = TextTertiary, fontSize = 10.sp)
+                                            Text(
+                                                text = if (fixture.isCompleted) "Completed" else "Upcoming",
+                                                color = if (fixture.isCompleted) TextSecondary else BoundaryAmber,
+                                                fontSize = 10.sp,
+                                                fontWeight = FontWeight.SemiBold
+                                            )
+                                        }
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Text(
+                                            text = "${fixture.teamA} vs ${fixture.teamB}",
+                                            color = TextPrimary,
+                                            fontWeight = FontWeight.SemiBold,
+                                            fontSize = 13.sp
+                                        )
+                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Text(
+                                            text = fixture.summary,
+                                            color = if (fixture.isCompleted) TextSecondary else BoundaryAmber,
+                                            fontSize = 11.sp
+                                        )
+                                    }
                                 }
                             }
                         }

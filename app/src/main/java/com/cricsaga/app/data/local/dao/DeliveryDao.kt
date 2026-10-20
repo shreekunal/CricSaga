@@ -18,6 +18,9 @@ interface DeliveryDao {
     @Query("SELECT * FROM deliveries WHERE inningsId = :inningsId ORDER BY deliveryIndex ASC")
     fun getDeliveriesForInnings(inningsId: String): Flow<List<DeliveryEntity>>
 
+    @Query("SELECT * FROM deliveries WHERE inningsId = :inningsId ORDER BY deliveryIndex ASC")
+    suspend fun getDeliveriesListForInnings(inningsId: String): List<DeliveryEntity>
+
     @Query("SELECT * FROM deliveries WHERE inningsId = :inningsId ORDER BY deliveryIndex DESC LIMIT 1")
     suspend fun getLastDelivery(inningsId: String): DeliveryEntity?
 
