@@ -13,6 +13,7 @@ import com.cricsaga.app.data.repository.SeededMatchData
 import com.cricsaga.app.domain.engine.MatchResultCalculator
 import com.cricsaga.app.domain.engine.ScoringEngine
 import com.cricsaga.app.domain.model.*
+import com.cricsaga.app.ui.home.GrassrootsHeroItem
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.util.UUID
@@ -61,6 +62,7 @@ class ScoringViewModel(application: Application) : AndroidViewModel(application)
 
     val allMatches: StateFlow<List<MatchEntity>>
     val allTeams: StateFlow<List<TeamEntity>>
+    val topPerformers: StateFlow<List<GrassrootsHeroItem>>
 
     private val _uiState = MutableStateFlow(ScoringUiState())
     val uiState: StateFlow<ScoringUiState> = _uiState.asStateFlow()
@@ -80,6 +82,42 @@ class ScoringViewModel(application: Application) : AndroidViewModel(application)
             SharingStarted.WhileSubscribed(5000),
             emptyList()
         )
+
+        topPerformers = repository.getAllPlayerStats()
+            .combine(repository.getAllUsers()) { statsList, users ->
+                val userMap = users.associateBy { it.userId }
+                statsList.filter { it.runsScored > 0 || it.wicketsTaken > 0 }
+                    .sortedByDescending { it.runsScored + (it.wicketsTaken * 25) }
+                    .take(3)
+                    .map { stat ->
+                        val user = userMap[stat.userId]
+                        val name = user?.fullName ?: "Player"
+                        val initials = name.split(" ")
+                            .mapNotNull { it.firstOrNull()?.toString() }
+                            .take(2)
+                            .joinToString("")
+                            .uppercase()
+                            .ifEmpty { "CR" }
+                        val performance = if (stat.runsScored >= stat.wicketsTaken * 20) {
+                            "${stat.runsScored} runs • HS ${stat.highestScore} (${stat.fifties}x50, ${stat.hundreds}x100)"
+                        } else {
+                            "${stat.wicketsTaken} wkts • ${stat.maidens} maidens"
+                        }
+                        val role = user?.playingRole?.name?.replace('_', ' ')?.lowercase()
+                            ?.replaceFirstChar { it.uppercase() } ?: "All-Rounder"
+                        GrassrootsHeroItem(
+                            playerName = name,
+                            initials = initials,
+                            teamName = user?.city?.ifEmpty { "Grassroots XI" } ?: "Grassroots XI",
+                            performance = performance,
+                            context = "$role • ${stat.matches} matches"
+                        )
+                    }
+            }.stateIn(
+                viewModelScope,
+                SharingStarted.WhileSubscribed(5000),
+                emptyList()
+            )
 
         loadActiveMatch()
     }

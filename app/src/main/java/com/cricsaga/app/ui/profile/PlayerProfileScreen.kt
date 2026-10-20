@@ -74,58 +74,36 @@ fun PlayerProfileScreen(
     val jerseyNum = currentUser?.jerseyNumber?.ifBlank { "18" } ?: "18"
     val cityText = "${currentUser?.city?.ifBlank { "Mumbai" } ?: "Mumbai"} • Jersey #$jerseyNum"
 
-    val totalMatches = 24 + (playerStats?.matches ?: 0)
-    val totalInnings = 22 + (playerStats?.innings ?: 0)
-    val totalRuns = 782 + (playerStats?.runsScored ?: 0)
-    val totalBalls = 464 + (playerStats?.ballsFaced ?: 0)
-    val highestScore = maxOf(88, playerStats?.highestScore ?: 0)
-    val totalWickets = 14 + (playerStats?.wicketsTaken ?: 0)
-    val totalBallsBowled = (38 * 6 + 4) + (playerStats?.legalBallsBowled ?: 0)
+    val totalMatches = playerStats?.matches ?: 0
+    val totalInnings = playerStats?.innings ?: 0
+    val totalRuns = playerStats?.runsScored ?: 0
+    val totalBalls = playerStats?.ballsFaced ?: 0
+    val highestScore = playerStats?.highestScore ?: 0
+    val totalWickets = playerStats?.wicketsTaken ?: 0
+    val totalBallsBowled = playerStats?.legalBallsBowled ?: 0
     val oversBowledFormatted = "${totalBallsBowled / 6}.${totalBallsBowled % 6}"
-    val totalRunsConceded = 262 + (playerStats?.runsConceded ?: 0)
-    val totalMaidens = 2 + (playerStats?.maidens ?: 0)
-    val totalFifties = 5 + (playerStats?.fifties ?: 0)
-    val totalHundreds = 0 + (playerStats?.hundreds ?: 0)
-    val totalFours = 68 + (playerStats?.fours ?: 0)
-    val totalSixes = 26 + (playerStats?.sixes ?: 0)
+    val totalRunsConceded = playerStats?.runsConceded ?: 0
+    val totalMaidens = playerStats?.maidens ?: 0
+    val totalFifties = playerStats?.fifties ?: 0
+    val totalHundreds = playerStats?.hundreds ?: 0
+    val totalFours = playerStats?.fours ?: 0
+    val totalSixes = playerStats?.sixes ?: 0
 
-    val batAvg = if (totalInnings > 0) String.format("%.1f", totalRuns.toDouble() / (totalInnings - 3).coerceAtLeast(1)) else "0.0"
-    val batSr = if (totalBalls > 0) String.format("%.1f", (totalRuns.toDouble() / totalBalls.toDouble()) * 100.0) else "0.0"
-    val bowlEcon = if (totalBallsBowled > 0) String.format("%.2f", (totalRunsConceded.toDouble() / (totalBallsBowled.toDouble() / 6.0))) else "0.0"
-    val bowlAvg = if (totalWickets > 0) String.format("%.2f", totalRunsConceded.toDouble() / totalWickets.toDouble()) else "0.0"
+    val batAvg = if (totalInnings > 0) String.format(java.util.Locale.US, "%.1f", totalRuns.toDouble() / totalInnings.toDouble()) else "0.0"
+    val batSr = if (totalBalls > 0) String.format(java.util.Locale.US, "%.1f", (totalRuns.toDouble() / totalBalls.toDouble()) * 100.0) else "0.0"
+    val bowlEcon = if (totalBallsBowled > 0) String.format(java.util.Locale.US, "%.2f", (totalRunsConceded.toDouble() / (totalBallsBowled.toDouble() / 6.0))) else "0.0"
+    val bowlAvg = if (totalWickets > 0) String.format(java.util.Locale.US, "%.2f", totalRunsConceded.toDouble() / totalWickets.toDouble()) else "0.0"
 
     // Archetype resolution
     val archetype = when {
-        (batSr.toDoubleOrNull() ?: 0.0) >= 140.0 -> "POWER HITTER"
+        (batSr.toDoubleOrNull() ?: 0.0) >= 140.0 && totalRuns >= 50 -> "POWER HITTER"
         currentUser?.playingRole == PlayingRole.BOWLER -> "STRIKE BOWLER"
         currentUser?.playingRole == PlayingRole.WICKET_KEEPER -> "WK ANCHOR"
-        (batAvg.toDoubleOrNull() ?: 0.0) >= 35.0 -> "SOLID ANCHOR"
+        (batAvg.toDoubleOrNull() ?: 0.0) >= 35.0 && totalRuns >= 50 -> "SOLID ANCHOR"
         else -> "ALL-ROUNDER"
     }
 
-    val matchHistory = listOf(
-        CareerMatchRecord(
-            matchTitle = "Warriors CC vs Royal Tigers",
-            dateText = "18 Oct 2026 • 15 Overs",
-            battingPerformance = "64* (32) • 6x4, 3x6",
-            bowlingPerformance = "2/18 (3.0 ov)",
-            resultWon = true
-        ),
-        CareerMatchRecord(
-            matchTitle = "Shivaji Park Champions vs Metro Strikers",
-            dateText = "12 Oct 2026 • 20 Overs",
-            battingPerformance = "42 (24) • 4x4, 2x6",
-            bowlingPerformance = "1/24 (4.0 ov)",
-            resultWon = true
-        ),
-        CareerMatchRecord(
-            matchTitle = "Corporate Trophy Semi-Final",
-            dateText = "05 Oct 2026 • 12 Overs",
-            battingPerformance = "18 (9) • 1x4, 2x6",
-            bowlingPerformance = "0/15 (2.0 ov)",
-            resultWon = false
-        )
-    )
+    val matchHistory = emptyList<CareerMatchRecord>()
 
     val hapticManager = com.cricsaga.app.ui.utils.LocalHapticManager.current
 
@@ -577,38 +555,69 @@ fun PlayerProfileScreen(
 
                 4 -> {
                     // Match History
-                    items(matchHistory) { record ->
-                        Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 5.dp),
-                            colors = CardDefaults.cardColors(containerColor = SlateSurfaceDark),
-                            shape = RoundedCornerShape(8.dp),
-                            border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(CardBorderDark))
-                        ) {
-                            Column(modifier = Modifier.padding(12.dp)) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
+                    if (matchHistory.isEmpty()) {
+                        item {
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                                colors = CardDefaults.cardColors(containerColor = SlateSurfaceDark),
+                                shape = RoundedCornerShape(8.dp),
+                                border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(CardBorderDark))
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(24.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally
                                 ) {
-                                    Text(record.matchTitle, style = PlayerNameSecondary, color = TextPrimary)
                                     Text(
-                                        text = if (record.resultWon) "WON" else "LOST",
-                                        color = if (record.resultWon) BoundaryGreen else TextTertiary,
-                                        style = MicroTag
+                                        text = "No matches recorded yet",
+                                        style = PlayerNameSecondary,
+                                        color = TextPrimary
+                                    )
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        text = "Completed matches where this player participates will appear in this career history log.",
+                                        style = BodyCaption,
+                                        color = TextSecondary,
+                                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
                                     )
                                 }
+                            }
+                        }
+                    } else {
+                        items(matchHistory) { record ->
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 5.dp),
+                                colors = CardDefaults.cardColors(containerColor = SlateSurfaceDark),
+                                shape = RoundedCornerShape(8.dp),
+                                border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(CardBorderDark))
+                            ) {
+                                Column(modifier = Modifier.padding(12.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(record.matchTitle, style = PlayerNameSecondary, color = TextPrimary)
+                                        Text(
+                                            text = if (record.resultWon) "WON" else "LOST",
+                                            color = if (record.resultWon) BoundaryGreen else TextTertiary,
+                                            style = MicroTag
+                                        )
+                                    }
 
-                                Text(record.dateText, style = BodyCaption, color = TextTertiary)
-                                Spacer(modifier = Modifier.height(6.dp))
+                                    Text(record.dateText, style = BodyCaption, color = TextTertiary)
+                                    Spacer(modifier = Modifier.height(6.dp))
 
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Text("Bat: ${record.battingPerformance}", style = BodyCaption, color = TextSecondary)
-                                    Text("Bowl: ${record.bowlingPerformance}", style = BodyCaption, color = TextSecondary)
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Text("Bat: ${record.battingPerformance}", style = BodyCaption, color = TextSecondary)
+                                        Text("Bowl: ${record.bowlingPerformance}", style = BodyCaption, color = TextSecondary)
+                                    }
                                 }
                             }
                         }

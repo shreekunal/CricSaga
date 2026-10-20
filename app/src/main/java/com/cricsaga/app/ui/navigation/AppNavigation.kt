@@ -1,6 +1,8 @@
 package com.cricsaga.app.ui.navigation
 
 import android.content.Intent
+import android.net.Uri
+import android.widget.Toast
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -283,10 +285,31 @@ fun AppNavigation(
 
             // Tab 3: Discover Grassroots Cricket Hub
             composable(Screen.Discover.route) {
+                val context = LocalContext.current
                 DiscoverScreen(
                     isPro = subscriptionState.isActive,
                     onContactWhatsApp = { phone, message ->
-                        // Intent or action to connect with captain/organizer
+                        hapticManager.tapUiClick()
+                        val digits = phone.filter { it.isDigit() }
+                        val formattedPhone = if (digits.length == 10) "91$digits" else digits
+                        val encodedMessage = Uri.encode(message)
+                        val uri = Uri.parse("https://wa.me/$formattedPhone?text=$encodedMessage")
+                        val intent = Intent(Intent.ACTION_VIEW, uri).apply {
+                            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                        }
+                        try {
+                            context.startActivity(intent)
+                        } catch (e: Exception) {
+                            Toast.makeText(context, "Could not open WhatsApp. Dialing phone number...", Toast.LENGTH_SHORT).show()
+                            val dialIntent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:$formattedPhone")).apply {
+                                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                            }
+                            try {
+                                context.startActivity(dialIntent)
+                            } catch (e2: Exception) {
+                                Toast.makeText(context, "No app available to handle this request", Toast.LENGTH_SHORT).show()
+                            }
+                        }
                     }
                 )
             }

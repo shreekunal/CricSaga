@@ -66,6 +66,7 @@ data class GrassrootsHeroItem(
 fun HomeScreen(
     isPro: Boolean,
     matches: List<MatchEntity>,
+    topPerformers: List<GrassrootsHeroItem> = emptyList(),
     isDarkTheme: Boolean = true,
     onThemeToggleClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
@@ -77,68 +78,24 @@ fun HomeScreen(
 ) {
     val scrollState = rememberScrollState()
 
-    val demoRadarMatches = listOf(
-        LiveRadarItem(
-            matchId = "live_1",
-            teamA = "Warriors CC",
-            teamB = "Royal Tigers",
-            scoreText = "142/4",
-            oversText = "16.2 ov",
-            crrText = "CRR 8.7",
-            equationText = "Tigers need 28 runs in 22 balls",
-            isLive = true
-        ),
-        LiveRadarItem(
-            matchId = "live_2",
-            teamA = "Shivaji Park XI",
-            teamB = "Metro Strikers",
-            scoreText = "86/2",
-            oversText = "9.4 ov",
-            crrText = "CRR 8.9",
-            equationText = "1st Innings • 15 Overs Match",
-            isLive = true
-        )
-    )
-
     val activeRadarMatches = androidx.compose.runtime.remember(matches) {
         val liveOrRecent = matches.filter { it.matchStatus == MatchStatus.LIVE || it.matchStatus == MatchStatus.COMPLETED }
-        if (liveOrRecent.isNotEmpty()) {
-            liveOrRecent.map { m ->
-                val parts = m.matchTitle.split(" vs ")
-                val teamA = parts.getOrNull(0) ?: "Team A"
-                val teamB = parts.getOrNull(1) ?: "Team B"
-                LiveRadarItem(
-                    matchId = m.matchId,
-                    teamA = teamA,
-                    teamB = teamB,
-                    scoreText = if (m.matchStatus == MatchStatus.COMPLETED) m.resultSummary?.take(18) ?: "Final" else "Live",
-                    oversText = "${m.totalOvers} ov",
-                    crrText = m.ballType.name.replace("_", " "),
-                    equationText = m.resultSummary ?: "${m.totalOvers} overs match",
-                    isLive = m.matchStatus == MatchStatus.LIVE
-                )
-            }
-        } else {
-            demoRadarMatches
+        liveOrRecent.map { m ->
+            val parts = m.matchTitle.split(" vs ")
+            val teamA = parts.getOrNull(0) ?: "Team A"
+            val teamB = parts.getOrNull(1) ?: "Team B"
+            LiveRadarItem(
+                matchId = m.matchId,
+                teamA = teamA,
+                teamB = teamB,
+                scoreText = if (m.matchStatus == MatchStatus.COMPLETED) m.resultSummary?.take(18) ?: "Final" else "Live",
+                oversText = "${m.totalOvers} ov",
+                crrText = m.ballType.name.replace("_", " "),
+                equationText = m.resultSummary ?: "${m.totalOvers} overs match",
+                isLive = m.matchStatus == MatchStatus.LIVE
+            )
         }
     }
-
-    val topPerformers = listOf(
-        GrassrootsHeroItem(
-            playerName = "Rohit Verma",
-            initials = "RV",
-            teamName = "Warriors CC",
-            performance = "104* (48) • 8x4, 7x6",
-            context = "vs Royal Tigers • League Stage"
-        ),
-        GrassrootsHeroItem(
-            playerName = "Jasprit Khan",
-            initials = "JK",
-            teamName = "Royal Tigers",
-            performance = "5/14 (4.0) • Econ 3.50",
-            context = "vs Metro Strikers • Semi-Final"
-        )
-    )
 
     Scaffold(
         containerColor = CharcoalBackgroundDark,

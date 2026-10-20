@@ -53,18 +53,18 @@ fun PlayerDetailScreen(
     val jerseyNum = user.jerseyNumber.ifBlank { "18" }
     val cityText = "${user.city.ifBlank { "Grassroots Player" }} • Jersey #$jerseyNum"
 
-    val totalMatches = 12 + (stats?.matches ?: 0)
-    val totalInnings = 11 + (stats?.innings ?: 0)
-    val totalRuns = 340 + (stats?.runsScored ?: 0)
-    val totalBalls = 210 + (stats?.ballsFaced ?: 0)
-    val totalWickets = 8 + (stats?.wicketsTaken ?: 0)
-    val totalBallsBowled = 120 + (stats?.legalBallsBowled ?: 0)
-    val totalRunsConceded = 150 + (stats?.runsConceded ?: 0)
+    val totalMatches = stats?.matches ?: 0
+    val totalInnings = stats?.innings ?: 0
+    val totalRuns = stats?.runsScored ?: 0
+    val totalBalls = stats?.ballsFaced ?: 0
+    val totalWickets = stats?.wicketsTaken ?: 0
+    val totalBallsBowled = stats?.legalBallsBowled ?: 0
+    val totalRunsConceded = stats?.runsConceded ?: 0
 
-    val batAvg = if (totalInnings > 0) String.format("%.1f", totalRuns.toDouble() / (totalInnings - 2).coerceAtLeast(1)) else "0.0"
-    val batSr = if (totalBalls > 0) String.format("%.1f", (totalRuns.toDouble() / totalBalls.toDouble()) * 100.0) else "0.0"
-    val bowlEcon = if (totalBallsBowled > 0) String.format("%.2f", totalRunsConceded.toDouble() / (totalBallsBowled.toDouble() / 6.0)) else "0.0"
-    val bowlAvg = if (totalWickets > 0) String.format("%.2f", totalRunsConceded.toDouble() / totalWickets.toDouble()) else "0.0"
+    val batAvg = if (totalInnings > 0) String.format(java.util.Locale.US, "%.1f", totalRuns.toDouble() / totalInnings.toDouble()) else "0.0"
+    val batSr = if (totalBalls > 0) String.format(java.util.Locale.US, "%.1f", (totalRuns.toDouble() / totalBalls.toDouble()) * 100.0) else "0.0"
+    val bowlEcon = if (totalBallsBowled > 0) String.format(java.util.Locale.US, "%.2f", totalRunsConceded.toDouble() / (totalBallsBowled.toDouble() / 6.0)) else "0.0"
+    val bowlAvg = if (totalWickets > 0) String.format(java.util.Locale.US, "%.2f", totalRunsConceded.toDouble() / totalWickets.toDouble()) else "0.0"
 
     val archetype = when {
         (batSr.toDoubleOrNull() ?: 0.0) >= 140.0 -> "POWER HITTER"

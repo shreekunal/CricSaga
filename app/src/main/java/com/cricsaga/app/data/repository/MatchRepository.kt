@@ -262,6 +262,8 @@ class MatchRepository(private val database: CricSagaDatabase) {
 
     fun getPlayerStatsFlow(userId: String): Flow<PlayerStatsEntity?> = database.playerStatsDao().getStatsFlowForUser(userId)
 
+    fun getAllPlayerStats(): Flow<List<PlayerStatsEntity>> = database.playerStatsDao().getAllPlayerStats()
+
     suspend fun insertUser(user: UserEntity) = withContext(Dispatchers.IO) {
         userDao.insertUser(user)
     }
