@@ -66,29 +66,20 @@ Avoid expanding the initial MVP with costly or complex features such as live str
 
 - **Free:** A free tier for users.
 - **Premium:** ₹99 per month per individual user.
+- **Redemption / Direct Payment Strategy:**
+  - In initial days, users can activate/redeem Pro membership using **Redeem / Promo Codes** provided directly by us (via direct UPI/payment), bypassing third-party payment gateways and Google Play's 15–30% commission.
+  - Server-side verification: The backend validates the code and applies the Pro entitlement expiration date.
+  - Google Play Billing can be added later as an optional convenience when volume requires it.
 - Each person manages their own subscription.
 - Team-wide subscriptions are out of scope for the initial launch and may be considered later.
-- Exact Premium feature entitlements are **not yet decided**.
-- Subscription entitlement must be verified server-side. Do not trust a client-side flag alone.
-- Before implementing payments, confirm applicable Google Play Billing requirements and test purchase flows using Google's supported test environment.
 
 ### Decision 4 — Historical-data import
 
-**Chosen approach:** Screenshot-based assisted import.
-
-Proposed flow:
-1. User selects or uploads a scorecard screenshot they are authorized to use.
-2. OCR or another extraction method identifies available match and player data.
-3. CricSaga presents the extracted information for review.
-4. User corrects errors and confirms the import.
-5. Validated data is saved and clearly identified as imported historical data where appropriate.
-
-Requirements:
-- Never assume OCR is perfectly accurate.
-- Validate totals, overs, wickets, player names, and other fields where possible.
-- Do not silently import unreviewed OCR output.
-- Do not promise full automatic migration from CricHeroes until a supported, authorized export or integration path is confirmed.
-- Spreadsheet import may be added later.
+**Decoupled Architecture:**
+- The scorecard screenshot OCR extraction and historical migration will be handled in a **dedicated separate companion tool/app (or web utility)** rather than embedding heavy OCR/image processing inside this scoring app.
+- **Benefit:** Keeps the CricSaga Android scoring client ultra-lightweight, lightning fast on low-memory devices, and free of heavy machine learning / image processing dependencies.
+- Migrated data is validated in the companion tool and saved into the user's account via the backend API.
+- Never assume OCR is perfectly accurate; review and validation remain required before confirmation.
 
 ### Decision 5 — Authentication and security
 

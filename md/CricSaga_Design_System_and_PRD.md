@@ -199,7 +199,10 @@ erDiagram
 
 ## 4. Free vs. Premium (₹99/Month) Feature Boundaries
 
-| Feature | **Free Tier** | **Premium Tier (₹99/mo)** |
+* **Pro Activation:** Users can activate/redeem Pro membership using **Redeem Codes** directly provided to them, cutting 3rd-party payment gateway fees in initial days.
+* **Architecture Cleanliness:** Historical scorecard migration/extraction from CricHeroes is decoupled into a **separate companion app / utility**, keeping this core scoring APK 100% lightweight and clean.
+
+| Feature | **Free Tier** | **Premium Tier (₹99/mo or Redeem Code)** |
 | :--- | :---: | :---: |
 | **User Registration & Profile** | Full | Full |
 | **Team Creation & Rosters** | Unlimited | Unlimited |
@@ -207,7 +210,7 @@ erDiagram
 | **Live Match Sharing (Web View via WhatsApp)**| Unlimited | Unlimited |
 | **Basic Scorecards (Batting, Bowling, FOW)** | Unlimited | Unlimited |
 | **Basic Career Stats (Runs, Wickets, Matches)** | Included | Included |
-| **Historical Scorecard Screenshot OCR Importer** | 1 Trial Match | **Unlimited Import** |
+| **Historical Migration (via Companion App)** | 1 Trial Match | **Unlimited Migration** |
 | **Wagon Wheels & Spider Charts** | Locked | **Unlocked** |
 | **Manhattan & Worm Graphs** | Locked | **Unlocked** |
 | **PDF Scorecard Export** | Watermarked | **Clean Pro PDF Export** |
