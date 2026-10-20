@@ -15,9 +15,10 @@ import com.cricsaga.app.data.local.entity.*
         TeamMemberEntity::class,
         MatchEntity::class,
         InningsEntity::class,
-        DeliveryEntity::class
+        DeliveryEntity::class,
+        PlayerStatsEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 @TypeConverters(Converters::class)

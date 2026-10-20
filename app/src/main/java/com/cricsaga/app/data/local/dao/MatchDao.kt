@@ -7,6 +7,7 @@ import androidx.room.Query
 import androidx.room.Update
 import com.cricsaga.app.data.local.entity.InningsEntity
 import com.cricsaga.app.data.local.entity.MatchEntity
+import com.cricsaga.app.domain.model.MatchStatus
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -16,6 +17,9 @@ interface MatchDao {
 
     @Update
     suspend fun updateMatch(match: MatchEntity)
+
+    @Query("UPDATE matches SET matchStatus = :status WHERE matchId = :matchId")
+    suspend fun updateMatchStatus(matchId: String, status: MatchStatus)
 
     @Query("SELECT * FROM matches WHERE matchId = :matchId")
     suspend fun getMatchById(matchId: String): MatchEntity?
