@@ -24,7 +24,7 @@ import com.cricsaga.app.data.local.entity.*
         ChatMessageEntity::class,
         CommentEntity::class
     ],
-    version = 9,
+    version = 10,
     exportSchema = false
 )
 @TypeConverters(Converters::class)

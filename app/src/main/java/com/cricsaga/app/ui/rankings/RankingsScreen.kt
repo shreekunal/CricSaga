@@ -358,8 +358,8 @@ private fun PlayerRankingCard(
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
             .clickable(onClick = onPlayerClick),
+        shape = RoundedCornerShape(12.dp),
         color = MaterialTheme.colorScheme.surface,
         tonalElevation = 2.dp,
         border = androidx.compose.foundation.BorderStroke(
@@ -529,8 +529,8 @@ private fun TeamRankingCard(
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
             .clickable(onClick = onTeamClick),
+        shape = RoundedCornerShape(12.dp),
         color = MaterialTheme.colorScheme.surface,
         tonalElevation = 2.dp,
         border = androidx.compose.foundation.BorderStroke(
@@ -718,108 +718,74 @@ fun ChampionshipPodium(
     val second = top3.getOrNull(1)
     val third = top3.getOrNull(2)
 
-    Card(
+    Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 2.dp),
-        shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = CardDefaults.outlinedCardBorder().copy(
-            brush = androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+            .padding(vertical = 4.dp),
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surface,
+        tonalElevation = 2.dp,
+        border = androidx.compose.foundation.BorderStroke(
+            width = 1.dp,
+            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
         )
     ) {
-        Column(
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 10.dp, start = 8.dp, end = 8.dp, bottom = 8.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+                .padding(horizontal = 8.dp, vertical = 14.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.Top
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Default.EmojiEvents,
-                    contentDescription = null,
-                    tint = Color(0xFFFFB800),
-                    modifier = Modifier.size(15.dp)
+            // #2 Silver (Left)
+            if (second != null) {
+                PodiumPlayerCard(
+                    player = second,
+                    rank = 2,
+                    accentColor = Color(0xFF94A3B8),
+                    primaryStatLabel = primaryStatLabel,
+                    modifier = Modifier.weight(1f),
+                    onPlayerClick = { onPlayerClick(second.userId) }
                 )
-                Spacer(modifier = Modifier.width(5.dp))
-                Text(
-                    text = "CHAMPIONSHIP PODIUM",
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Black,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    letterSpacing = 0.8.sp
+            } else {
+                Spacer(modifier = Modifier.weight(1f))
+            }
+
+            // #1 Gold Champion (Center)
+            if (first != null) {
+                PodiumPlayerCard(
+                    player = first,
+                    rank = 1,
+                    accentColor = Color(0xFFFFB800),
+                    primaryStatLabel = primaryStatLabel,
+                    isChampion = true,
+                    modifier = Modifier.weight(1.15f),
+                    onPlayerClick = { onPlayerClick(first.userId) }
                 )
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // 3-Column Compact Podium Display
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.Bottom
-            ) {
-                // #2 Silver (Left)
-                if (second != null) {
-                    PodiumPillar(
-                        player = second,
-                        rank = 2,
-                        pillarHeight = 44.dp,
-                        accentColor = Color(0xFF94A3B8),
-                        rankLabel = "2ND",
-                        primaryStatLabel = primaryStatLabel,
-                        modifier = Modifier.weight(1f),
-                        onPlayerClick = { onPlayerClick(second.userId) }
-                    )
-                } else {
-                    Spacer(modifier = Modifier.weight(1f))
-                }
-
-                // #1 Gold (Center)
-                if (first != null) {
-                    PodiumPillar(
-                        player = first,
-                        rank = 1,
-                        pillarHeight = 56.dp,
-                        accentColor = Color(0xFFFFB800),
-                        rankLabel = "1ST",
-                        primaryStatLabel = primaryStatLabel,
-                        modifier = Modifier.weight(1.08f),
-                        isChampion = true,
-                        onPlayerClick = { onPlayerClick(first.userId) }
-                    )
-                }
-
-                // #3 Bronze (Right)
-                if (third != null) {
-                    PodiumPillar(
-                        player = third,
-                        rank = 3,
-                        pillarHeight = 36.dp,
-                        accentColor = Color(0xFFD97706),
-                        rankLabel = "3RD",
-                        primaryStatLabel = primaryStatLabel,
-                        modifier = Modifier.weight(1f),
-                        onPlayerClick = { onPlayerClick(third.userId) }
-                    )
-                } else {
-                    Spacer(modifier = Modifier.weight(1f))
-                }
+            // #3 Bronze (Right)
+            if (third != null) {
+                PodiumPlayerCard(
+                    player = third,
+                    rank = 3,
+                    accentColor = Color(0xFFD97706),
+                    primaryStatLabel = primaryStatLabel,
+                    modifier = Modifier.weight(1f),
+                    onPlayerClick = { onPlayerClick(third.userId) }
+                )
+            } else {
+                Spacer(modifier = Modifier.weight(1f))
             }
         }
     }
 }
 
 @Composable
-fun PodiumPillar(
+fun PodiumPlayerCard(
     player: PlayerRankingItem,
     rank: Int,
-    pillarHeight: androidx.compose.ui.unit.Dp,
     accentColor: Color,
-    rankLabel: String,
     primaryStatLabel: String,
     modifier: Modifier = Modifier,
     isChampion: Boolean = false,
@@ -834,108 +800,111 @@ fun PodiumPillar(
 
     Column(
         modifier = modifier
-            .clip(RoundedCornerShape(10.dp))
+            .clip(RoundedCornerShape(12.dp))
             .clickable(onClick = onPlayerClick)
-            .padding(horizontal = 2.dp),
+            .padding(horizontal = 4.dp, vertical = 2.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        if (isChampion) {
-            Icon(
-                imageVector = Icons.Default.MilitaryTech,
-                contentDescription = "Champion",
-                tint = Color(0xFFFFB800),
-                modifier = Modifier.size(18.dp)
-            )
-        } else {
-            Spacer(modifier = Modifier.height(4.dp))
+        // Champion Crown Indicator
+        Box(
+            modifier = Modifier.height(20.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            if (isChampion) {
+                Icon(
+                    imageVector = Icons.Default.WorkspacePremium,
+                    contentDescription = "Champion",
+                    tint = Color(0xFFFFB800),
+                    modifier = Modifier.size(20.dp)
+                )
+            }
         }
 
+        Spacer(modifier = Modifier.height(2.dp))
+
+        // Avatar with Rank Badge overlay
         Box(contentAlignment = Alignment.BottomCenter) {
             Box(
                 modifier = Modifier
-                    .size(if (isChampion) 44.dp else 36.dp)
-                    .clip(CircleShape)
-                    .background(accentColor.copy(alpha = 0.15f))
-                    .border(1.5.dp, accentColor, CircleShape),
+                    .size(if (isChampion) 54.dp else 46.dp)
+                    .background(accentColor.copy(alpha = 0.12f), CircleShape)
+                    .border(
+                        width = if (isChampion) 2.dp else 1.5.dp,
+                        color = accentColor,
+                        shape = CircleShape
+                    ),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     text = player.initials,
-                    fontSize = if (isChampion) 14.sp else 12.sp,
+                    fontSize = if (isChampion) 16.sp else 13.sp,
                     fontWeight = FontWeight.Black,
                     color = accentColor
                 )
             }
+
+            // Rank Number Pill
             Surface(
                 color = accentColor,
-                shape = CircleShape,
-                modifier = Modifier
-                    .offset(y = 4.dp)
-                    .size(15.dp)
+                shape = RoundedCornerShape(8.dp),
+                modifier = Modifier.offset(y = 6.dp)
             ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Text(
-                        text = "$rank",
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.Black,
-                        color = Color.White
-                    )
-                }
+                Text(
+                    text = "#$rank",
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Black,
+                    color = Color.White,
+                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp)
+                )
             }
         }
 
-        Spacer(modifier = Modifier.height(6.dp))
+        Spacer(modifier = Modifier.height(10.dp))
 
+        // Player Name
         Text(
             text = player.playerName,
-            fontSize = if (isChampion) 11.sp else 10.sp,
+            fontSize = if (isChampion) 12.sp else 11.sp,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onSurface,
             maxLines = 1,
             overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
         )
 
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                text = statValue,
-                fontSize = if (isChampion) 12.sp else 11.sp,
-                fontWeight = FontWeight.Black,
-                color = accentColor
-            )
-            Spacer(modifier = Modifier.width(2.dp))
-            Text(
-                text = primaryStatLabel,
-                fontSize = 7.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
+        // Player City
+        Text(
+            text = player.city.ifBlank { "Mumbai" },
+            fontSize = 9.5.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+        )
 
-        Spacer(modifier = Modifier.height(4.dp))
+        Spacer(modifier = Modifier.height(6.dp))
 
+        // Primary Stat Capsule Pill
         Surface(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(pillarHeight),
-            shape = RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp),
-            color = accentColor.copy(alpha = if (isChampion) 0.22f else 0.14f),
-            border = androidx.compose.foundation.BorderStroke(1.dp, accentColor.copy(alpha = 0.5f))
+            shape = RoundedCornerShape(12.dp),
+            color = accentColor.copy(alpha = 0.12f),
+            border = androidx.compose.foundation.BorderStroke(0.75.dp, accentColor.copy(alpha = 0.35f))
         ) {
-            Box(contentAlignment = Alignment.Center) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        text = rankLabel,
-                        fontSize = if (isChampion) 13.sp else 11.sp,
-                        fontWeight = FontWeight.Black,
-                        color = accentColor
-                    )
-                    Text(
-                        text = player.city.ifBlank { "Mumbai" },
-                        fontSize = 8.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1
-                    )
-                }
+            Row(
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = statValue,
+                    fontSize = if (isChampion) 12.sp else 11.sp,
+                    fontWeight = FontWeight.Black,
+                    color = accentColor
+                )
+                Spacer(modifier = Modifier.width(3.dp))
+                Text(
+                    text = primaryStatLabel,
+                    fontSize = 8.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
     }

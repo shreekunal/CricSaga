@@ -187,8 +187,8 @@ fun DiscoverScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 4.dp)
-                    .clip(RoundedCornerShape(12.dp))
                     .clickable { onRankingsClick() },
+                shape = RoundedCornerShape(12.dp),
                 color = MaterialTheme.colorScheme.surface,
                 border = androidx.compose.foundation.BorderStroke(1.dp, AmberFourPrimary.copy(alpha = 0.35f))
             ) {

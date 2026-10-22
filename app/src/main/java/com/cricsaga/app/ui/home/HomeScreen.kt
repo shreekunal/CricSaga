@@ -192,12 +192,11 @@ fun HomeScreen(
 
                         // Join Plus Button (with Gap to right actions)
                         Surface(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(16.dp))
-                                .clickable {
-                                    hapticManager?.tapUiClick()
-                                    onJoinPlusClick()
-                                },
+                            modifier = Modifier.clickable {
+                                hapticManager?.tapUiClick()
+                                onJoinPlusClick()
+                            },
+                            shape = RoundedCornerShape(16.dp),
                             color = AmberFourPrimary.copy(alpha = 0.15f),
                             border = BorderStroke(1.dp, AmberFourPrimary.copy(alpha = 0.7f))
                         ) {
@@ -330,12 +329,11 @@ fun HomeScreen(
                         )
 
                         Surface(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(16.dp))
-                                .clickable {
-                                    hapticManager?.tapBoundaryFour()
-                                    onStartMatchClick()
-                                },
+                            modifier = Modifier.clickable {
+                                hapticManager?.tapBoundaryFour()
+                                onStartMatchClick()
+                            },
+                            shape = RoundedCornerShape(16.dp),
                             color = CrimsonPrimaryDark
                         ) {
                             Row(
@@ -350,7 +348,7 @@ fun HomeScreen(
                                 )
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text(
-                                    text = "+ Match",
+                                    text = "Match",
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = Color.White
@@ -405,44 +403,7 @@ fun HomeScreen(
                 }
             }
 
-            // Section 2: Post Composition Quick Bar
-            item {
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp)
-                        .clickable {
-                            hapticManager?.tapUiClick()
-                            showCreatePostDialog = true
-                        },
-                    shape = RoundedCornerShape(12.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(34.dp)
-                                .background(CrimsonPrimaryDark.copy(alpha = 0.2f), CircleShape),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(Icons.Default.SportsCricket, contentDescription = null, modifier = Modifier.size(16.dp), tint = CrimsonPrimaryDark)
-                        }
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Text(
-                            text = "What's happening on the pitch? Post an update...",
-                            fontSize = 12.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-            }
-
-            // Section 3: Dual Feed Tabs (For You vs Following)
+            // Section 2: Dual Feed Tabs (For You vs Following)
             item {
                 TabRow(
                     selectedTabIndex = selectedFeedTab,
@@ -1052,38 +1013,20 @@ fun CricketPostCard(
                         )
                     }
 
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        if (!post.authorTeamName.isNullOrBlank()) {
-                            Surface(
-                                color = MaterialTheme.colorScheme.surfaceVariant,
-                                shape = RoundedCornerShape(4.dp)
-                            ) {
-                                Text(
-                                    text = post.authorTeamName,
-                                    fontSize = 9.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
-                                )
-                            }
-                            Spacer(modifier = Modifier.width(4.dp))
-                        }
-                        Text(
-                            text = "${post.authorRole} • ${post.authorCity}",
-                            fontSize = 11.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
+                    Text(
+                        text = "${post.authorRole} • ${post.authorCity}",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
 
                 if (!isMyPost) {
                     Surface(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(12.dp))
-                            .clickable {
-                                hapticManager?.tapUiClick()
-                                onToggleFollow()
-                            },
+                        modifier = Modifier.clickable {
+                            hapticManager?.tapUiClick()
+                            onToggleFollow()
+                        },
+                        shape = RoundedCornerShape(12.dp),
                         color = if (isFollowing) MaterialTheme.colorScheme.surfaceVariant else CrimsonPrimaryDark.copy(alpha = 0.15f)
                     ) {
                         Text(
@@ -1113,8 +1056,8 @@ fun CricketPostCard(
                 Surface(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(8.dp))
                         .clickable(enabled = post.linkedMatchId != null, onClick = onMatchClick),
+                    shape = RoundedCornerShape(8.dp),
                     color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
                 ) {
                     Row(
@@ -1252,18 +1195,6 @@ fun CreatePostDialog(
     var performanceTagText by remember { mutableStateOf("") }
     val hapticManager = com.cricsaga.app.ui.utils.LocalHapticManager.current
 
-    val guidedTags = listOf(
-        "50* (28)",
-        "100* (54)",
-        "3/18 (4.0)",
-        "5/12 (3.4)",
-        "Hat-trick",
-        "Captain's Knock",
-        "Match Winner",
-        "Finisher 32* (12)",
-        "Maiden Over"
-    )
-
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
@@ -1300,35 +1231,6 @@ fun CreatePostDialog(
                         singleLine = true,
                         shape = RoundedCornerShape(8.dp)
                     )
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Text(
-                        text = "Quick Presets:",
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        items(guidedTags) { tag ->
-                            Surface(
-                                shape = RoundedCornerShape(12.dp),
-                                color = if (performanceTagText == tag) CrimsonPrimaryDark.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceVariant,
-                                border = if (performanceTagText == tag) BorderStroke(1.dp, CrimsonPrimaryDark) else null,
-                                modifier = Modifier.clickable {
-                                    hapticManager?.tapUiClick()
-                                    performanceTagText = tag
-                                }
-                            ) {
-                                Text(
-                                    text = tag,
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = if (performanceTagText == tag) CrimsonPrimaryDark else MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                                )
-                            }
-                        }
-                    }
                 }
             }
         },

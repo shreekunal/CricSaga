@@ -12,6 +12,7 @@ data class UserEntity(
     val userId: String,
     val phoneNumber: String,
     val fullName: String,
+    val password: String = "123456",
     val profilePhotoUrl: String? = null,
     val playingRole: PlayingRole = PlayingRole.ALL_ROUNDER,
     val battingStyle: BattingStyle = BattingStyle.RIGHT_HAND,

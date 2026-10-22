@@ -187,46 +187,53 @@ fun AppNavigation(
             startDestination = if (authState is AuthState.Unauthenticated) Screen.PhoneLogin.route else Screen.Home.route,
             modifier = Modifier.padding(paddingValues)
         ) {
-            // Auth Flow: Google Sign-In & Pitch Guest Scorer
+            // Auth Flow: Phone Number + Password Sign In & Sign Up
             composable(Screen.PhoneLogin.route) {
                 PhoneLoginScreen(
-                    onGoogleSignIn = { email, displayName ->
+                    onSignIn = { phone, password, onError ->
                         coroutineScope.launch {
-                            val allUsers = scoringViewModel.repository.getAllUsers().first()
-                            val existingUser = allUsers.find {
-                                it.userId == "user_${email.replace("@", "_").replace(".", "_")}" ||
-                                it.fullName.equals(displayName, ignoreCase = true)
-                            }
-                            if (existingUser != null) {
-                                authManager.setLoggedIn(existingUser.userId, existingUser.phoneNumber)
+                            val user = scoringViewModel.repository.authenticateUser(phone, password)
+                            if (user != null) {
+                                authManager.setLoggedIn(user.userId, user.phoneNumber)
                                 navController.navigate(Screen.Home.route) {
                                     popUpTo(0) { inclusive = true }
                                 }
                             } else {
-                                tempGoogleName = displayName
-                                tempGoogleEmail = email
-                                tempAuthPhone = ""
-                                navController.navigate(Screen.ProfileSetup.route)
+                                val cleanPhone = phone.filter { it.isDigit() }.takeLast(10)
+                                val existing = scoringViewModel.repository.getUserByPhone(cleanPhone)
+                                    ?: scoringViewModel.repository.getUserByPhone(phone)
+                                if (existing != null) {
+                                    onError("Incorrect password. Please try again.")
+                                } else {
+                                    onError("No account found with this phone number. Switch to Sign Up.")
+                                }
                             }
                         }
                     },
-                    onContinueAsGuest = {
-                        authManager.setGuestMode()
-                        navController.navigate(Screen.Home.route) {
-                            popUpTo(0) { inclusive = true }
-                        }
-                    },
-                    onPhoneVerified = { phone ->
+                    onSignUp = { fullName, phone, password, onError ->
                         coroutineScope.launch {
-                            val existingUser = scoringViewModel.repository.getUserByPhone(phone)
-                            if (existingUser != null) {
-                                authManager.setLoggedIn(existingUser.userId, phone)
+                            val cleanPhone = phone.filter { it.isDigit() }.takeLast(10)
+                            val existing = scoringViewModel.repository.getUserByPhone(cleanPhone)
+                                ?: scoringViewModel.repository.getUserByPhone(phone)
+                            if (existing != null) {
+                                onError("An account already exists with this phone number. Please Sign In.")
+                            } else {
+                                val newUserId = "user_${cleanPhone}"
+                                val newUser = UserEntity(
+                                    userId = newUserId,
+                                    phoneNumber = cleanPhone,
+                                    fullName = fullName,
+                                    password = password,
+                                    playingRole = com.cricsaga.app.domain.model.PlayingRole.ALL_ROUNDER,
+                                    battingStyle = com.cricsaga.app.domain.model.BattingStyle.RIGHT_HAND,
+                                    bowlingStyle = com.cricsaga.app.domain.model.BowlingStyle.RIGHT_ARM_MEDIUM,
+                                    city = "Mumbai"
+                                )
+                                scoringViewModel.repository.insertUser(newUser)
+                                authManager.setLoggedIn(newUserId, cleanPhone)
                                 navController.navigate(Screen.Home.route) {
                                     popUpTo(0) { inclusive = true }
                                 }
-                            } else {
-                                tempAuthPhone = phone
-                                navController.navigate(Screen.ProfileSetup.route)
                             }
                         }
                     }
@@ -804,6 +811,13 @@ fun AppNavigation(
                     onBackClick = {
                         hapticManager.tapUiClick()
                         navController.popBackStack()
+                    },
+                    onLogout = {
+                        hapticManager.tapUiClick()
+                        authManager.logout()
+                        navController.navigate(Screen.PhoneLogin.route) {
+                            popUpTo(0) { inclusive = true }
+                        }
                     }
                 )
             }

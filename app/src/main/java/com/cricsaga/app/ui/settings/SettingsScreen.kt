@@ -26,7 +26,8 @@ import com.cricsaga.app.ui.utils.HapticManager
 fun SettingsScreen(
     themeManager: ThemeManager,
     hapticManager: HapticManager,
-    onBackClick: () -> Unit
+    onBackClick: () -> Unit,
+    onLogout: () -> Unit = {}
 ) {
     val themeMode by themeManager.themeMode.collectAsState()
     val isHapticsEnabled by hapticManager.isEnabled.collectAsState()
@@ -290,6 +291,29 @@ fun SettingsScreen(
                             Text("Barlow Condensed + DM Sans", style = BodyCaption, color = TextPrimary)
                         }
                     }
+                }
+            }
+
+            // Section 5: Account & Logout
+            item {
+                Spacer(modifier = Modifier.height(8.dp))
+                Button(
+                    onClick = {
+                        hapticManager.tapUiClick()
+                        onLogout()
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp),
+                    shape = RoundedCornerShape(10.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = DismissalRed)
+                ) {
+                    Text(
+                        text = "LOG OUT OF CRICSAGA",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.sp,
+                        color = Color.White
+                    )
                 }
             }
         }
