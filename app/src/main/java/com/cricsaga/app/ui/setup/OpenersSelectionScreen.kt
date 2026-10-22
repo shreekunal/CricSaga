@@ -1,5 +1,6 @@
 package com.cricsaga.app.ui.setup
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -34,20 +35,54 @@ fun OpenersSelectionScreen(
     val scrollState = rememberScrollState()
     val hapticManager = com.cricsaga.app.ui.utils.LocalHapticManager.current
 
+    LaunchedEffect(battingSquad, bowlingSquad) {
+        if (strikerId.isEmpty() && battingSquad.isNotEmpty()) {
+            strikerId = battingSquad[0].userId
+        }
+        if (nonStrikerId.isEmpty() && battingSquad.size > 1) {
+            nonStrikerId = battingSquad[1].userId
+        }
+        if (openingBowlerId.isEmpty() && bowlingSquad.isNotEmpty()) {
+            openingBowlerId = bowlingSquad[0].userId
+        }
+    }
+
     Scaffold(
-        containerColor = CharcoalBackgroundDark,
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
-                title = { Text("Select Opening Players", fontWeight = FontWeight.Bold, color = TextPrimary) },
+                title = {
+                    Column {
+                        Text(
+                            text = "Select Opening Players",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = "$battingTeamName vs $bowlingTeamName",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                },
                 navigationIcon = {
                     IconButton(onClick = {
                         hapticManager?.tapUiClick()
                         onBackClick()
                     }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = TextPrimary)
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back",
+                            tint = MaterialTheme.colorScheme.onSurface
+                        )
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = CharcoalBackgroundDark)
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    titleContentColor = MaterialTheme.colorScheme.onSurface,
+                    navigationIconContentColor = MaterialTheme.colorScheme.onSurface
+                )
             )
         }
     ) { paddingValues ->
@@ -55,33 +90,55 @@ fun OpenersSelectionScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .padding(16.dp)
+                .padding(horizontal = 16.dp, vertical = 12.dp)
                 .verticalScroll(scrollState),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             // Striker Selector
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = SlateSurfaceDark),
-                shape = RoundedCornerShape(12.dp)
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                shape = RoundedCornerShape(16.dp),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
             ) {
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("OPENING STRIKER ($battingTeamName)", color = CrimsonPrimaryDark, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text(
+                        text = "OPENING STRIKER ($battingTeamName)",
+                        color = CrimsonPrimaryDark,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.sp,
+                        letterSpacing = 0.5.sp
+                    )
                     if (battingSquad.isEmpty()) {
-                        Text("No squad members found for $battingTeamName.", color = TextTertiary, fontSize = 12.sp)
+                        Text(
+                            text = "No squad members found for $battingTeamName.",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontSize = 12.sp
+                        )
                     } else {
                         LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             items(battingSquad.filter { it.userId != nonStrikerId }) { p ->
+                                val isSelected = strikerId == p.userId
                                 FilterChip(
-                                    selected = strikerId == p.userId,
+                                    selected = isSelected,
                                     onClick = {
                                         hapticManager?.tapUiClick()
                                         strikerId = p.userId
                                     },
-                                    label = { Text(p.fullName) },
+                                    label = {
+                                        Text(
+                                            text = p.fullName,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                        )
+                                    },
                                     colors = FilterChipDefaults.filterChipColors(
                                         selectedContainerColor = CrimsonPrimaryDark,
-                                        selectedLabelColor = Color.White
+                                        selectedLabelColor = Color.White,
+                                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                        labelColor = MaterialTheme.colorScheme.onSurface
                                     )
                                 )
                             }
@@ -93,26 +150,48 @@ fun OpenersSelectionScreen(
             // Non-Striker Selector
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = SlateSurfaceDark),
-                shape = RoundedCornerShape(12.dp)
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                shape = RoundedCornerShape(16.dp),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
             ) {
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("OPENING NON-STRIKER ($battingTeamName)", color = BoundaryAmber, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text(
+                        text = "OPENING NON-STRIKER ($battingTeamName)",
+                        color = BoundaryAmber,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.sp,
+                        letterSpacing = 0.5.sp
+                    )
                     if (battingSquad.size < 2) {
-                        Text("At least 2 squad members needed to select non-striker.", color = TextTertiary, fontSize = 12.sp)
+                        Text(
+                            text = "At least 2 squad members needed to select non-striker.",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontSize = 12.sp
+                        )
                     } else {
                         LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             items(battingSquad.filter { it.userId != strikerId }) { p ->
+                                val isSelected = nonStrikerId == p.userId
                                 FilterChip(
-                                    selected = nonStrikerId == p.userId,
+                                    selected = isSelected,
                                     onClick = {
                                         hapticManager?.tapUiClick()
                                         nonStrikerId = p.userId
                                     },
-                                    label = { Text(p.fullName) },
+                                    label = {
+                                        Text(
+                                            text = p.fullName,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                        )
+                                    },
                                     colors = FilterChipDefaults.filterChipColors(
-                                        selectedContainerColor = BoundaryAmber,
-                                        selectedLabelColor = Color.Black
+                                        selectedContainerColor = AmberFourPrimary,
+                                        selectedLabelColor = Color.White,
+                                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                        labelColor = MaterialTheme.colorScheme.onSurface
                                     )
                                 )
                             }
@@ -124,26 +203,48 @@ fun OpenersSelectionScreen(
             // Opening Bowler Selector
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = SlateSurfaceDark),
-                shape = RoundedCornerShape(12.dp)
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                shape = RoundedCornerShape(16.dp),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
             ) {
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("OPENING BOWLER ($bowlingTeamName)", color = BoundaryGreen, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text(
+                        text = "OPENING BOWLER ($bowlingTeamName)",
+                        color = Color(0xFF059669),
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.sp,
+                        letterSpacing = 0.5.sp
+                    )
                     if (bowlingSquad.isEmpty()) {
-                        Text("No squad members found for $bowlingTeamName.", color = TextTertiary, fontSize = 12.sp)
+                        Text(
+                            text = "No squad members found for $bowlingTeamName.",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontSize = 12.sp
+                        )
                     } else {
                         LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             items(bowlingSquad) { b ->
+                                val isSelected = openingBowlerId == b.userId
                                 FilterChip(
-                                    selected = openingBowlerId == b.userId,
+                                    selected = isSelected,
                                     onClick = {
                                         hapticManager?.tapUiClick()
                                         openingBowlerId = b.userId
                                     },
-                                    label = { Text(b.fullName) },
+                                    label = {
+                                        Text(
+                                            text = b.fullName,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                        )
+                                    },
                                     colors = FilterChipDefaults.filterChipColors(
-                                        selectedContainerColor = BoundaryGreen,
-                                        selectedLabelColor = Color.Black
+                                        selectedContainerColor = Color(0xFF059669),
+                                        selectedLabelColor = Color.White,
+                                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                        labelColor = MaterialTheme.colorScheme.onSurface
                                     )
                                 )
                             }
@@ -152,19 +253,33 @@ fun OpenersSelectionScreen(
                 }
             }
 
+            val canStart = strikerId.isNotEmpty() &&
+                    nonStrikerId.isNotEmpty() &&
+                    openingBowlerId.isNotEmpty() &&
+                    strikerId != nonStrikerId
+
             Button(
                 onClick = {
                     hapticManager?.tapUiClick()
                     onStartMatch(strikerId, nonStrikerId, openingBowlerId)
                 },
-                enabled = strikerId.isNotEmpty() && nonStrikerId.isNotEmpty() && openingBowlerId.isNotEmpty() && strikerId != nonStrikerId,
-                colors = ButtonDefaults.buttonColors(containerColor = CrimsonPrimaryDark),
-                shape = RoundedCornerShape(8.dp),
+                enabled = canStart,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = CrimsonPrimaryDark,
+                    disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                    disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                ),
+                shape = RoundedCornerShape(12.dp),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(48.dp)
+                    .height(52.dp)
             ) {
-                Text("LET'S PLAY! START SCORING", fontWeight = FontWeight.Bold, color = Color.White)
+                Text(
+                    text = "LET'S PLAY! START SCORING",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 15.sp,
+                    color = if (canStart) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
     }

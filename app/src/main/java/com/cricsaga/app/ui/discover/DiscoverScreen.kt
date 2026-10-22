@@ -84,26 +84,6 @@ fun DiscoverScreen(
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
-        topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text(
-                            text = "Discover",
-                            fontWeight = FontWeight.Black,
-                            fontSize = 20.sp,
-                            color = MaterialTheme.colorScheme.onBackground
-                        )
-                        Text(
-                            text = "Grassroots Matchmaker",
-                            fontSize = 11.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
-            )
-        },
         floatingActionButton = {
             ExtendedFloatingActionButton(
                 onClick = {
@@ -122,6 +102,20 @@ fun DiscoverScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
+            Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
+                Text(
+                    text = "Discover",
+                    fontWeight = FontWeight.Black,
+                    fontSize = 20.sp,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+                Text(
+                    text = "Grassroots Matchmaker",
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
             // Search Input
             OutlinedTextField(
                 value = searchQuery,

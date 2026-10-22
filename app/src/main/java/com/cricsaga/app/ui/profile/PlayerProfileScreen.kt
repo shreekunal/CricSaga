@@ -57,6 +57,9 @@ fun PlayerProfileScreen(
     onUpdateProfile: (UserEntity) -> Unit = {},
     onTeamClick: (String) -> Unit = {},
     onCreateOrJoinTeamClick: () -> Unit = {},
+    onLikePost: (String) -> Unit = {},
+    onDeletePost: (String) -> Unit = {},
+    onRepostPost: (String) -> Unit = {},
     onLogout: () -> Unit = {}
 ) {
     val context = LocalContext.current
@@ -115,57 +118,7 @@ fun PlayerProfileScreen(
     val hapticManager = com.cricsaga.app.ui.utils.LocalHapticManager.current
 
     Scaffold(
-        containerColor = CharcoalBackgroundDark,
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = "My Career",
-                        style = PlayerNamePrimary,
-                        color = TextPrimary
-                    )
-                },
-                actions = {
-                    // Share Collectible Athlete Card Action
-                    IconButton(onClick = {
-                        hapticManager?.tapUiClick()
-                        ShareUtils.generateAndShareAthleteCard(
-                            context = context,
-                            playerName = playerName,
-                            jerseyNumber = jerseyNum,
-                            archetype = archetype,
-                            city = currentUser?.city?.ifBlank { "Mumbai" } ?: "Mumbai",
-                            matches = totalMatches,
-                            runs = totalRuns,
-                            wickets = totalWickets,
-                            average = batAvg,
-                            profilePhotoPath = currentUser?.profilePhotoUrl
-                        )
-                    }) {
-                        Icon(
-                            Icons.Default.Share,
-                            contentDescription = "Share Athlete Card",
-                            tint = BoundaryAmber,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-
-                    // Logout / Switch Account Action
-                    IconButton(onClick = {
-                        hapticManager?.tapUiClick()
-                        onLogout()
-                    }) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.Logout,
-                            contentDescription = "Switch Account / Logout",
-                            tint = TextSecondary,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = CharcoalBackgroundDark)
-            )
-        }
+        containerColor = MaterialTheme.colorScheme.background
     ) { paddingValues ->
         LazyColumn(
             modifier = Modifier
@@ -173,6 +126,62 @@ fun PlayerProfileScreen(
                 .padding(paddingValues),
             contentPadding = PaddingValues(bottom = 24.dp)
         ) {
+            // Header Row: My Career Title + Share & Logout Actions
+            item {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 6.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "My Career",
+                        style = PlayerNamePrimary,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        // Share Collectible Athlete Card Action
+                        IconButton(onClick = {
+                            hapticManager?.tapUiClick()
+                            ShareUtils.generateAndShareAthleteCard(
+                                context = context,
+                                playerName = playerName,
+                                jerseyNumber = jerseyNum,
+                                archetype = archetype,
+                                city = currentUser?.city?.ifBlank { "Mumbai" } ?: "Mumbai",
+                                matches = totalMatches,
+                                runs = totalRuns,
+                                wickets = totalWickets,
+                                average = batAvg,
+                                profilePhotoPath = currentUser?.profilePhotoUrl
+                            )
+                        }) {
+                            Icon(
+                                Icons.Default.Share,
+                                contentDescription = "Share Athlete Card",
+                                tint = AmberFourPrimary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+
+                        // Logout / Switch Account Action
+                        IconButton(onClick = {
+                            hapticManager?.tapUiClick()
+                            onLogout()
+                        }) {
+                            Icon(
+                                Icons.AutoMirrored.Filled.Logout,
+                                contentDescription = "Switch Account / Logout",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+                }
+            }
+
             // 1. Collectible Athlete Card Hero
             item {
                 Box(
@@ -824,9 +833,11 @@ fun PlayerProfileScreen(
                                 isFollowing = false,
                                 onAuthorClick = {},
                                 onToggleFollow = {},
-                                onLikeClick = {},
+                                onLikeClick = { onLikePost(p.postId) },
                                 onMessageAuthor = {},
-                                onMatchClick = {}
+                                onMatchClick = {},
+                                onRepostClick = { onRepostPost(p.postId) },
+                                onDeleteClick = { onDeletePost(p.postId) }
                             )
                         }
                     }

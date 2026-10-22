@@ -1,20 +1,24 @@
 package com.cricsaga.app.ui.redeem
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.AdminPanelSettings
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.CardMembership
-import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.WorkspacePremium
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -23,7 +27,6 @@ import androidx.compose.ui.unit.sp
 import com.cricsaga.app.data.local.ProManager
 import com.cricsaga.app.data.local.ProPlan
 import com.cricsaga.app.ui.theme.*
-import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -31,35 +34,39 @@ fun RedeemCodeScreen(
     proManager: ProManager,
     onBackClick: () -> Unit = {}
 ) {
-    var codeInput by remember { mutableStateOf("") }
-    var feedbackMessage by remember { mutableStateOf<String?>(null) }
-    var isSuccess by remember { mutableStateOf(false) }
-    var isRedeeming by remember { mutableStateOf(false) }
     val subscriptionState by proManager.subscriptionState.collectAsState()
+    var selectedPlan by remember { mutableStateOf(ProPlan.ONE_YEAR) }
+    var actionMessage by remember { mutableStateOf<String?>(null) }
     val scrollState = rememberScrollState()
-    val coroutineScope = rememberCoroutineScope()
+    val hapticManager = com.cricsaga.app.ui.utils.LocalHapticManager.current
 
     Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
                 title = {
                     Text(
                         text = "Pro Membership",
                         fontWeight = FontWeight.Bold,
-                        color = TextPrimary,
+                        color = MaterialTheme.colorScheme.onBackground,
                         fontSize = 18.sp
                     )
                 },
                 navigationIcon = {
-                    IconButton(onClick = onBackClick) {
+                    IconButton(onClick = {
+                        hapticManager?.tapUiClick()
+                        onBackClick()
+                    }) {
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Back",
-                            tint = TextPrimary
+                            tint = MaterialTheme.colorScheme.onBackground
                         )
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = CharcoalBackgroundDark)
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.background
+                )
             )
         }
     ) { paddingValues ->
@@ -67,60 +74,88 @@ fun RedeemCodeScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .padding(16.dp)
+                .padding(horizontal = 16.dp, vertical = 8.dp)
                 .verticalScroll(scrollState),
             verticalArrangement = Arrangement.spacedBy(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Pro Member Status Card
-            Card(
+            // Section 1: Hero Membership Status Card
+            Surface(
                 modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = SlateSurfaceDark),
-                shape = RoundedCornerShape(10.dp),
-                border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(CardBorderDark))
+                shape = RoundedCornerShape(16.dp),
+                color = if (subscriptionState.isActive) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surface,
+                border = BorderStroke(
+                    1.dp,
+                    if (subscriptionState.isActive) BoundaryAmber else MaterialTheme.colorScheme.outlineVariant
+                )
             ) {
                 Column(
-                    modifier = Modifier.padding(18.dp),
+                    modifier = Modifier.padding(20.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Icon(
-                        Icons.Default.Star,
-                        contentDescription = null,
-                        tint = if (subscriptionState.isActive) BoundaryAmber else TextSecondary,
-                        modifier = Modifier.size(32.dp)
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Box(
+                        modifier = Modifier
+                            .size(54.dp)
+                            .clip(CircleShape)
+                            .background(if (subscriptionState.isActive) BoundaryAmber.copy(alpha = 0.15f) else CrimsonPrimaryDark.copy(alpha = 0.15f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = if (subscriptionState.isActive) Icons.Default.WorkspacePremium else Icons.Default.Star,
+                            contentDescription = null,
+                            tint = if (subscriptionState.isActive) BoundaryAmber else CrimsonPrimaryDark,
+                            modifier = Modifier.size(30.dp)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
                     Text(
-                        text = if (subscriptionState.isActive) {
-                            "Pro Active • ${subscriptionState.plan?.title ?: "Member"}"
-                        } else {
-                            "Upgrade to Pro"
-                        },
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 16.sp,
-                        color = TextPrimary
+                        text = if (subscriptionState.isActive) "CRICSAGA PRO ACTIVE" else "ELEVATE YOUR CRICKET",
+                        fontWeight = FontWeight.Black,
+                        fontSize = 17.sp,
+                        letterSpacing = 0.5.sp,
+                        color = if (subscriptionState.isActive) BoundaryAmber else MaterialTheme.colorScheme.onSurface
                     )
+
                     Spacer(modifier = Modifier.height(4.dp))
+
                     Text(
                         text = if (subscriptionState.isActive) {
-                            "Valid until: ${subscriptionState.formattedExpiry}"
+                            "Plan: ${subscriptionState.plan?.title ?: "Pro"} • Valid: ${subscriptionState.formattedExpiry}"
                         } else {
-                            "100% ad-free scoring, unwatermarked PDF exports, and detailed analytics."
+                            "Unlock full match analytics, official PDF scorecards, and verified golden player badges."
                         },
-                        color = TextTertiary,
                         fontSize = 12.sp,
-                        textAlign = TextAlign.Center
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                        lineHeight = 17.sp
                     )
+
+                    if (subscriptionState.isActive) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        OutlinedButton(
+                            onClick = {
+                                hapticManager?.tapUiClick()
+                                proManager.deactivatePro()
+                                actionMessage = "Membership deactivated for testing."
+                            },
+                            shape = RoundedCornerShape(8.dp),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+                        ) {
+                            Text("Switch to Free Tier", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
                 }
             }
 
-            // The 3 Plan Types
+            // Section 2: Three Pricing Plans
             Text(
-                text = "MEMBERSHIP TIERS",
-                color = TextSecondary,
-                fontWeight = FontWeight.Bold,
+                text = "SELECT MEMBERSHIP PLAN",
                 fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
                 letterSpacing = 1.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.fillMaxWidth()
             )
 
@@ -128,186 +163,209 @@ fun RedeemCodeScreen(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                PlanCard(
-                    plan = ProPlan.THREE_MONTHS,
+                MembershipPlanCard(
+                    plan = ProPlan.ONE_MONTH,
+                    isSelected = selectedPlan == ProPlan.ONE_MONTH,
+                    tag = null,
                     modifier = Modifier.weight(1f),
-                    sampleCode = "SEASON-99-A1"
+                    onSelect = {
+                        hapticManager?.tapUiClick()
+                        selectedPlan = ProPlan.ONE_MONTH
+                    }
                 )
-                PlanCard(
+
+                MembershipPlanCard(
                     plan = ProPlan.ONE_YEAR,
+                    isSelected = selectedPlan == ProPlan.ONE_YEAR,
+                    tag = "SAVE 83%",
                     modifier = Modifier.weight(1.1f),
-                    sampleCode = "CRIC-PRO-2026",
-                    highlight = true
+                    onSelect = {
+                        hapticManager?.tapUiClick()
+                        selectedPlan = ProPlan.ONE_YEAR
+                    }
                 )
-                PlanCard(
+
+                MembershipPlanCard(
                     plan = ProPlan.LIFETIME,
+                    isSelected = selectedPlan == ProPlan.LIFETIME,
+                    tag = "VIP",
                     modifier = Modifier.weight(1f),
-                    sampleCode = "CRICSAGA-VIP"
+                    onSelect = {
+                        hapticManager?.tapUiClick()
+                        selectedPlan = ProPlan.LIFETIME
+                    }
                 )
             }
 
-            // Redeem Code Input Section
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = SlateSurfaceDark),
-                shape = RoundedCornerShape(10.dp),
-                border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(CardBorderDark))
-            ) {
-                Column(modifier = Modifier.padding(14.dp)) {
-                    Text(
-                        text = "REDEEM PRO CODE",
-                        color = TextSecondary,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 11.sp,
-                        letterSpacing = 1.sp
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "Each code is single-use and activates the specified plan:",
-                        color = TextTertiary,
-                        fontSize = 12.sp
-                    )
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    OutlinedTextField(
-                        value = codeInput,
-                        onValueChange = { codeInput = it.uppercase() },
-                        placeholder = { Text("ENTER CODE HERE", color = TextTertiary, fontSize = 12.sp) },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = TextSecondary,
-                            unfocusedBorderColor = CardBorderDark,
-                            focusedTextColor = TextPrimary,
-                            unfocusedTextColor = TextPrimary
-                        ),
-                        singleLine = true
-                    )
-
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    Button(
-                        onClick = {
-                            if (!isRedeeming && codeInput.isNotBlank()) {
-                                isRedeeming = true
-                                coroutineScope.launch {
-                                    val result = proManager.activateProWithCode(codeInput)
-                                    isSuccess = result.isSuccess
-                                    feedbackMessage = result.message
-                                    isRedeeming = false
-                                }
-                            }
-                        },
-                        enabled = !isRedeeming,
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(containerColor = CrimsonPrimaryDark),
-                        shape = RoundedCornerShape(6.dp)
-                    ) {
-                        Text(
-                            text = if (isRedeeming) "Verifying..." else "Apply Code",
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White,
-                            fontSize = 13.sp
-                        )
-                    }
-
-                    if (feedbackMessage != null) {
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = feedbackMessage!!,
-                            color = if (isSuccess) BoundaryGreen else DismissalRed,
-                            fontWeight = FontWeight.Medium,
-                            fontSize = 12.sp
-                        )
-                    }
-                }
-            }
-
-            // Pro Features List
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = SlateSurfaceDark),
-                shape = RoundedCornerShape(10.dp),
-                border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(CardBorderDark))
-            ) {
-                Column(modifier = Modifier.padding(14.dp)) {
-                    Text("PRO INCLUDED PERKS", color = TextSecondary, fontWeight = FontWeight.Bold, fontSize = 11.sp, letterSpacing = 1.sp)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    ProPerkRow("100% Ad-Free experience across the entire app")
-                    ProPerkRow("Export unwatermarked PDF scorecards")
-                    ProPerkRow("Instant WhatsApp match summary poster maker")
-                    ProPerkRow("Wagon wheel, spider chart & Manhattan run-rate analytics")
-                    ProPerkRow("Unlimited historical migration via companion tool")
-                }
-            }
-
-            // Single-Use Security Note
-            Row(
+            // Section 3: Action Button
+            Button(
+                onClick = {
+                    hapticManager?.tapBoundaryFour()
+                    proManager.activatePlan(selectedPlan)
+                    actionMessage = "Congratulations! ${selectedPlan.title} (${selectedPlan.price}) is now ACTIVE on your profile."
+                },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 4.dp),
-                verticalAlignment = Alignment.CenterVertically
+                    .height(50.dp),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = CrimsonPrimaryDark)
             ) {
-                Icon(Icons.Default.Lock, contentDescription = null, tint = TextTertiary, modifier = Modifier.size(13.dp))
-                Spacer(modifier = Modifier.width(6.dp))
                 Text(
-                    text = "Each issued code permanently expires upon first redemption.",
-                    color = TextTertiary,
-                    fontSize = 11.sp
+                    text = "UPGRADE TO ${selectedPlan.title.uppercase()} • ${selectedPlan.price}",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 13.sp,
+                    color = Color.White
                 )
             }
+
+            actionMessage?.let { msg ->
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = BoundaryGreen.copy(alpha = 0.12f),
+                    border = BorderStroke(1.dp, BoundaryGreen.copy(alpha = 0.4f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = msg,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = BoundaryGreen,
+                        modifier = Modifier.padding(12.dp),
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
+
+            // Section 4: What You Get (Features Quad)
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(14.dp),
+                color = MaterialTheme.colorScheme.surface,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(
+                        text = "ALL PLANS INCLUDE",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    FeatureRow("100% Ad-Free Live Scoring on Ground")
+                    FeatureRow("Unlimited Official PDF Scorecard Downloads")
+                    FeatureRow("Worm Graphs & Manhattan Run-Rate Charts")
+                    FeatureRow("Verified Golden Athlete Profile Badge")
+                    FeatureRow("Unlimited Squad & Player Roster Creations")
+                    FeatureRow("Priority Grassroots Leaderboard Rankings")
+                }
+            }
+
+            // Section 5: Admin Dashboard Notice Card
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+            ) {
+                Row(
+                    modifier = Modifier.padding(14.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.AdminPanelSettings,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column {
+                        Text(
+                            text = "Admin Dashboard Integration",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "Tournament organizers and authorized admins can promote any registered cricketer to Pro directly from the CricSaga Admin Dashboard.",
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            lineHeight = 15.sp
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
         }
     }
 }
 
 @Composable
-fun PlanCard(
+private fun MembershipPlanCard(
     plan: ProPlan,
+    isSelected: Boolean,
+    tag: String?,
     modifier: Modifier = Modifier,
-    sampleCode: String = "",
-    highlight: Boolean = false
+    onSelect: () -> Unit
 ) {
-    Card(
-        modifier = modifier,
-        colors = CardDefaults.cardColors(
-            containerColor = if (highlight) ElevatedSurfaceDark else SlateSurfaceDark
-        ),
-        shape = RoundedCornerShape(8.dp),
-        border = CardDefaults.outlinedCardBorder().copy(
-            brush = androidx.compose.ui.graphics.SolidColor(if (highlight) CrimsonPrimaryDark else CardBorderDark)
-        )
+    val borderColor = if (isSelected) CrimsonPrimaryDark else MaterialTheme.colorScheme.outlineVariant
+    val containerColor = if (isSelected) CrimsonPrimaryDark.copy(alpha = 0.08f) else MaterialTheme.colorScheme.surface
+
+    Surface(
+        modifier = modifier.clickable(onClick = onSelect),
+        shape = RoundedCornerShape(12.dp),
+        color = containerColor,
+        border = BorderStroke(if (isSelected) 2.dp else 1.dp, borderColor)
     ) {
         Column(
-            modifier = Modifier.padding(10.dp),
+            modifier = Modifier.padding(12.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            if (highlight) {
-                Text(
-                    text = "BEST VALUE",
-                    color = CrimsonPrimaryDark,
-                    fontSize = 8.sp,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 0.5.sp
-                )
-                Spacer(modifier = Modifier.height(2.dp))
+            tag?.let {
+                Surface(
+                    color = if (plan.isBestValue) CrimsonPrimaryDark else BoundaryAmber,
+                    shape = RoundedCornerShape(4.dp)
+                ) {
+                    Text(
+                        text = it,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Black,
+                        color = Color.White,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.height(6.dp))
+            } ?: run {
+                Spacer(modifier = Modifier.height(17.dp))
             }
+
             Text(
                 text = plan.title,
-                color = TextPrimary,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.SemiBold,
-                textAlign = TextAlign.Center
+                fontWeight = FontWeight.Bold,
+                fontSize = 13.sp,
+                color = MaterialTheme.colorScheme.onSurface
             )
-            Spacer(modifier = Modifier.height(2.dp))
+
+            Spacer(modifier = Modifier.height(4.dp))
+
             Text(
                 text = plan.price,
-                color = TextPrimary,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Black,
+                fontSize = 20.sp,
+                color = if (isSelected) CrimsonPrimaryDark else MaterialTheme.colorScheme.onSurface
             )
+
+            Spacer(modifier = Modifier.height(2.dp))
+
             Text(
                 text = plan.durationText,
-                color = TextTertiary,
                 fontSize = 10.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center
             )
         }
@@ -315,15 +373,23 @@ fun PlanCard(
 }
 
 @Composable
-fun ProPerkRow(text: String) {
+private fun FeatureRow(label: String) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 3.dp),
-        verticalAlignment = Alignment.CenterVertically
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.fillMaxWidth()
     ) {
-        Icon(Icons.Default.CheckCircle, contentDescription = null, tint = TextSecondary, modifier = Modifier.size(14.dp))
-        Spacer(modifier = Modifier.width(8.dp))
-        Text(text, color = TextSecondary, fontSize = 12.sp)
+        Icon(
+            imageVector = Icons.Default.CheckCircle,
+            contentDescription = null,
+            tint = BoundaryGreen,
+            modifier = Modifier.size(16.dp)
+        )
+        Spacer(modifier = Modifier.width(10.dp))
+        Text(
+            text = label,
+            fontSize = 12.sp,
+            color = MaterialTheme.colorScheme.onSurface,
+            fontWeight = FontWeight.Medium
+        )
     }
 }

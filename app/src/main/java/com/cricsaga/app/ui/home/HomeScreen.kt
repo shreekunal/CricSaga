@@ -90,7 +90,9 @@ fun HomeScreen(
     onCreatePost: (content: String, performanceTag: String?) -> Unit,
     onDirectMessageAuthor: (authorId: String, authorName: String) -> Unit,
     getCommentsForPost: ((String) -> Flow<List<CommentEntity>>)? = null,
-    onAddComment: ((String, String) -> Unit)? = null
+    onAddComment: ((String, String) -> Unit)? = null,
+    onDeletePost: ((String) -> Unit)? = null,
+    onRepostPost: ((String) -> Unit)? = null
 ) {
     var selectedFeedTab by remember { mutableIntStateOf(0) } // 0: For You, 1: Following
     var showCreatePostDialog by remember { mutableStateOf(false) }
@@ -140,158 +142,6 @@ fun HomeScreen(
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
-        topBar = {
-            TopAppBar(
-                title = {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        // Left: Profile Avatar (Clickable to My Career)
-                        val initials = currentUserName.split(" ")
-                            .mapNotNull { it.firstOrNull()?.toString() }
-                            .take(2)
-                            .joinToString("")
-                            .uppercase()
-                            .ifEmpty { "CR" }
-
-                        val avatarBitmap = remember(currentUserAvatarUrl) {
-                            ImageUtils.loadBitmapFromPath(currentUserAvatarUrl)
-                        }
-
-                        Box(
-                            modifier = Modifier
-                                .size(36.dp)
-                                .clip(CircleShape)
-                                .background(MaterialTheme.colorScheme.surfaceVariant)
-                                .border(1.5.dp, CrimsonPrimaryDark, CircleShape)
-                                .clickable {
-                                    hapticManager?.tapUiClick()
-                                    onProfileClick()
-                                },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            if (avatarBitmap != null) {
-                                Image(
-                                    bitmap = avatarBitmap,
-                                    contentDescription = "My Profile",
-                                    modifier = Modifier.fillMaxSize(),
-                                    contentScale = ContentScale.Crop
-                                )
-                            } else {
-                                Text(
-                                    text = initials,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Black,
-                                    color = CrimsonPrimaryDark
-                                )
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.width(10.dp))
-
-                        // Join Plus Button (with Gap to right actions)
-                        Surface(
-                            modifier = Modifier.clickable {
-                                hapticManager?.tapUiClick()
-                                onJoinPlusClick()
-                            },
-                            shape = RoundedCornerShape(16.dp),
-                            color = AmberFourPrimary.copy(alpha = 0.15f),
-                            border = BorderStroke(1.dp, AmberFourPrimary.copy(alpha = 0.7f))
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.WorkspacePremium,
-                                    contentDescription = null,
-                                    tint = AmberFourPrimary,
-                                    modifier = Modifier.size(13.dp)
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(
-                                    text = if (isPro) "Plus Active" else "Join Plus",
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = AmberFourPrimary
-                                )
-                            }
-                        }
-                    }
-                },
-                actions = {
-                    // Theme Switcher Toggle
-                    IconButton(onClick = {
-                        hapticManager?.tapUiClick()
-                        onThemeToggleClick()
-                    }) {
-                        Icon(
-                            imageVector = if (isDarkTheme) Icons.Default.LightMode else Icons.Default.DarkMode,
-                            contentDescription = "Toggle Theme",
-                            tint = if (isDarkTheme) AmberFourPrimary else TextPrimaryLight
-                        )
-                    }
-
-                    // Direct Messages Icon with Unread Badge
-                    Box(contentAlignment = Alignment.TopEnd) {
-                        IconButton(onClick = {
-                            hapticManager?.tapUiClick()
-                            onMessagesClick()
-                        }) {
-                            Icon(
-                                Icons.AutoMirrored.Filled.Chat,
-                                contentDescription = "Messages",
-                                tint = MaterialTheme.colorScheme.onBackground
-                            )
-                        }
-                        if (unreadMessageCount > 0) {
-                            Box(
-                                modifier = Modifier
-                                    .padding(top = 6.dp, end = 6.dp)
-                                    .size(16.dp)
-                                    .background(CrimsonPrimaryDark, CircleShape),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = unreadMessageCount.toString(),
-                                    color = Color.White,
-                                    fontSize = 9.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                        }
-                    }
-
-                    // Notifications Icon
-                    IconButton(onClick = {
-                        hapticManager?.tapUiClick()
-                        showNotificationsDialog = true
-                        onNotificationsClick()
-                    }) {
-                        Icon(
-                            Icons.Default.Notifications,
-                            contentDescription = "Notifications",
-                            tint = MaterialTheme.colorScheme.onBackground
-                        )
-                    }
-
-                    // Settings Gear Icon
-                    IconButton(onClick = {
-                        hapticManager?.tapUiClick()
-                        onSettingsClick()
-                    }) {
-                        Icon(
-                            Icons.Default.Settings,
-                            contentDescription = "Settings",
-                            tint = MaterialTheme.colorScheme.onBackground
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
-            )
-        },
         floatingActionButton = {
             ExtendedFloatingActionButton(
                 onClick = {
@@ -311,7 +161,7 @@ fun HomeScreen(
                 .padding(paddingValues),
             contentPadding = PaddingValues(bottom = 80.dp)
         ) {
-            // Section 1: Clear Live Score Header & Sleek + Match Action
+            // Section 1: Clear Live Score Header & Sleek Actions
             item {
                 Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
                     Row(
@@ -321,9 +171,16 @@ fun HomeScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
+                        Text(
+                            text = "Live Score",
+                            fontSize = 17.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onBackground
+                        )
+
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             Surface(
                                 modifier = Modifier.clickable {
@@ -335,16 +192,16 @@ fun HomeScreen(
                                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                             ) {
                                 Row(
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Icon(
-                                        imageVector = Icons.Default.Groups,
-                                        contentDescription = "Teams",
-                                        modifier = Modifier.size(15.dp),
+                                        imageVector = Icons.Default.Add,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(13.dp),
                                         tint = CrimsonPrimaryDark
                                     )
-                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Spacer(modifier = Modifier.width(3.dp))
                                     Text(
                                         text = "Teams",
                                         fontSize = 12.sp,
@@ -354,39 +211,32 @@ fun HomeScreen(
                                 }
                             }
 
-                            Text(
-                                text = "Live Score",
-                                fontSize = 17.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onBackground
-                            )
-                        }
-
-                        Surface(
-                            modifier = Modifier.clickable {
-                                hapticManager?.tapBoundaryFour()
-                                onStartMatchClick()
-                            },
-                            shape = RoundedCornerShape(16.dp),
-                            color = CrimsonPrimaryDark
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                                verticalAlignment = Alignment.CenterVertically
+                            Surface(
+                                modifier = Modifier.clickable {
+                                    hapticManager?.tapBoundaryFour()
+                                    onStartMatchClick()
+                                },
+                                shape = RoundedCornerShape(16.dp),
+                                color = CrimsonPrimaryDark
                             ) {
-                                Icon(
-                                    imageVector = Icons.Default.Add,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(13.dp),
-                                    tint = Color.White
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(
-                                    text = "+ Match",
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White
-                                )
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Add,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(13.dp),
+                                        tint = Color.White
+                                    )
+                                    Spacer(modifier = Modifier.width(3.dp))
+                                    Text(
+                                        text = "Match",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.White
+                                    )
+                                }
                             }
                         }
                     }
@@ -518,7 +368,9 @@ fun HomeScreen(
                         onLikeClick = { onLikePostClick(post.postId) },
                         onMessageAuthor = { onDirectMessageAuthor(post.authorId, post.authorName) },
                         onMatchClick = { post.linkedMatchId?.let { onMatchClick(it) } },
-                        onCommentClick = { activeCommentPost = post }
+                        onCommentClick = { activeCommentPost = post },
+                        onRepostClick = { onRepostPost?.invoke(post.postId) },
+                        onDeleteClick = { onDeletePost?.invoke(post.postId) }
                     )
                 }
             }
@@ -976,7 +828,9 @@ fun CricketPostCard(
     onLikeClick: () -> Unit,
     onMessageAuthor: () -> Unit,
     onMatchClick: () -> Unit,
-    onCommentClick: () -> Unit = {}
+    onCommentClick: () -> Unit = {},
+    onRepostClick: (() -> Unit)? = null,
+    onDeleteClick: (() -> Unit)? = null
 ) {
     val hapticManager = com.cricsaga.app.ui.utils.LocalHapticManager.current
     val formattedTime = remember(post.createdAt) {
@@ -1069,6 +923,21 @@ fun CricketPostCard(
                             fontWeight = FontWeight.Bold,
                             color = if (isFollowing) MaterialTheme.colorScheme.onSurfaceVariant else CrimsonPrimaryDark,
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
+                    }
+                } else if (onDeleteClick != null) {
+                    IconButton(
+                        onClick = {
+                            hapticManager?.tapUiClick()
+                            onDeleteClick()
+                        },
+                        modifier = Modifier.size(28.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Delete,
+                            contentDescription = "Delete Post",
+                            modifier = Modifier.size(16.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                         )
                     }
                 }
@@ -1185,7 +1054,13 @@ fun CricketPostCard(
                 }
 
                 // Repost Button
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.clickable {
+                        hapticManager?.tapBoundaryFour()
+                        onRepostClick?.invoke()
+                    }
+                ) {
                     Icon(
                         imageVector = Icons.Default.Repeat,
                         contentDescription = "Repost",

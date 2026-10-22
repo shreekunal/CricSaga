@@ -111,6 +111,7 @@ fun AppNavigation(
         Screen.Profile
     )
     val showBottomBar = currentRoute in bottomBarScreens.map { it.route } && authState !is AuthState.Unauthenticated
+    val showTopHeader = showBottomBar
 
     // Transient Match Setup State across screens
     var tempTitle by remember { mutableStateOf("") }
@@ -128,11 +129,42 @@ fun AppNavigation(
     var tempBowlingTeamName by remember { mutableStateOf("") }
 
     Scaffold(
-        containerColor = CharcoalBackgroundDark,
+        containerColor = MaterialTheme.colorScheme.background,
+        topBar = {
+            if (showTopHeader) {
+                com.cricsaga.app.ui.components.CricSagaTopHeader(
+                    isPro = subscriptionState.isActive,
+                    currentUserName = currentUser?.fullName ?: "Rohit Sharma",
+                    currentUserAvatarUrl = currentUser?.profilePhotoUrl,
+                    unreadMessageCount = unreadChatCount,
+                    isDarkTheme = currentDark,
+                    onThemeToggleClick = {
+                        hapticManager.tapUiClick()
+                        themeManager.toggleTheme(currentDark)
+                    },
+                    onProfileClick = {
+                        hapticManager.tapUiClick()
+                        navController.navigate(Screen.Profile.route)
+                    },
+                    onJoinPlusClick = {
+                        hapticManager.tapUiClick()
+                        navController.navigate(Screen.Redeem.route)
+                    },
+                    onMessagesClick = {
+                        hapticManager.tapUiClick()
+                        navController.navigate(Screen.Messages.route)
+                    },
+                    onSettingsClick = {
+                        hapticManager.tapUiClick()
+                        navController.navigate(Screen.Settings.route)
+                    }
+                )
+            }
+        },
         bottomBar = {
             if (showBottomBar) {
                 NavigationBar(
-                    containerColor = CharcoalBackgroundDark,
+                    containerColor = MaterialTheme.colorScheme.surface,
                     tonalElevation = 0.dp
                 ) {
                     bottomBarScreens.forEach { screen ->
@@ -156,7 +188,7 @@ fun AppNavigation(
                                     Icon(
                                         it,
                                         contentDescription = screen.title,
-                                        tint = if (isSelected) TextPrimary else TextTertiary,
+                                        tint = if (isSelected) CrimsonPrimaryDark else MaterialTheme.colorScheme.onSurfaceVariant,
                                         modifier = Modifier.size(20.dp)
                                     )
                                 }
@@ -164,18 +196,18 @@ fun AppNavigation(
                             label = {
                                 Text(
                                     text = screen.title,
-                                    color = if (isSelected) TextPrimary else TextTertiary,
+                                    color = if (isSelected) CrimsonPrimaryDark else MaterialTheme.colorScheme.onSurfaceVariant,
                                     fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
                                     fontSize = 10.sp,
                                     maxLines = 1
                                 )
                             },
                             colors = NavigationBarItemDefaults.colors(
-                                indicatorColor = ElevatedSurfaceDark,
-                                selectedIconColor = TextPrimary,
-                                unselectedIconColor = TextTertiary,
-                                selectedTextColor = TextPrimary,
-                                unselectedTextColor = TextTertiary
+                                indicatorColor = CrimsonPrimaryDark.copy(alpha = 0.12f),
+                                selectedIconColor = CrimsonPrimaryDark,
+                                unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                selectedTextColor = CrimsonPrimaryDark,
+                                unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         )
                     }
@@ -416,6 +448,12 @@ fun AppNavigation(
                             chatDraftText = ""
                             navController.navigate("chat/${authorId}")
                         }
+                    },
+                    onDeletePost = { postId ->
+                        scoringViewModel.deletePost(postId)
+                    },
+                    onRepostPost = { postId ->
+                        scoringViewModel.incrementRepost(postId)
                     }
                 )
             }
@@ -650,6 +688,15 @@ fun AppNavigation(
                             scoringViewModel.repository.updateUser(updated)
                         }
                     },
+                    onLikePost = { postId ->
+                        scoringViewModel.toggleLikePost(postId)
+                    },
+                    onDeletePost = { postId ->
+                        scoringViewModel.deletePost(postId)
+                    },
+                    onRepostPost = { postId ->
+                        scoringViewModel.incrementRepost(postId)
+                    },
                     onLogout = {
                         hapticManager.tapUiClick()
                         authManager.logout()
@@ -691,9 +738,14 @@ fun AppNavigation(
             composable(Screen.TeamDetail.route) {
                 selectedTeamForDetail?.let { team ->
                     val squad by scoringViewModel.repository.getTeamMembers(team.teamId).collectAsState(initial = emptyList())
+                    var teamStats by remember(team.teamId) { mutableStateOf<com.cricsaga.app.data.repository.TeamStatsSummary?>(null) }
+                    LaunchedEffect(team.teamId) {
+                        teamStats = scoringViewModel.repository.getTeamStats(team.teamId)
+                    }
                     TeamDetailScreen(
                         team = team,
                         squad = squad,
+                        teamStats = teamStats,
                         onAddPlayer = { name, jersey, role ->
                             coroutineScope.launch {
                                 scoringViewModel.repository.addPlayerToTeam(
@@ -712,6 +764,12 @@ fun AppNavigation(
                         onSetCaptain = { player ->
                             coroutineScope.launch {
                                 scoringViewModel.repository.setTeamCaptain(team.teamId, player.userId)
+                            }
+                        },
+                        onDeleteTeam = {
+                            coroutineScope.launch {
+                                scoringViewModel.repository.deleteTeam(team.teamId)
+                                navController.popBackStack()
                             }
                         },
                         onPlayerClick = { player ->
@@ -770,6 +828,12 @@ fun AppNavigation(
                                     navController.navigate(Screen.TeamDetail.route)
                                 }
                             }
+                        },
+                        onLikePost = { postId ->
+                            scoringViewModel.toggleLikePost(postId)
+                        },
+                        onRepostPost = { postId ->
+                            scoringViewModel.incrementRepost(postId)
                         },
                         onBackClick = {
                             hapticManager.tapUiClick()
@@ -861,10 +925,26 @@ fun AppNavigation(
                         hapticManager.tapUiClick()
                         navController.popBackStack()
                     },
-                    onCreateTeam = { name, code ->
+                    onCreateTeam = { name, code, city, onCreated ->
                         coroutineScope.launch {
-                            scoringViewModel.repository.createTeam(name, code, "Mumbai")
+                            val newTeamId = scoringViewModel.repository.createTeam(name, code, city)
+                            onCreated(newTeamId)
                         }
+                    },
+                    onAddPlayerToTeam = { teamId, name, phone, role, password, onAdded ->
+                        coroutineScope.launch {
+                            scoringViewModel.repository.addPlayerToTeam(
+                                teamId = teamId,
+                                name = name,
+                                phone = phone,
+                                role = role,
+                                password = password
+                            )
+                            onAdded()
+                        }
+                    },
+                    getTeamMembersFlow = { teamId ->
+                        scoringViewModel.repository.getTeamMembers(teamId)
                     },
                     onProceedToOpeners = { title, teamA, teamB, overs, ballType, tossWinner, decision, maxOversPerBowler ->
                         tempTitle = title

@@ -600,21 +600,24 @@ class MatchRepository(private val database: CricSagaDatabase) {
         teamDao.insertTeam(team)
 
         val defaultRoster = listOf(
-            Triple("Batter 1", PlayingRole.TOP_ORDER_BATTER, "07"),
-            Triple("Batter 2", PlayingRole.TOP_ORDER_BATTER, "18"),
-            Triple("Batter 3", PlayingRole.MIDDLE_ORDER_BATTER, "45"),
+            Triple("Batter 1", PlayingRole.BATSMAN, "07"),
+            Triple("Batter 2", PlayingRole.BATSMAN, "18"),
+            Triple("Batter 3", PlayingRole.BATSMAN, "45"),
             Triple("All-Rounder", PlayingRole.ALL_ROUNDER, "33"),
-            Triple("Keeper", PlayingRole.WICKET_KEEPER_BATTER, "01"),
-            Triple("Bowler 1", PlayingRole.FAST_BOWLER, "93"),
-            Triple("Bowler 2", PlayingRole.SPIN_BOWLER, "99"),
-            Triple("Bowler 3", PlayingRole.MEDIUM_PACER, "24")
+            Triple("Keeper", PlayingRole.WICKET_KEEPER, "01"),
+            Triple("Bowler 1", PlayingRole.BOWLER, "93"),
+            Triple("Bowler 2", PlayingRole.BOWLER, "99"),
+            Triple("Bowler 3", PlayingRole.BOWLER, "24")
         )
         defaultRoster.forEach { (roleName, role, jersey) ->
-            val userId = UUID.randomUUID().toString()
+            val randomSuffix = (10000000..99999999).random().toString()
+            val phone = "98$randomSuffix"
+            val userId = "user_$phone"
             val user = UserEntity(
                 userId = userId,
-                phoneNumber = "90000000" + (10..99).random(),
+                phoneNumber = phone,
                 fullName = "$name $roleName",
+                password = "123456",
                 playingRole = role,
                 jerseyNumber = jersey,
                 city = city.ifBlank { "Mumbai" }
@@ -633,19 +636,33 @@ class MatchRepository(private val database: CricSagaDatabase) {
         role: PlayingRole = PlayingRole.ALL_ROUNDER,
         battingStyle: BattingStyle = BattingStyle.RIGHT_HAND,
         bowlingStyle: BowlingStyle = BowlingStyle.RIGHT_ARM_MEDIUM,
-        jerseyNumber: String = "00"
+        jerseyNumber: String = "00",
+        password: String = "123456",
+        city: String = "Mumbai"
     ): String = withContext(Dispatchers.IO) {
-        val userId = UUID.randomUUID().toString()
-        val user = UserEntity(
-            userId = userId,
-            phoneNumber = phone,
-            fullName = name,
-            playingRole = role,
-            battingStyle = battingStyle,
-            bowlingStyle = bowlingStyle,
-            jerseyNumber = jerseyNumber
-        )
-        userDao.insertUser(user)
+        val cleanPhone = phone.filter { it.isDigit() }.takeLast(10).ifEmpty {
+            val randomSuffix = (10000000..99999999).random().toString()
+            "98$randomSuffix"
+        }
+        val existing = userDao.getUserByPhone(cleanPhone)
+        val userId = if (existing != null) {
+            existing.userId
+        } else {
+            val newUserId = "user_$cleanPhone"
+            val user = UserEntity(
+                userId = newUserId,
+                phoneNumber = cleanPhone,
+                fullName = name.trim().ifBlank { "Player $cleanPhone" },
+                password = password.ifBlank { "123456" },
+                playingRole = role,
+                battingStyle = battingStyle,
+                bowlingStyle = bowlingStyle,
+                jerseyNumber = jerseyNumber.ifBlank { (1..99).random().toString() },
+                city = city.ifBlank { "Mumbai" }
+            )
+            userDao.insertUser(user)
+            newUserId
+        }
         teamDao.insertTeamMember(TeamMemberEntity(teamId = teamId, userId = userId))
         userId
     }

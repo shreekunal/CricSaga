@@ -63,7 +63,9 @@ fun DismissalBottomSheet(
                     DismissalType.RUN_OUT to "Run Out",
                     DismissalType.STUMPED to "Stumped",
                     DismissalType.LBW to "LBW",
-                    DismissalType.HIT_WICKET to "Hit Wicket"
+                    DismissalType.HIT_WICKET to "Hit Wicket",
+                    DismissalType.RETIRED_HURT to "Retired Hurt",
+                    DismissalType.RETIRED_OUT to "Retired Out"
                 )) { (type, label) ->
                     val isSelected = selectedType == type
                     FilterChip(
@@ -81,9 +83,14 @@ fun DismissalBottomSheet(
                 }
             }
 
-            // 2. Who is out? (Only relevant if Run Out)
-            if (selectedType == DismissalType.RUN_OUT) {
-                Text("Batsman Out:", color = MutedGrey, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+            // 2. Who is out? (Relevant if Run Out or Retired)
+            if (selectedType in listOf(DismissalType.RUN_OUT, DismissalType.RETIRED_HURT, DismissalType.RETIRED_OUT)) {
+                Text(
+                    text = if (selectedType == DismissalType.RETIRED_HURT) "Batsman Retiring Hurt:" else if (selectedType == DismissalType.RETIRED_OUT) "Batsman Retiring Out:" else "Batsman Out:",
+                    color = MutedGrey,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     FilterChip(
                         selected = selectedDismissedPlayerId == striker?.userId,
@@ -173,7 +180,7 @@ fun DismissalBottomSheet(
                     hapticManager?.tapWicket()
                     val dismissal = DismissalDetails(
                         dismissalType = selectedType,
-                        dismissedPlayerId = if (selectedType == DismissalType.RUN_OUT) selectedDismissedPlayerId else (striker?.userId ?: ""),
+                        dismissedPlayerId = if (selectedType in listOf(DismissalType.RUN_OUT, DismissalType.RETIRED_HURT, DismissalType.RETIRED_OUT)) selectedDismissedPlayerId else (striker?.userId ?: ""),
                         primaryFielderId = if (selectedType in listOf(DismissalType.CAUGHT, DismissalType.RUN_OUT, DismissalType.STUMPED)) selectedFielderId else null,
                         runsCompletedBeforeDismissal = if (selectedType == DismissalType.RUN_OUT) runsCompletedBeforeOut else 0
                     )

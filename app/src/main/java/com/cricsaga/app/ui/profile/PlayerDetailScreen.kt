@@ -49,6 +49,8 @@ fun PlayerDetailScreen(
     onToggleFollow: () -> Unit = {},
     onMessageClick: () -> Unit = {},
     onTeamClick: (String) -> Unit = {},
+    onLikePost: (String) -> Unit = {},
+    onRepostPost: (String) -> Unit = {},
     onBackClick: () -> Unit
 ) {
     val context = LocalContext.current
@@ -796,9 +798,10 @@ fun PlayerDetailScreen(
                                 isFollowing = isFollowing,
                                 onAuthorClick = {},
                                 onToggleFollow = onToggleFollow,
-                                onLikeClick = {},
+                                onLikeClick = { onLikePost(post.postId) },
                                 onMessageAuthor = onMessageClick,
-                                onMatchClick = {}
+                                onMatchClick = {},
+                                onRepostClick = { onRepostPost(post.postId) }
                             )
                         }
                     }

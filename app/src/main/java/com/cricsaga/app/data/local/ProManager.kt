@@ -14,9 +14,9 @@ import java.util.Date
 import java.util.Locale
 
 enum class ProPlan(val title: String, val price: String, val durationText: String, val isBestValue: Boolean = false) {
-    THREE_MONTHS("3 Months Pass", "₹99", "90 Days Access"),
-    ONE_YEAR("Annual Pass", "₹199", "365 Days Access", isBestValue = true),
-    LIFETIME("Lifetime VIP", "₹2,000", "Unlimited Forever")
+    ONE_MONTH("1 Month", "₹99", "30 Days Access"),
+    ONE_YEAR("1 Year", "₹199", "365 Days Access", isBestValue = true),
+    LIFETIME("Lifetime", "₹1999", "Unlimited Forever")
 }
 
 data class ProSubscriptionState(
@@ -86,13 +86,57 @@ class ProManager(context: Context) {
         return state.isActive
     }
 
+    fun activatePlan(plan: ProPlan) {
+        val now = System.currentTimeMillis()
+        val expiresAt = when (plan) {
+            ProPlan.ONE_MONTH -> now + (30L * 24 * 60 * 60 * 1000)
+            ProPlan.ONE_YEAR -> now + (365L * 24 * 60 * 60 * 1000)
+            ProPlan.LIFETIME -> Long.MAX_VALUE
+        }
+
+        prefs.edit()
+            .putBoolean("is_pro_active", true)
+            .putString("pro_plan", plan.name)
+            .putString("redeemed_code", "DIRECT_PRO")
+            .putLong("pro_activated_at", now)
+            .putLong("pro_expires_at", expiresAt)
+            .apply()
+
+        val newState = ProSubscriptionState(
+            isActive = true,
+            plan = plan,
+            redeemedCode = "DIRECT_PRO",
+            activatedAt = now,
+            expiresAt = expiresAt
+        )
+        _subscriptionState.value = newState
+        (isProFlow as MutableStateFlow).value = true
+    }
+
+    fun promoteUserToPro(plan: ProPlan) {
+        activatePlan(plan)
+    }
+
+    fun deactivatePro() {
+        prefs.edit()
+            .putBoolean("is_pro_active", false)
+            .remove("pro_plan")
+            .remove("redeemed_code")
+            .remove("pro_activated_at")
+            .remove("pro_expires_at")
+            .apply()
+
+        _subscriptionState.value = ProSubscriptionState(isActive = false)
+        (isProFlow as MutableStateFlow).value = false
+    }
+
     suspend fun seedDefaultCodesIfEmpty() = withContext(Dispatchers.IO) {
         if (redeemCodeDao.getCount() == 0) {
             val initialCodes = listOf(
-                // 3 Months Tier (₹99)
-                RedeemCodeEntity("SEASON-99-A1", ProPlan.THREE_MONTHS, 90),
-                RedeemCodeEntity("SEASON-99-B2", ProPlan.THREE_MONTHS, 90),
-                RedeemCodeEntity("CRIC-SEASON-2026", ProPlan.THREE_MONTHS, 90),
+                // 1 Month Tier (₹99)
+                RedeemCodeEntity("MONTH-99-A1", ProPlan.ONE_MONTH, 30),
+                RedeemCodeEntity("MONTH-99-B2", ProPlan.ONE_MONTH, 30),
+                RedeemCodeEntity("CRIC-MONTH-2026", ProPlan.ONE_MONTH, 30),
 
                 // 1 Year Tier (₹199)
                 RedeemCodeEntity("ANNUAL-199-A1", ProPlan.ONE_YEAR, 365),
@@ -100,10 +144,10 @@ class ProManager(context: Context) {
                 RedeemCodeEntity("CRIC-PRO-2026", ProPlan.ONE_YEAR, 365),
                 RedeemCodeEntity("PRO-SAGA-TURF", ProPlan.ONE_YEAR, 365),
 
-                // Lifetime VIP Tier (₹2,000)
-                RedeemCodeEntity("VIP-2000-A1", ProPlan.LIFETIME, 36500),
+                // Lifetime VIP Tier (₹1,999)
+                RedeemCodeEntity("VIP-1999-A1", ProPlan.LIFETIME, 36500),
                 RedeemCodeEntity("CRICSAGA-VIP", ProPlan.LIFETIME, 36500),
-                RedeemCodeEntity("FOUNDER-2000", ProPlan.LIFETIME, 36500)
+                RedeemCodeEntity("FOUNDER-1999", ProPlan.LIFETIME, 36500)
             )
             redeemCodeDao.insertCodes(initialCodes)
         }
@@ -122,7 +166,7 @@ class ProManager(context: Context) {
         if (codeEntity == null) {
             val fallbackPlan = when {
                 cleanCode.startsWith("VIP-") || cleanCode.startsWith("LIFE-") -> ProPlan.LIFETIME
-                cleanCode.startsWith("SEASON-") || cleanCode.startsWith("3M-") -> ProPlan.THREE_MONTHS
+                cleanCode.startsWith("SEASON-") || cleanCode.startsWith("1M-") -> ProPlan.ONE_MONTH
                 cleanCode.startsWith("ANNUAL-") || cleanCode.startsWith("PRO-") -> ProPlan.ONE_YEAR
                 else -> null
             }
@@ -157,7 +201,7 @@ class ProManager(context: Context) {
 
         val plan = codeEntity.plan
         val expiresAt = when (plan) {
-            ProPlan.THREE_MONTHS -> now + (90L * 24 * 60 * 60 * 1000)
+            ProPlan.ONE_MONTH -> now + (30L * 24 * 60 * 60 * 1000)
             ProPlan.ONE_YEAR -> now + (365L * 24 * 60 * 60 * 1000)
             ProPlan.LIFETIME -> Long.MAX_VALUE
         }

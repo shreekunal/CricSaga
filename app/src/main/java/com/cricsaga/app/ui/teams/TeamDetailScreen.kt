@@ -36,13 +36,16 @@ import com.cricsaga.app.ui.utils.ImageUtils
 fun TeamDetailScreen(
     team: TeamEntity,
     squad: List<UserEntity>,
+    teamStats: com.cricsaga.app.data.repository.TeamStatsSummary? = null,
     onAddPlayer: (name: String, jersey: String, role: PlayingRole) -> Unit,
     onRemovePlayer: (UserEntity) -> Unit = {},
     onSetCaptain: (UserEntity) -> Unit = {},
+    onDeleteTeam: () -> Unit = {},
     onPlayerClick: (UserEntity) -> Unit,
     onBackClick: () -> Unit
 ) {
     var showAddDialog by remember { mutableStateOf(false) }
+    var showDeleteConfirmDialog by remember { mutableStateOf(false) }
     var playerForAction by remember { mutableStateOf<UserEntity?>(null) }
     val hapticManager = com.cricsaga.app.ui.utils.LocalHapticManager.current
 
@@ -65,6 +68,18 @@ fun TeamDetailScreen(
                             Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Back",
                             tint = TextPrimary
+                        )
+                    }
+                },
+                actions = {
+                    IconButton(onClick = {
+                        hapticManager?.tapUiClick()
+                        showDeleteConfirmDialog = true
+                    }) {
+                        Icon(
+                            Icons.Default.Delete,
+                            contentDescription = "Delete Team",
+                            tint = CrimsonPrimaryDark
                         )
                     }
                 },
@@ -141,14 +156,15 @@ fun TeamDetailScreen(
                         Spacer(modifier = Modifier.height(12.dp))
 
                         // Team Stats Quad
+                        val stats = teamStats ?: com.cricsaga.app.data.repository.TeamStatsSummary(0, 0, 0, "0.0%")
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceAround
                         ) {
-                            TeamStatCol("PLAYED", "12")
-                            TeamStatCol("WON", "8")
-                            TeamStatCol("LOST", "4")
-                            TeamStatCol("WIN %", "66.7%")
+                            TeamStatCol("PLAYED", "${stats.played}")
+                            TeamStatCol("WON", "${stats.won}")
+                            TeamStatCol("LOST", "${stats.lost}")
+                            TeamStatCol("WIN %", stats.winPct)
                         }
                     }
                 }
@@ -420,6 +436,33 @@ fun TeamDetailScreen(
                         hapticManager?.tapUiClick()
                         showAddDialog = false
                     }) {
+                        Text("CANCEL", color = TextSecondary)
+                    }
+                }
+            )
+        }
+
+        if (showDeleteConfirmDialog) {
+            AlertDialog(
+                onDismissRequest = { showDeleteConfirmDialog = false },
+                containerColor = SlateSurfaceDark,
+                title = { Text("Delete Team", fontWeight = FontWeight.Bold, color = TextPrimary) },
+                text = { Text("Are you sure you want to delete ${team.teamName}? This action cannot be undone.", color = TextSecondary, fontSize = 13.sp) },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            hapticManager?.tapWicket()
+                            showDeleteConfirmDialog = false
+                            onDeleteTeam()
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = DismissalRed),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Text("DELETE", fontWeight = FontWeight.Bold, color = Color.White)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showDeleteConfirmDialog = false }) {
                         Text("CANCEL", color = TextSecondary)
                     }
                 }
