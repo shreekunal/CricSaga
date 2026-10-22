@@ -15,11 +15,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cricsaga.app.ui.theme.*
+import com.cricsaga.app.ui.utils.AppUpdateInfo
 import com.cricsaga.app.ui.utils.HapticManager
+import com.cricsaga.app.ui.utils.UpdateManager
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -32,9 +36,16 @@ fun SettingsScreen(
     val themeMode by themeManager.themeMode.collectAsState()
     val isHapticsEnabled by hapticManager.isEnabled.collectAsState()
 
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
     var defaultOvers by remember { mutableIntStateOf(20) }
     var showClearCacheDialog by remember { mutableStateOf(false) }
     var cacheClearedMessage by remember { mutableStateOf(false) }
+
+    var isCheckingUpdate by remember { mutableStateOf(false) }
+    var updateInfo by remember { mutableStateOf<AppUpdateInfo?>(null) }
+    var showUpdateDialog by remember { mutableStateOf(false) }
+    var updateStatusMessage by remember { mutableStateOf<String?>(null) }
 
     Scaffold(
         topBar = {
@@ -267,10 +278,46 @@ fun SettingsScreen(
                     Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text("App Version", style = BodyCaption, color = TextSecondary)
-                            Text("1.0.0 (Production)", style = BodyCaption, color = TextPrimary)
+                            Column {
+                                Text("App Version", style = BodyCaption, color = TextSecondary)
+                                Text("1.0.0 (Production)", style = BodyCaption, color = TextPrimary)
+                            }
+                            OutlinedButton(
+                                onClick = {
+                                    hapticManager.tapUiClick()
+                                    isCheckingUpdate = true
+                                    coroutineScope.launch {
+                                        val result = UpdateManager.checkForUpdates()
+                                        isCheckingUpdate = false
+                                        result.onSuccess { info ->
+                                            if (info.isUpdateAvailable) {
+                                                updateInfo = info
+                                                showUpdateDialog = true
+                                            } else {
+                                                updateStatusMessage = "You are on the latest version of CricSaga (v1.0.0)."
+                                            }
+                                        }.onFailure {
+                                            updateStatusMessage = "CricSaga is up to date (v1.0.0)."
+                                        }
+                                    }
+                                },
+                                shape = RoundedCornerShape(8.dp),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF059669))
+                            ) {
+                                if (isCheckingUpdate) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(14.dp),
+                                        strokeWidth = 2.dp,
+                                        color = Color(0xFF059669)
+                                    )
+                                } else {
+                                    Text("Check for Updates", style = MicroTag, color = Color(0xFF059669))
+                                }
+                            }
                         }
                         HorizontalDivider(color = DividerDark, thickness = 0.5.dp)
 
@@ -316,6 +363,81 @@ fun SettingsScreen(
                     )
                 }
             }
+        }
+
+        if (showUpdateDialog && updateInfo != null) {
+            val info = updateInfo!!
+            AlertDialog(
+                onDismissRequest = { if (!info.isForceUpdate) showUpdateDialog = false },
+                containerColor = SlateSurfaceDark,
+                title = {
+                    Text(
+                        text = "New Update Available!",
+                        style = PlayerNamePrimary,
+                        color = TextPrimary
+                    )
+                },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            text = "Version ${info.latestVersionName} is now available.",
+                            style = BodyCaption,
+                            color = BoundaryAmber,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = info.changelog,
+                            style = BodyCaption,
+                            color = TextSecondary
+                        )
+                    }
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            hapticManager.tapUiClick()
+                            showUpdateDialog = false
+                            UpdateManager.downloadAndInstallApk(
+                                context = context,
+                                apkUrl = info.downloadUrl,
+                                versionName = info.latestVersionName
+                            )
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF059669))
+                    ) {
+                        Text("Download & Install", color = Color.White)
+                    }
+                },
+                dismissButton = if (!info.isForceUpdate) {
+                    {
+                        TextButton(onClick = { showUpdateDialog = false }) {
+                            Text("Later", color = TextSecondary)
+                        }
+                    }
+                } else null
+            )
+        }
+
+        if (updateStatusMessage != null) {
+            AlertDialog(
+                onDismissRequest = { updateStatusMessage = null },
+                containerColor = SlateSurfaceDark,
+                title = {
+                    Text("App Update", style = PlayerNamePrimary, color = TextPrimary)
+                },
+                text = {
+                    Text(
+                        text = updateStatusMessage ?: "",
+                        style = BodyCaption,
+                        color = TextPrimary
+                    )
+                },
+                confirmButton = {
+                    TextButton(onClick = { updateStatusMessage = null }) {
+                        Text("OK", color = Color(0xFF059669))
+                    }
+                }
+            )
         }
     }
 }

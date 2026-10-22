@@ -1,0 +1,8 @@
+{
+  "latest_version_code": 1,
+  "latest_version_name": "1.0.0",
+  "apk_url": "https://github.com/cricsaga/cricsaga-app/releases/download/v1.0.0/cricsaga-v1.0.0.apk",
+  "changelog": "Initial production release of CricSaga. Live ball-by-ball scoring, player statistics, wagon wheel analytics, team rosters, and Pro membership tiers.",
+  "is_force_update": false,
+  "min_supported_version_code": 1
+}
