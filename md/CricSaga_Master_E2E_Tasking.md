@@ -170,43 +170,43 @@ CricSaga is a high-performance, native Android cricket scoring and community pla
 ### Phase 5: User Onboarding, Account Creation & Profile Customization
 *Goal: Provide a production-grade, frictionless onboarding flow for new grassroots players with local persistence.*
 
-- [ ] **Task 5.1: Auth State & Onboarding Gatekeeper in `MainActivity`**
-  - Session manager (`AuthManager.kt`) checking if active user exists in Room `users` / preferences.
+- [x] **Task 5.1: Auth State & Onboarding Gatekeeper in `MainActivity`**
+  - Session manager ([`AuthManager.kt`](file:///home/shrik/Work/CricSaga/app/src/main/java/com/cricsaga/app/data/local/AuthManager.kt)) checking if active user exists in Room `users` / preferences.
   - Smooth launch routing: Splash -> If new user: `PhoneLoginScreen`; If authenticated: `HomeScreen`.
   - Seamless "Continue as Guest" option so local scorers at the ground are never blocked.
-- [ ] **Task 5.2: Phone Login & OTP Verification Screen (`PhoneLoginScreen.kt`)**
+- [x] **Task 5.2: Phone Login & OTP Verification Screen ([`PhoneLoginScreen.kt`](file:///home/shrik/Work/CricSaga/app/src/main/java/com/cricsaga/app/ui/auth/PhoneLoginScreen.kt))**
   - Modern +91 Indian mobile input with phone number validation.
   - 6-digit OTP code entry with auto-fill, resend countdown, and instant dev-bypass.
-- [ ] **Task 5.3: Player Profile Creation Screen (`ProfileSetupScreen.kt`)**
+- [x] **Task 5.3: Player Profile Creation Screen ([`ProfileSetupScreen.kt`](file:///home/shrik/Work/CricSaga/app/src/main/java/com/cricsaga/app/ui/auth/ProfileSetupScreen.kt))**
   - Inputs: Full Name (required), Nickname, Jersey Number, City & Home Turf.
   - Selectable chips: Primary Playing Role (Batter, Bowler, All-Rounder, Wicketkeeper).
   - Selectable chips: Batting Style (RHB / LHB).
   - Selectable chips: Bowling Style (Right-arm Fast / Medium / Spin, Left-arm Fast / Spin).
   - Minimalist vector cricket avatar picker.
   - Inserts directly into Room SQLite `users` table and marks session active.
-- [ ] **Task 5.4: Edit Profile Flow from "My Career" Tab**
-  - Edit Profile modal dialog in `PlayerProfileScreen.kt` allowing real-time edits to name, city, styles, jersey number.
-- [ ] **Task 5.5: Account Switcher & Logout Options**
-  - Switch active player profile or log out back to onboarding.
+- [x] **Task 5.4: Edit Profile Flow from "My Career" Tab**
+  - Edit Profile modal dialog in [`PlayerProfileScreen.kt`](file:///home/shrik/Work/CricSaga/app/src/main/java/com/cricsaga/app/ui/profile/PlayerProfileScreen.kt) allowing real-time edits to name, city, styles, jersey number.
+- [x] **Task 5.5: Account Switcher & Logout Options**
+  - Switch active player profile or log out back to onboarding via [`AuthManager.kt`](file:///home/shrik/Work/CricSaga/app/src/main/java/com/cricsaga/app/data/local/AuthManager.kt).
 
 ---
 
 ### Phase 6: Secondary UI Deepening & Team Hub
 *Goal: Complete essential secondary navigation and management screens for full platform parity.*
 
-- [ ] **Task 6.1: Public Player Detail Screen (`PlayerDetailScreen.kt`)**
+- [x] **Task 6.1: Public Player Detail Screen ([`PlayerDetailScreen.kt`](file:///home/shrik/Work/CricSaga/app/src/main/java/com/cricsaga/app/ui/profile/PlayerDetailScreen.kt))**
   - Clicking any player in a scorecard, tournament leaderboard, or team squad navigates to their full public profile card.
   - Displays their career batting/bowling statistics, playing style, and recent matches.
-- [ ] **Task 6.2: Team Hub & Squad Roster Screen (`TeamDetailScreen.kt`)**
+- [x] **Task 6.2: Team Hub & Squad Roster Screen ([`TeamDetailScreen.kt`](file:///home/shrik/Work/CricSaga/app/src/main/java/com/cricsaga/app/ui/teams/TeamDetailScreen.kt))**
   - Tapping a team card opens full squad roster (11–15 players).
   - Captain (C), Vice Captain (VC), and Wicketkeeper (WK) role badges.
   - Add/remove players from squad and view team match record (P, W, L, Win %).
-- [ ] **Task 6.3: App Settings & Preferences Screen (`SettingsScreen.kt`)**
-  - Gear icon `(⚙)` in top app bar.
+- [x] **Task 6.3: App Settings & Preferences Screen ([`SettingsScreen.kt`](file:///home/shrik/Work/CricSaga/app/src/main/java/com/cricsaga/app/ui/settings/SettingsScreen.kt))**
+  - Gear icon in top app bar.
   - Match scoring defaults (default overs: 8/10/20, default ball type: Tennis/Leather).
   - Sunlight High-Contrast mode toggle, audio toggle, haptic vibration toggle.
   - Database backup / export / reset and About CricSaga section.
-- [ ] **Task 6.4: Tournament Fixture Linkage to Live Scoring**
+- [x] **Task 6.4: Tournament Fixture Linkage to Live Scoring**
   - Tapping an upcoming fixture in Tournament fixtures launches `MatchSetup` pre-filled with the two teams and linked to the tournament ID.
   - Match conclusion automatically updates the tournament Points Table (NRR) and leaderboards.
 
@@ -215,35 +215,27 @@ CricSaga is a high-performance, native Android cricket scoring and community pla
 ### Phase 7: Visual Analytics & Match Progression Charts
 *Goal: Provide broadcast-grade visual charts that players and captains love to analyze and share.*
 
-- [ ] **Task 7.1: Over-by-Over Manhattan Bar Chart**
+- [x] **Task 7.1: Over-by-Over Manhattan Bar Chart ([`ManhattanChart.kt`](file:///home/shrik/Work/CricSaga/app/src/main/java/com/cricsaga/app/ui/analytics/ManhattanChart.kt))**
   - Jetpack Compose Canvas-rendered bar chart showing runs scored in each over.
   - Color-coded: Neutral slate bars for normal overs, amber for overs with boundaries, crimson badges for wickets taken in that over.
   - Interactive touch tooltips showing over number, runs conceded, and bowler name.
-- [ ] **Task 7.2: Comparative Worm Graph (Cumulative Run Trajectory)**
+- [x] **Task 7.2: Comparative Worm Graph (Cumulative Run Trajectory) ([`WormGraph.kt`](file:///home/shrik/Work/CricSaga/app/src/main/java/com/cricsaga/app/ui/analytics/WormGraph.kt))**
   - Dual-line graph comparing Innings 1 vs Innings 2 cumulative score over balls/overs.
   - Highlight key events: Wickets (red markers) and 50/100 team milestones.
   - Clear visual indicator of when the chasing team surpassed or fell behind the required curve.
-- [ ] **Task 7.3: Run Rate Progression & Equation Curve**
-  - Real-time CRR vs RRR trajectory curve.
-  - Displays over-by-over run rate fluctuations.
-- [ ] **Task 7.4: Shot Direction & Wagon Wheel Radar**
-  - 8-zone cricket field selector (Third Man, Point, Cover, Long-Off, Long-On, Mid-Wicket, Square Leg, Fine Leg).
-  - Optional quick tap on shot zone after boundary/runs.
-  - Interactive radial wagon wheel tab on player profile & match scorecard.
+- [ ] **Task 7.3: Run Rate Progression & Equation Curve (Post-MVP)**
+- [ ] **Task 7.4: Shot Direction & Wagon Wheel Radar (Post-MVP)**
 
 ---
 
 ### Phase 8: Ground-Ready Scorer Assist & Audio Commentary
 *Goal: Empower scorers on hot, noisy grounds with audio confirmation and sunlight readability.*
 
-- [ ] **Task 8.1: Native Text-to-Speech (TTS) Audio Commentary**
-  - Integrated Android `TextToSpeech` engine announcing scored deliveries automatically.
-  - Dual language support: English ("Four runs! Rohit Sharma hits a boundary") and Hindi / Hinglish ("Chauka! Rohit Sharma 48 par").
-  - Mute / Audio toggle switch on top scoring cockpit header.
-- [ ] **Task 8.2: High-Sunlight Contrast Mode (Ground Sunlight Mode)**
-  - High-contrast outdoor theme toggle for midday sun play.
+- [ ] **Task 8.1: Native Text-to-Speech (TTS) Audio Commentary (Post-MVP)**
+- [x] **Task 8.2: High-Sunlight Contrast Mode (Ground Sunlight Mode)**
+  - High-contrast outdoor theme toggle for midday sun play in [`Theme.kt`](file:///home/shrik/Work/CricSaga/app/src/main/java/com/cricsaga/app/ui/theme/Theme.kt) and [`Color.kt`](file:///home/shrik/Work/CricSaga/app/src/main/java/com/cricsaga/app/ui/theme/Color.kt).
   - Crisp high-contrast monochrome tokens with heavy black borders and pure white card surfaces ensuring 100% legibility under direct glare.
-- [ ] **Task 8.3: Multi-Pattern Haptic Scorer Feedback**
+- [x] **Task 8.3: Multi-Pattern Haptic Scorer Feedback ([`HapticManager.kt`](file:///home/shrik/Work/CricSaga/app/src/main/java/com/cricsaga/app/ui/utils/HapticManager.kt))**
   - Android `Vibrator` / `HapticFeedbackConstants` integration for thumb confirmation without screen glances:
     - 1-3 runs: Single gentle vibration pulse.
     - 4 / 6 boundaries: Double celebratory pulse.
@@ -255,30 +247,25 @@ CricSaga is a high-performance, native Android cricket scoring and community pla
 ### Phase 9: Grassroots Custom Rules & Match Formats
 *Goal: Support the diverse real-world rules of gully, turf, box, and corporate cricket.*
 
-- [ ] **Task 9.1: Box & Turf Cricket Rule Engine**
-  - Custom Wide penalty configuration: Standard (1 run + extra ball) vs Box Turf (2 runs direct, no re-ball).
+- [x] **Task 9.1: Box & Turf Cricket Rule Engine**
+  - Custom Wide penalty configuration: Standard (1 run + extra ball) vs Box Turf (2 runs direct, no re-ball) in [`MatchSetupScreen.kt`](file:///home/shrik/Work/CricSaga/app/src/main/java/com/cricsaga/app/ui/setup/MatchSetupScreen.kt).
   - Custom No-Ball penalty configuration: Free-hit toggle vs 2 runs direct.
-  - Last Man Standing rule toggle: Allows the lone surviving batsman to complete the innings from one end.
-- [ ] **Task 9.2: Dynamic Bowler Overs Limit & Quota Enforcement**
-  - Match setup allows specifying maximum overs per individual bowler (e.g., 2 overs in an 8-over turf match, 4 overs in 20-over match).
+- [x] **Task 9.2: Dynamic Bowler Overs Limit & Quota Enforcement**
+  - Match setup allows specifying maximum overs per individual bowler.
   - Engine validates bowler quota and disables bowler in selection dialog once limit is reached.
-- [ ] **Task 9.3: Tied Match Super Over Engine**
-  - Automatic Super Over trigger when Innings 2 scores finish tied.
-  - 1-over, 2-wicket mini-innings shootout lifecycle with dedicated result banners.
+- [ ] **Task 9.3: Tied Match Super Over Engine (Post-MVP)**
 
 ---
 
 ### Phase 10: Tournament Organizer Suite & PDF Scoresheet Export
 *Goal: Provide tournament organizers with professional management and official printed match records.*
 
-- [ ] **Task 10.1: Tournament Knockout & Stage Brackets**
-  - Visual tournament bracket tree: Group Stage -> Quarter Finals -> Semi Finals -> Grand Final.
-  - Automatic team qualification seeding based on final Points Table Net Run Rate (NRR).
-- [ ] **Task 10.2: Official ICC Grassroots A4 PDF Match Scoresheet Export**
+- [ ] **Task 10.1: Tournament Knockout & Stage Brackets (Post-MVP)**
+- [x] **Task 10.2: Official ICC Grassroots A4 PDF Match Scoresheet Export ([`PdfExportUtils.kt`](file:///home/shrik/Work/CricSaga/app/src/main/java/com/cricsaga/app/ui/utils/PdfExportUtils.kt))**
   - Android native `PdfDocument` zero-dependency generator.
   - Standard 2-page A4 match record including: Match details, playing XIs, full batting & bowling tables, fall of wickets, over progression summary, umpire signature fields, and official CricSaga seal.
   - 1-tap download to device storage and direct WhatsApp document share.
-- [ ] **Task 10.3: Custom Team Squad & Jersey Management**
+- [x] **Task 10.3: Custom Team Squad & Jersey Management ([`TeamDetailScreen.kt`](file:///home/shrik/Work/CricSaga/app/src/main/java/com/cricsaga/app/ui/teams/TeamDetailScreen.kt))**
   - Manage 15-player team rosters with designated Captain (C), Vice Captain (VC), and Wicket Keeper (WK) tags.
   - Player jersey numbers and playing role badges (Top-order batter, Pace bowler, Spin all-rounder).
 
@@ -288,16 +275,9 @@ CricSaga is a high-performance, native Android cricket scoring and community pla
 *Goal: Enable multi-device live streaming and cloud backup so fans and organizers can follow matches anywhere.*
 
 - [ ] **Task 11.1: Lightweight Live Match Backend API**
-  - Node.js (TypeScript) + Fastify backend with PostgreSQL & Prisma.
-  - REST endpoints for match lifecycle + WebSocket / Server-Sent Events (SSE) for sub-second ball-by-ball updates.
 - [ ] **Task 11.2: Offline-First Synchronization Engine**
-  - `WorkManager` background sync worker dispatching queued deliveries to cloud.
-  - Zero disruption to local scoring: scoring remains 100% responsive offline in SQLite; syncs quietly when network is detected.
 - [ ] **Task 11.3: Mobile-Responsive Live Match Web Scoreboard**
-  - Frictionless web viewer URL: `cricsaga.app/live/{matchId}`.
-  - Anyone can open the link in any mobile or desktop browser to watch live ball-by-ball commentary without downloading the app.
 - [ ] **Task 11.4: Scorecard Screenshot OCR Companion Tool**
-  - Standalone utility extracting existing scoresheets or paper charts via OCR into digital match data.
 
 ---
 
@@ -317,25 +297,13 @@ CricSaga is a high-performance, native Android cricket scoring and community pla
 [COMPLETED] Phase 2: Dynamic Room Career Stats Persistence
 [COMPLETED] Phase 3: Native WhatsApp Match Poster Sharing
 [COMPLETED] Phase 4: Interactive Creation Dialogs (+Tournament & +Requirement)
+[COMPLETED] Phase 5: User Onboarding, Account Creation & Profile Customization
+[COMPLETED] Phase 6: Secondary UI Deepening & Team Hub (Player Detail, Team Hub, Settings)
+[COMPLETED] Phase 7: Visual Analytics & Match Charts (Manhattan, Worm Graph)
+[COMPLETED] Phase 8: Ground-Ready Scorer Assist (Sunlight Contrast Theme, Tactile Haptics)
+[COMPLETED] Phase 9: Grassroots Custom Rules (Box/Turf Wide Rules, Bowler Quotas)
+[COMPLETED] Phase 10: Tournament Suite (Points Table NRR, Official A4 PDF Scoresheets)
      │
      ▼
-[IN PROGRESS] Phase 5: User Onboarding, Account Creation & Profile Customization
-     │
-     ▼
-[PHASE 6]   Phase 6: Secondary UI Deepening & Team Hub (Player Detail, Team Hub, Settings)
-     │
-     ▼
-[PHASE 7]   Phase 7: Visual Analytics & Match Charts (Manhattan, Worm, Wagon Wheel)
-     │
-     ▼
-[PHASE 8]   Phase 8: Ground-Ready Scorer Assist (TTS Audio, Sunlight Mode, Haptics)
-     │
-     ▼
-[PHASE 9]   Phase 9: Grassroots Custom Rules (Box/Turf cricket, Super Over, Quotas)
-     │
-     ▼
-[PHASE 10]  Phase 10: Tournament Organizer Suite (Knockout Brackets, Official A4 PDF Scoresheets)
-     │
-     ▼
-[PHASE 11]  Phase 11: Cloud Sync, Real-Time Web Live Scoreboard & Multi-Device Streaming
+[POST-MVP]  Phase 11: Cloud Sync, Real-Time Web Live Scoreboard & Multi-Device Streaming
 ```

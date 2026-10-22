@@ -90,7 +90,7 @@ To guarantee **zero learning curve** for existing CricHeroes scorers, the layout
 | |    BYE     |  LEG BYE   |   OUT / W  |     UNDO     | |
 | |    (B)     |    (Lb)    |   (Crimson)|   (Warning)  | |
 | +------------+------------+------------+--------------+ |
-| [ 🔄 Rotate Strike ] [ 👥 Bowler ] [ 🛑 Extras / Edit ] |
+| [ Rotate Strike ] [ Bowler ] [ Extras / Edit ]           |
 +---------------------------------------------------------+
 ```
 
