@@ -169,10 +169,23 @@ val BoundaryAmber: Color
     @ReadOnlyComposable
     get() = LocalCricSagaColors.current.accentFour
 
+val AmberFourPrimary: Color
+    @Composable
+    @ReadOnlyComposable
+    get() = LocalCricSagaColors.current.accentFour
+
 val BoundaryGreen: Color
     @Composable
     @ReadOnlyComposable
     get() = LocalCricSagaColors.current.accentSix
+
+val ForestSixPrimary: Color
+    @Composable
+    @ReadOnlyComposable
+    get() = LocalCricSagaColors.current.accentSix
+
+val TextPrimaryLight: Color
+    get() = LightTextPrimary
 
 val DismissalRed: Color
     @Composable

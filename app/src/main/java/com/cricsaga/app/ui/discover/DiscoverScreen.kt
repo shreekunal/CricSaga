@@ -2,21 +2,26 @@ package com.cricsaga.app.ui.discover
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
-import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -34,148 +39,82 @@ data class LookingForItem(
     val contactPhone: String
 )
 
-data class TurfItem(
-    val id: String,
-    val name: String,
-    val location: String,
-    val distance: String,
-    val surfaceType: String,
-    val hasLights: Boolean,
-    val pricePerHour: String,
-    val rating: String,
-    val phone: String
-)
-
-data class OpenTourneyItem(
-    val id: String,
-    val name: String,
-    val organizer: String,
-    val prizePool: String,
-    val entryFee: String,
-    val format: String,
-    val dates: String,
-    val location: String
-)
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DiscoverScreen(
     isPro: Boolean,
     lookingForList: List<LookingForItem> = emptyList(),
     onPostRequirement: (type: String, title: String, organizer: String, timing: String, location: String, note: String, phone: String) -> Unit = { _, _, _, _, _, _, _ -> },
-    onContactWhatsApp: (String, String) -> Unit = { _, _ -> }
+    onContactDirectChat: (title: String, organizer: String, phone: String) -> Unit = { _, _, _ -> },
+    onContactWhatsApp: (String, String) -> Unit = { _, _ -> },
+    onRankingsClick: () -> Unit = {}
 ) {
-    var selectedTab by remember { mutableIntStateOf(0) }
-    val tabs = listOf("Looking For", "Grounds & Turfs", "Tournaments")
-
+    var selectedFilter by remember { mutableStateOf("All") }
+    var searchQuery by remember { mutableStateOf("") }
     var showPostDialog by remember { mutableStateOf(false) }
 
-    val turfsList = listOf(
-        TurfItem(
-            id = "turf_1",
-            name = "Apex Arena Box Cricket",
-            location = "Andheri West, Mumbai",
-            distance = "1.8 km",
-            surfaceType = "Astroturf",
-            hasLights = true,
-            pricePerHour = "₹900/hr",
-            rating = "4.8",
-            phone = "9820111222"
-        ),
-        TurfItem(
-            id = "turf_2",
-            name = "Skyline Turf & Nets",
-            location = "Kandivali East, Mumbai",
-            distance = "4.2 km",
-            surfaceType = "Astroturf + Nets",
-            hasLights = true,
-            pricePerHour = "₹1,100/hr",
-            rating = "4.9",
-            phone = "9820333444"
-        ),
-        TurfItem(
-            id = "turf_3",
-            name = "Shivaji Gymkhana Cricket Ground",
-            location = "Dadar, Mumbai",
-            distance = "6.5 km",
-            surfaceType = "Natural Red Clay",
-            hasLights = false,
-            pricePerHour = "₹2,500/slot",
-            rating = "4.7",
-            phone = "9820777888"
-        )
-    )
+    val filterOptions = listOf("All", "Urgent / Today", "Players", "Opponents", "Scorers", "Umpires")
 
-    val tourneysList = listOf(
-        OpenTourneyItem(
-            id = "trn_1",
-            name = "Mumbai Champions Trophy 2026",
-            organizer = "Grassroots Cricket Board",
-            prizePool = "₹75,000 Cash",
-            entryFee = "₹4,500 / team",
-            format = "15 Overs Heavy Tennis (Knockout)",
-            dates = "Nov 15 - Nov 20, 2026",
-            location = "Shivaji Park, Mumbai"
-        ),
-        OpenTourneyItem(
-            id = "trn_2",
-            name = "Midnight Box League Season 4",
-            organizer = "Turf Kings Association",
-            prizePool = "₹30,000 Cash",
-            entryFee = "₹2,200 / team",
-            format = "8 Overs Box Cricket • Floodlights",
-            dates = "Fridays in November",
-            location = "Champions Arena, Andheri"
-        )
-    )
+    val filteredList = remember(lookingForList, selectedFilter, searchQuery) {
+        lookingForList.filter { item ->
+            val matchesFilter = when (selectedFilter) {
+                "All" -> true
+                "Urgent / Today" -> item.timing.contains("Tonight", ignoreCase = true) ||
+                        item.timing.contains("Today", ignoreCase = true) ||
+                        item.note.contains("Urgent", ignoreCase = true)
+                "Players" -> item.type.contains("Player", ignoreCase = true)
+                "Opponents" -> item.type.contains("Opponent", ignoreCase = true)
+                "Scorers" -> item.type.contains("Scorer", ignoreCase = true)
+                "Umpires" -> item.type.contains("Umpire", ignoreCase = true)
+                else -> true
+            }
+
+            val matchesSearch = if (searchQuery.isBlank()) true else {
+                item.title.contains(searchQuery, ignoreCase = true) ||
+                        item.teamOrOrganizer.contains(searchQuery, ignoreCase = true) ||
+                        item.location.contains(searchQuery, ignoreCase = true) ||
+                        item.note.contains(searchQuery, ignoreCase = true)
+            }
+
+            matchesFilter && matchesSearch
+        }
+    }
+
+    val hapticManager = com.cricsaga.app.ui.utils.LocalHapticManager.current
 
     Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            Column(modifier = Modifier.background(CharcoalBackgroundDark)) {
-                TopAppBar(
-                    title = {
+            TopAppBar(
+                title = {
+                    Column {
                         Text(
                             text = "Discover",
-                            fontWeight = FontWeight.Bold,
-                            color = TextPrimary,
-                            fontSize = 20.sp
+                            fontWeight = FontWeight.Black,
+                            fontSize = 20.sp,
+                            color = MaterialTheme.colorScheme.onBackground
                         )
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(containerColor = CharcoalBackgroundDark)
-                )
-
-                TabRow(
-                    selectedTabIndex = selectedTab,
-                    containerColor = CharcoalBackgroundDark,
-                    contentColor = CrimsonPrimaryDark,
-                    divider = { HorizontalDivider(color = DividerDark, thickness = 0.5.dp) },
-                    indicator = { tabPositions ->
-                        TabRowDefaults.SecondaryIndicator(
-                            Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
-                            color = CrimsonPrimaryDark
+                        Text(
+                            text = "Grassroots Matchmaker",
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
-                ) {
-                    val hapticManager = com.cricsaga.app.ui.utils.LocalHapticManager.current
-                    tabs.forEachIndexed { index, title ->
-                        Tab(
-                            selected = selectedTab == index,
-                            onClick = {
-                                hapticManager?.tapUiClick()
-                                selectedTab = index
-                            },
-                            text = {
-                                Text(
-                                    text = title,
-                                    fontSize = 12.sp,
-                                    fontWeight = if (selectedTab == index) FontWeight.Bold else FontWeight.Normal,
-                                    color = if (selectedTab == index) TextPrimary else TextSecondary
-                                )
-                            }
-                        )
-                    }
-                }
-            }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
+            )
+        },
+        floatingActionButton = {
+            ExtendedFloatingActionButton(
+                onClick = {
+                    hapticManager?.tapUiClick()
+                    showPostDialog = true
+                },
+                icon = { Icon(Icons.Default.Add, contentDescription = "Post Requirement", tint = Color.White) },
+                text = { Text("POST REQUIREMENT", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 12.sp) },
+                containerColor = CrimsonPrimaryDark,
+                shape = RoundedCornerShape(24.dp)
+            )
         }
     ) { paddingValues ->
         Column(
@@ -183,337 +122,160 @@ fun DiscoverScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            when (selectedTab) {
-                0 -> {
-                    // "Looking For" Feed
-                    LazyColumn(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(horizontal = 16.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
-                        contentPadding = PaddingValues(vertical = 12.dp)
-                    ) {
-                        item {
-                            Surface(
-                                modifier = Modifier.fillMaxWidth(),
-                                color = SlateSurfaceDark,
-                                shape = RoundedCornerShape(8.dp),
-                                border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(CardBorderDark))
-                            ) {
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(12.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(
-                                            text = "Need players or opponent?",
-                                            color = TextPrimary,
-                                            fontWeight = FontWeight.SemiBold,
-                                            fontSize = 13.sp
-                                        )
-                                        Text(
-                                            text = "Post a request to reach local teams.",
-                                            color = TextTertiary,
-                                            fontSize = 11.sp
-                                        )
-                                    }
-                                    Button(
-                                        onClick = { showPostDialog = true },
-                                        colors = ButtonDefaults.buttonColors(containerColor = ElevatedSurfaceDark),
-                                        shape = RoundedCornerShape(6.dp),
-                                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
-                                    ) {
-                                        Icon(Icons.Default.Add, contentDescription = null, tint = TextPrimary, modifier = Modifier.size(14.dp))
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Text("Post", color = TextPrimary, fontWeight = FontWeight.Medium, fontSize = 11.sp)
-                                    }
-                                }
-                            }
-                        }
-
-                        if (lookingForList.isEmpty()) {
-                            item {
-                                Card(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    colors = CardDefaults.cardColors(containerColor = SlateSurfaceDark),
-                                    shape = RoundedCornerShape(10.dp),
-                                    border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(CardBorderDark))
-                                ) {
-                                    Column(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(24.dp),
-                                        horizontalAlignment = Alignment.CenterHorizontally
-                                    ) {
-                                        Text(
-                                            text = "No Grassroots Requests Posted",
-                                            style = PlayerNameSecondary,
-                                            color = TextPrimary
-                                        )
-                                        Spacer(modifier = Modifier.height(4.dp))
-                                        Text(
-                                            text = "Need an opponent for the weekend or short on players? Tap 'Post' above.",
-                                            style = BodyCaption,
-                                            color = TextSecondary,
-                                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                                        )
-                                    }
-                                }
-                            }
-                        } else {
-                            items(lookingForList) { item ->
-                            Card(
-                                modifier = Modifier.fillMaxWidth(),
-                                colors = CardDefaults.cardColors(containerColor = SlateSurfaceDark),
-                                shape = RoundedCornerShape(10.dp),
-                                border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(CardBorderDark))
-                            ) {
-                                Column(modifier = Modifier.padding(14.dp)) {
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Surface(
-                                            color = ElevatedSurfaceDark,
-                                            shape = RoundedCornerShape(4.dp)
-                                        ) {
-                                            Text(
-                                                text = item.type.uppercase(),
-                                                color = TextSecondary,
-                                                fontSize = 9.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                            )
-                                        }
-                                        Text(text = item.teamOrOrganizer, color = TextTertiary, fontSize = 11.sp)
-                                    }
-
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                    Text(
-                                        text = item.title,
-                                        color = TextPrimary,
-                                        fontWeight = FontWeight.SemiBold,
-                                        fontSize = 14.sp
-                                    )
-                                    Spacer(modifier = Modifier.height(4.dp))
-
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(Icons.Default.AccessTime, contentDescription = null, tint = TextTertiary, modifier = Modifier.size(12.dp))
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Text(text = item.timing, color = TextSecondary, fontSize = 11.sp)
-                                    }
-                                    Spacer(modifier = Modifier.height(2.dp))
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(Icons.Default.LocationOn, contentDescription = null, tint = TextTertiary, modifier = Modifier.size(12.dp))
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Text(text = item.location, color = TextSecondary, fontSize = 11.sp)
-                                    }
-
-                                    Spacer(modifier = Modifier.height(6.dp))
-                                    Text(
-                                        text = item.note,
-                                        color = TextTertiary,
-                                        fontSize = 11.sp
-                                    )
-
-                                    Spacer(modifier = Modifier.height(10.dp))
-                                    Button(
-                                        onClick = { onContactWhatsApp(item.contactPhone, "Hi! I saw your post on CricSaga: ${item.title}") },
-                                        modifier = Modifier.fillMaxWidth(),
-                                        colors = ButtonDefaults.buttonColors(containerColor = ElevatedSurfaceDark),
-                                        shape = RoundedCornerShape(6.dp),
-                                        contentPadding = PaddingValues(vertical = 8.dp)
-                                    ) {
-                                        Icon(Icons.AutoMirrored.Filled.Send, contentDescription = null, tint = TextPrimary, modifier = Modifier.size(14.dp))
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Text(
-                                            text = "Message on WhatsApp",
-                                            fontWeight = FontWeight.Medium,
-                                            fontSize = 12.sp,
-                                            color = TextPrimary
-                                        )
-                                    }
-                                }
-                            }
+            // Search Input
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 6.dp),
+                placeholder = { Text("Search by player role, team, or location...", fontSize = 12.sp) },
+                leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search", tint = MaterialTheme.colorScheme.onSurfaceVariant) },
+                trailingIcon = {
+                    if (searchQuery.isNotEmpty()) {
+                        IconButton(onClick = { searchQuery = "" }) {
+                            Icon(Icons.Default.Close, contentDescription = "Clear", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
+                },
+                singleLine = true,
+                shape = RoundedCornerShape(12.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = CrimsonPrimaryDark,
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outline
+                )
+            )
+
+            // Filter Chips Row
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
+                    .padding(horizontal = 16.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                filterOptions.forEach { filter ->
+                    val isSelected = selectedFilter == filter
+                    FilterChip(
+                        selected = isSelected,
+                        onClick = {
+                            hapticManager?.tapUiClick()
+                            selectedFilter = filter
+                        },
+                        label = {
+                            Text(
+                                text = filter,
+                                fontSize = 11.sp,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                            )
+                        },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = if (filter == "Urgent / Today") DarkAlertWicket else CrimsonPrimaryDark,
+                            selectedLabelColor = Color.White,
+                            containerColor = MaterialTheme.colorScheme.surface,
+                            labelColor = MaterialTheme.colorScheme.onSurface
+                        ),
+                        shape = RoundedCornerShape(16.dp)
+                    )
                 }
             }
 
-                1 -> {
-                    // Grounds & Turfs
-                    LazyColumn(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(horizontal = 16.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
-                        contentPadding = PaddingValues(vertical = 12.dp)
+            Spacer(modifier = Modifier.height(6.dp))
+
+            // Regional Leaderboards Scouting Banner
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 4.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .clickable { onRankingsClick() },
+                color = MaterialTheme.colorScheme.surface,
+                border = androidx.compose.foundation.BorderStroke(1.dp, AmberFourPrimary.copy(alpha = 0.35f))
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.EmojiEvents,
+                        contentDescription = null,
+                        tint = AmberFourPrimary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Regional Rankings & Leaderboards",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = "Scout top batters, bowlers & club standings",
+                            fontSize = 10.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Text(
+                        text = "EXPLORE >",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = AmberFourPrimary
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            if (filteredList.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(32.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                        shape = RoundedCornerShape(14.dp)
                     ) {
-                        items(turfsList) { turf ->
-                            Card(
-                                modifier = Modifier.fillMaxWidth(),
-                                colors = CardDefaults.cardColors(containerColor = SlateSurfaceDark),
-                                shape = RoundedCornerShape(10.dp),
-                                border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(CardBorderDark))
-                            ) {
-                                Column(modifier = Modifier.padding(14.dp)) {
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Text(
-                                            text = turf.name,
-                                            color = TextPrimary,
-                                            fontWeight = FontWeight.SemiBold,
-                                            fontSize = 14.sp
-                                        )
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Icon(
-                                                imageVector = Icons.Default.Star,
-                                                contentDescription = null,
-                                                tint = BoundaryAmber,
-                                                modifier = Modifier.size(11.dp)
-                                            )
-                                            Spacer(modifier = Modifier.width(3.dp))
-                                            Text(
-                                                text = turf.rating,
-                                                color = TextSecondary,
-                                                fontSize = 11.sp,
-                                                fontWeight = FontWeight.Medium
-                                            )
-                                        }
-                                    }
-
-                                    Spacer(modifier = Modifier.height(2.dp))
-                                    Text(
-                                        text = "${turf.location} • ${turf.distance}",
-                                        color = TextTertiary,
-                                        fontSize = 11.sp
-                                    )
-
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                    ) {
-                                        Surface(
-                                            color = ElevatedSurfaceDark,
-                                            shape = RoundedCornerShape(4.dp)
-                                        ) {
-                                            Text(
-                                                text = turf.surfaceType,
-                                                color = TextSecondary,
-                                                fontSize = 10.sp,
-                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                            )
-                                        }
-                                        if (turf.hasLights) {
-                                            Surface(
-                                                color = ElevatedSurfaceDark,
-                                                shape = RoundedCornerShape(4.dp)
-                                            ) {
-                                                Text(
-                                                    text = "Floodlights",
-                                                    color = TextSecondary,
-                                                    fontSize = 10.sp,
-                                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                                )
-                                            }
-                                        }
-                                    }
-
-                                    Spacer(modifier = Modifier.height(10.dp))
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Text(
-                                            text = turf.pricePerHour,
-                                            color = TextPrimary,
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 13.sp
-                                        )
-
-                                        Button(
-                                            onClick = { onContactWhatsApp(turf.phone, "Hi, I'd like to book a slot at ${turf.name}") },
-                                            colors = ButtonDefaults.buttonColors(containerColor = ElevatedSurfaceDark),
-                                            shape = RoundedCornerShape(6.dp),
-                                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
-                                        ) {
-                                            Text("Book Slot", color = TextPrimary, fontWeight = FontWeight.Medium, fontSize = 11.sp)
-                                        }
-                                    }
-                                }
-                            }
+                        Column(
+                            modifier = Modifier.padding(24.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                text = "No Matchmaking Posts Found",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 16.sp,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                text = "Need players for tonight's match, an opponent team, or an umpire? Post your requirement above!",
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                            )
                         }
                     }
                 }
-
-                2 -> {
-                    // Open Tournaments Tab
-                    LazyColumn(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(horizontal = 16.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
-                        contentPadding = PaddingValues(vertical = 12.dp)
-                    ) {
-                        items(tourneysList) { tourney ->
-                            Card(
-                                modifier = Modifier.fillMaxWidth(),
-                                colors = CardDefaults.cardColors(containerColor = SlateSurfaceDark),
-                                shape = RoundedCornerShape(10.dp),
-                                border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(CardBorderDark))
-                            ) {
-                                Column(modifier = Modifier.padding(14.dp)) {
-                                    Text(
-                                        text = tourney.name,
-                                        color = TextPrimary,
-                                        fontWeight = FontWeight.SemiBold,
-                                        fontSize = 14.sp
-                                    )
-                                    Spacer(modifier = Modifier.height(2.dp))
-                                    Text(
-                                        text = "By ${tourney.organizer} • ${tourney.location}",
-                                        color = TextTertiary,
-                                        fontSize = 11.sp
-                                    )
-
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween
-                                    ) {
-                                        Text("Prize: ${tourney.prizePool}", color = TextSecondary, fontSize = 11.sp)
-                                        Text("Entry: ${tourney.entryFee}", color = TextSecondary, fontSize = 11.sp)
-                                    }
-
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                    Text(
-                                        text = "${tourney.format} • ${tourney.dates}",
-                                        color = TextTertiary,
-                                        fontSize = 11.sp
-                                    )
-
-                                    Spacer(modifier = Modifier.height(10.dp))
-                                    Button(
-                                        onClick = { /* Register team */ },
-                                        modifier = Modifier.fillMaxWidth(),
-                                        colors = ButtonDefaults.buttonColors(containerColor = ElevatedSurfaceDark),
-                                        shape = RoundedCornerShape(6.dp),
-                                        contentPadding = PaddingValues(vertical = 8.dp)
-                                    ) {
-                                        Text("Register Team", color = TextPrimary, fontWeight = FontWeight.Medium, fontSize = 12.sp)
-                                    }
-                                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 80.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    items(filteredList, key = { it.id }) { item ->
+                        MatchmakingCard(
+                            item = item,
+                            onMessageClick = {
+                                onContactDirectChat(item.title, item.teamOrOrganizer, item.contactPhone)
+                            },
+                            onWhatsAppClick = {
+                                val message = "Hi! I saw your post on CricSaga: \"${item.title}\" for ${item.teamOrOrganizer}. I am interested in connecting!"
+                                onContactWhatsApp(item.contactPhone, message)
                             }
-                        }
+                        )
                     }
                 }
             }
@@ -521,155 +283,270 @@ fun DiscoverScreen(
     }
 
     if (showPostDialog) {
-        var selectedType by remember { mutableStateOf("Opponent") }
-        var titleText by remember { mutableStateOf("") }
-        var organizerText by remember { mutableStateOf("Warriors CC") }
-        var timingText by remember { mutableStateOf("Sunday • 7:00 AM - 10:00 AM") }
-        var locationText by remember { mutableStateOf("Shivaji Park Ground #4") }
-        var contactPhoneText by remember { mutableStateOf("9820123456") }
-        var noteText by remember { mutableStateOf("Friendly match, 50/50 cost split") }
-
-        val typeOptions = listOf("Opponent", "Players", "Scorer", "Umpire")
-
-        AlertDialog(
-            onDismissRequest = { showPostDialog = false },
-            containerColor = SlateSurfaceDark,
-            shape = RoundedCornerShape(16.dp),
-            title = {
-                Text(
-                    text = "Post Grassroots Requirement",
-                    color = TextPrimary,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp
-                )
-            },
-            text = {
-                val hapticManager = com.cricsaga.app.ui.utils.LocalHapticManager.current
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    // Type Selector Chips
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        typeOptions.forEach { type ->
-                            FilterChip(
-                                selected = selectedType == type,
-                                onClick = {
-                                    hapticManager?.tapUiClick()
-                                    selectedType = type
-                                },
-                                label = { Text(type, fontSize = 11.sp) },
-                                colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = CrimsonPrimaryDark,
-                                    selectedLabelColor = Color.White,
-                                    containerColor = ElevatedSurfaceDark,
-                                    labelColor = MutedGrey
-                                )
-                            )
-                        }
-                    }
-
-                    OutlinedTextField(
-                        value = titleText,
-                        onValueChange = { titleText = it },
-                        label = { Text("Title / Purpose", color = MutedGrey) },
-                        placeholder = { Text("e.g. Weekend Match • 16 Overs", color = Color.Gray) },
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = TextPrimary,
-                            unfocusedTextColor = TextPrimary,
-                            focusedBorderColor = CrimsonPrimaryDark,
-                            unfocusedBorderColor = CardBorderDark
-                        ),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    OutlinedTextField(
-                        value = organizerText,
-                        onValueChange = { organizerText = it },
-                        label = { Text("Team / Organizer Name", color = MutedGrey) },
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = TextPrimary,
-                            unfocusedTextColor = TextPrimary,
-                            focusedBorderColor = CrimsonPrimaryDark,
-                            unfocusedBorderColor = CardBorderDark
-                        ),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    OutlinedTextField(
-                        value = timingText,
-                        onValueChange = { timingText = it },
-                        label = { Text("Date & Timing", color = MutedGrey) },
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = TextPrimary,
-                            unfocusedTextColor = TextPrimary,
-                            focusedBorderColor = CrimsonPrimaryDark,
-                            unfocusedBorderColor = CardBorderDark
-                        ),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    OutlinedTextField(
-                        value = locationText,
-                        onValueChange = { locationText = it },
-                        label = { Text("Ground / Location", color = MutedGrey) },
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = TextPrimary,
-                            unfocusedTextColor = TextPrimary,
-                            focusedBorderColor = CrimsonPrimaryDark,
-                            unfocusedBorderColor = CardBorderDark
-                        ),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    OutlinedTextField(
-                        value = contactPhoneText,
-                        onValueChange = { contactPhoneText = it },
-                        label = { Text("WhatsApp Contact Number", color = MutedGrey) },
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = TextPrimary,
-                            unfocusedTextColor = TextPrimary,
-                            focusedBorderColor = CrimsonPrimaryDark,
-                            unfocusedBorderColor = CardBorderDark
-                        ),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-            },
-            confirmButton = {
-                val hapticManager = com.cricsaga.app.ui.utils.LocalHapticManager.current
-                Button(
-                    onClick = {
-                        hapticManager?.tapUiClick()
-                        onPostRequirement(
-                            selectedType,
-                            titleText.trim().ifEmpty { "Cricket Requirement • $selectedType" },
-                            organizerText.trim().ifEmpty { "Cricket Team" },
-                            timingText.trim(),
-                            locationText.trim(),
-                            noteText.trim(),
-                            contactPhoneText.trim().ifEmpty { "9820000000" }
-                        )
-                        showPostDialog = false
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = CrimsonPrimaryDark),
-                    shape = RoundedCornerShape(8.dp)
-                ) {
-                    Text("POST REQUIREMENT", fontWeight = FontWeight.Bold, color = Color.White)
-                }
-            },
-            dismissButton = {
-                val hapticManager = com.cricsaga.app.ui.utils.LocalHapticManager.current
-                TextButton(onClick = {
-                    hapticManager?.tapUiClick()
-                    showPostDialog = false
-                }) {
-                    Text("CANCEL", color = MutedGrey)
-                }
+        PostRequirementDialog(
+            onDismiss = { showPostDialog = false },
+            onPost = { type, title, organizer, timing, location, note, phone ->
+                onPostRequirement(type, title, organizer, timing, location, note, phone)
+                showPostDialog = false
             }
         )
     }
+}
+
+@Composable
+fun MatchmakingCard(
+    item: LookingForItem,
+    onMessageClick: () -> Unit,
+    onWhatsAppClick: () -> Unit
+) {
+    val hapticManager = com.cricsaga.app.ui.utils.LocalHapticManager.current
+    val isUrgent = item.timing.contains("Tonight", ignoreCase = true) || item.timing.contains("Today", ignoreCase = true)
+
+    val tagColor = when {
+        isUrgent -> DarkAlertWicket
+        item.type.contains("Opponent", ignoreCase = true) -> CrimsonPrimaryDark
+        item.type.contains("Player", ignoreCase = true) -> AmberFourPrimary
+        item.type.contains("Scorer", ignoreCase = true) -> ForestSixPrimary
+        else -> DarkBrandPrimary
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Surface(
+                    color = tagColor.copy(alpha = 0.15f),
+                    shape = RoundedCornerShape(6.dp)
+                ) {
+                    Text(
+                        text = item.type.uppercase(),
+                        fontWeight = FontWeight.Black,
+                        fontSize = 10.sp,
+                        color = tagColor,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                    )
+                }
+
+                if (isUrgent) {
+                    Surface(
+                        color = DarkAlertWicket.copy(alpha = 0.2f),
+                        shape = RoundedCornerShape(6.dp)
+                    ) {
+                        Text(
+                            text = "URGENT",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 10.sp,
+                            color = DarkAlertWicket,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Text(
+                text = item.title,
+                fontWeight = FontWeight.Bold,
+                fontSize = 15.sp,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+
+            Text(
+                text = "Posted by ${item.teamOrOrganizer}",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.AccessTime, contentDescription = null, modifier = Modifier.size(13.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(modifier = Modifier.width(5.dp))
+                Text(item.timing, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+
+            Spacer(modifier = Modifier.height(3.dp))
+
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.LocationOn, contentDescription = null, modifier = Modifier.size(13.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(modifier = Modifier.width(5.dp))
+                Text(item.location, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+
+            if (item.note.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = item.note,
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f),
+                    lineHeight = 16.sp
+                )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Button(
+                    onClick = {
+                        hapticManager?.tapUiClick()
+                        onMessageClick()
+                    },
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.onSurface)
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("MESSAGE", fontWeight = FontWeight.Bold, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface)
+                }
+
+                Button(
+                    onClick = {
+                        hapticManager?.tapUiClick()
+                        onWhatsAppClick()
+                    },
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColors(containerColor = ForestSixPrimary),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Icon(Icons.AutoMirrored.Filled.Send, contentDescription = null, modifier = Modifier.size(14.dp), tint = Color.White)
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("WHATSAPP", fontWeight = FontWeight.Bold, fontSize = 11.sp, color = Color.White)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun PostRequirementDialog(
+    onDismiss: () -> Unit,
+    onPost: (type: String, title: String, organizer: String, timing: String, location: String, note: String, phone: String) -> Unit
+) {
+    val types = listOf("Player", "Opponent", "Scorer", "Umpire")
+    var selectedType by remember { mutableStateOf("Player") }
+    var titleText by remember { mutableStateOf("") }
+    var organizerText by remember { mutableStateOf("") }
+    var timingText by remember { mutableStateOf("") }
+    var locationText by remember { mutableStateOf("") }
+    var noteText by remember { mutableStateOf("") }
+    var contactPhoneText by remember { mutableStateOf("") }
+    val hapticManager = com.cricsaga.app.ui.utils.LocalHapticManager.current
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Post Requirement", fontWeight = FontWeight.Bold, fontSize = 16.sp) },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text("Requirement Category", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    types.forEach { t ->
+                        FilterChip(
+                            selected = selectedType == t,
+                            onClick = {
+                                hapticManager?.tapUiClick()
+                                selectedType = t
+                            },
+                            label = { Text(t, fontSize = 11.sp) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = CrimsonPrimaryDark,
+                                selectedLabelColor = Color.White
+                            )
+                        )
+                    }
+                }
+
+                OutlinedTextField(
+                    value = titleText,
+                    onValueChange = { titleText = it },
+                    label = { Text("Title (e.g. Need 2 Batsmen for Tonight)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+
+                OutlinedTextField(
+                    value = organizerText,
+                    onValueChange = { organizerText = it },
+                    label = { Text("Team / Organizer Name") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+
+                OutlinedTextField(
+                    value = timingText,
+                    onValueChange = { timingText = it },
+                    label = { Text("Timing (e.g. Tonight 9 PM - 11 PM)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+
+                OutlinedTextField(
+                    value = locationText,
+                    onValueChange = { locationText = it },
+                    label = { Text("Venue / Ground Location") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+
+                OutlinedTextField(
+                    value = noteText,
+                    onValueChange = { noteText = it },
+                    label = { Text("Notes (Ball type, match format, fees)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    maxLines = 3
+                )
+
+                OutlinedTextField(
+                    value = contactPhoneText,
+                    onValueChange = { contactPhoneText = it },
+                    label = { Text("WhatsApp Contact Number") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    hapticManager?.tapUiClick()
+                    onPost(
+                        selectedType,
+                        titleText.trim().ifEmpty { "Cricket Requirement • $selectedType" },
+                        organizerText.trim().ifEmpty { "Cricket Team" },
+                        timingText.trim().ifEmpty { "Weekend Match" },
+                        locationText.trim().ifEmpty { "Local Turf Ground" },
+                        noteText.trim(),
+                        contactPhoneText.trim().ifEmpty { "9820000000" }
+                    )
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = CrimsonPrimaryDark),
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Text("POST REQUIREMENT", fontWeight = FontWeight.Bold, color = Color.White)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("CANCEL", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    )
 }

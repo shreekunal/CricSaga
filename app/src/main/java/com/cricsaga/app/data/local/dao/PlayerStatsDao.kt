@@ -12,6 +12,9 @@ interface PlayerStatsDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertOrUpdate(stats: PlayerStatsEntity)
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAll(stats: List<PlayerStatsEntity>)
+
     @Query("SELECT * FROM player_stats WHERE userId = :userId")
     suspend fun getStatsForUser(userId: String): PlayerStatsEntity?
 

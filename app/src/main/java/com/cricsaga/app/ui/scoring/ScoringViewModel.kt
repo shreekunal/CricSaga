@@ -7,6 +7,7 @@ import com.cricsaga.app.data.local.CricSagaDatabase
 import com.cricsaga.app.data.local.entity.DeliveryEntity
 import com.cricsaga.app.data.local.entity.LookingForEntity
 import com.cricsaga.app.data.local.entity.MatchEntity
+import com.cricsaga.app.data.local.entity.PostEntity
 import com.cricsaga.app.data.local.entity.TeamEntity
 import com.cricsaga.app.data.local.entity.UserEntity
 import com.cricsaga.app.data.repository.MatchRepository
@@ -15,6 +16,7 @@ import com.cricsaga.app.domain.engine.MatchResultCalculator
 import com.cricsaga.app.domain.engine.ScoringEngine
 import com.cricsaga.app.domain.model.*
 import com.cricsaga.app.ui.home.GrassrootsHeroItem
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.util.UUID
@@ -65,6 +67,13 @@ class ScoringViewModel(application: Application) : AndroidViewModel(application)
     val allTeams: StateFlow<List<TeamEntity>>
     val topPerformers: StateFlow<List<GrassrootsHeroItem>>
     val lookingForPosts: StateFlow<List<LookingForEntity>>
+    val allPosts: StateFlow<List<PostEntity>>
+    val selectedRankingCity = MutableStateFlow("All Regions")
+    val topBatters: StateFlow<List<PlayerRankingItem>>
+    val topBowlers: StateFlow<List<PlayerRankingItem>>
+    val topAllRounders: StateFlow<List<PlayerRankingItem>>
+    val teamRankings: StateFlow<List<TeamRankingItem>>
+    val availableCities: StateFlow<List<String>>
 
     private val _uiState = MutableStateFlow(ScoringUiState())
     val uiState: StateFlow<ScoringUiState> = _uiState.asStateFlow()
@@ -127,11 +136,105 @@ class ScoringViewModel(application: Application) : AndroidViewModel(application)
             emptyList()
         )
 
+        allPosts = repository.getAllPosts().stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(5000),
+            emptyList()
+        )
+
+        @OptIn(ExperimentalCoroutinesApi::class)
+        topBatters = selectedRankingCity.flatMapLatest { city ->
+            repository.getTopBatters(city)
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+        @OptIn(ExperimentalCoroutinesApi::class)
+        topBowlers = selectedRankingCity.flatMapLatest { city ->
+            repository.getTopBowlers(city)
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+        @OptIn(ExperimentalCoroutinesApi::class)
+        topAllRounders = selectedRankingCity.flatMapLatest { city ->
+            repository.getTopAllRounders(city)
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+        @OptIn(ExperimentalCoroutinesApi::class)
+        teamRankings = selectedRankingCity.flatMapLatest { city ->
+            repository.getTeamRankings(city)
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+        availableCities = repository.getAvailableCities().stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(5000),
+            listOf("All Regions")
+        )
+
         viewModelScope.launch {
             repository.seedInitialLookingForPostsIfEmpty()
         }
 
         loadActiveMatch()
+    }
+
+    fun setSelectedRankingCity(city: String) {
+        selectedRankingCity.value = city
+    }
+
+    fun createPost(
+        authorId: String,
+        authorName: String,
+        authorRole: String,
+        authorCity: String,
+        authorTeamName: String?,
+        authorAvatarUrl: String?,
+        content: String,
+        imageUri: String? = null,
+        linkedMatchId: String? = null,
+        performanceTag: String? = null
+    ) {
+        viewModelScope.launch {
+            repository.createPost(
+                authorId = authorId,
+                authorName = authorName,
+                authorRole = authorRole,
+                authorCity = authorCity,
+                authorTeamName = authorTeamName,
+                authorAvatarUrl = authorAvatarUrl,
+                content = content,
+                imageUri = imageUri,
+                linkedMatchId = linkedMatchId,
+                performanceTag = performanceTag
+            )
+        }
+    }
+
+    fun toggleLikePost(postId: String) {
+        viewModelScope.launch {
+            repository.toggleLikePost(postId)
+        }
+    }
+
+    fun followPlayer(followerId: String, followingId: String) {
+        viewModelScope.launch {
+            repository.followUser(followerId, followingId)
+        }
+    }
+
+    fun unfollowPlayer(followerId: String, followingId: String) {
+        viewModelScope.launch {
+            repository.unfollowUser(followerId, followingId)
+        }
+    }
+
+    fun sendChatMessage(
+        senderId: String,
+        receiverId: String,
+        text: String,
+        isChallenge: Boolean = false,
+        challengeDetails: String? = null
+    ) {
+        viewModelScope.launch {
+            repository.sendChatMessage(senderId, receiverId, text, isChallenge, challengeDetails)
+        }
     }
 
     fun createLookingForPost(

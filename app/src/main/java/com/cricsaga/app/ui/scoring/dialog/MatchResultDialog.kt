@@ -33,6 +33,7 @@ fun MatchResultDialog(
     selectedPotm: UserEntity?,
     onPotmSelected: (UserEntity) -> Unit,
     onViewScorecard: () -> Unit,
+    onShareToFeed: () -> Unit = {},
     onShareToWhatsApp: () -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -194,6 +195,20 @@ fun MatchResultDialog(
                         text = "VIEW FULL SCORECARD",
                         fontWeight = FontWeight.Bold,
                         color = Color.White,
+                        fontSize = 12.sp
+                    )
+                }
+
+                OutlinedButton(
+                    onClick = onShareToFeed,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(8.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = AmberFourPrimary)
+                ) {
+                    Text(
+                        text = "POST HIGHLIGHT TO FEED",
+                        fontWeight = FontWeight.Bold,
+                        color = AmberFourPrimary,
                         fontSize = 12.sp
                     )
                 }

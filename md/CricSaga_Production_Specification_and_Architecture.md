@@ -31,12 +31,12 @@ CricSaga is a high-performance, native Android cricket scoring, analytics, and g
 flowchart TD
     subgraph Presentation_Layer["UI & Presentation Layer (Jetpack Compose)"]
         UI_Nav["AppNavigation (NavHost & BottomBar)"]
-        UI_Home["HomeScreen (Radar & Heroes)"]
+        UI_Home["HomeScreen (Twitter-Style Cricket Feed & Live Radar)"]
         UI_Matches["MatchListScreen & ScoringScreen"]
-        UI_Discover["DiscoverScreen (Looking For & Turfs)"]
-        UI_Tournaments["TournamentListScreen (Points Table & NRR)"]
-        UI_Profile["PlayerProfileScreen (5-Tab Career)"]
-        UI_Dialogs["Dismissal, Bowlers, Break, Result & Team Creation Dialogs"]
+        UI_Discover["DiscoverScreen (Player & Opponent Matchmaking)"]
+        UI_Messages["ConversationListScreen & ChatScreen (Direct Messages & Challenges)"]
+        UI_Profile["PlayerProfileScreen & PlayerDetailScreen (5-Tab Career & Posts)"]
+        UI_Dialogs["Dismissal, Bowlers, Break, MatchResult, ComposePost & Challenge Dialogs"]
         UI_Charts["ManhattanChart & WormGraph (Canvas)"]
     end
 
@@ -48,11 +48,11 @@ flowchart TD
         ENG_Share["ShareUtils & PdfExportUtils"]
     end
 
-    subgraph Data_Layer["Data & Persistence Layer (Room SQLite v7)"]
+    subgraph Data_Layer["Data & Persistence Layer (Room SQLite v8)"]
         REPO["MatchRepository"]
         AUTH["AuthManager (Session & Profile Gatekeeper)"]
         PRO["ProManager (StateFlow Entitlements)"]
-        DB[("CricSagaDatabase (Room SQLite v7)")]
+        DB[("CricSagaDatabase (Room SQLite v8)")]
         DAO_Users["UserDao"]
         DAO_Teams["TeamDao"]
         DAO_Matches["MatchDao"]
@@ -60,7 +60,9 @@ flowchart TD
         DAO_Stats["PlayerStatsDao"]
         DAO_Codes["RedeemCodeDao"]
         DAO_Discover["DiscoverDao"]
-        DAO_Tourney["TournamentDao"]
+        DAO_Posts["PostDao"]
+        DAO_Follows["FollowDao"]
+        DAO_Messages["ChatMessageDao"]
     end
 
     Presentation_Layer --> Domain_Layer
@@ -74,14 +76,16 @@ flowchart TD
     DB --> DAO_Stats
     DB --> DAO_Codes
     DB --> DAO_Discover
-    DB --> DAO_Tourney
+    DB --> DAO_Posts
+    DB --> DAO_Follows
+    DB --> DAO_Messages
 ```
 
 ---
 
-## 3. Database Architecture & Schema Catalog (Room v7)
+## 3. Database Architecture & Schema Catalog (Room v8)
 
-The application uses an SQLite database managed through Android Room with Write-Ahead Logging (`WAL`). Schema version is locked at **Version 7**.
+The application uses an SQLite database managed through Android Room with Write-Ahead Logging (`WAL`). Schema version is locked at **Version 8**.
 
 ### 3.1 Entity Catalog & Relations
 
@@ -95,7 +99,10 @@ The application uses an SQLite database managed through Android Room with Write-
 | `deliveries` | `deliveryId` (TEXT) | `inningsId` references `innings`; `bowlerId`, `strikerId`, `nonStrikerId` | Granular ball-by-ball ledger for deterministic event replay |
 | `player_stats` | `userId` (TEXT) | `userId` references `users` | Career totals (runs, balls, 4s, 6s, 50s, 100s, wickets, maidens) |
 | `redeem_codes` | `code` (TEXT) | `redeemedByUserId` references `users` | Single-use promo codes for offline subscription activation |
-| `looking_for_posts` | `id` (TEXT) | None | Grassroots matchmaking feed (opponents, players, umpires) |
+| `looking_for_posts` | `id` (TEXT) | None | Grassroots matchmaking feed (opponents, players, umpires, scorers) |
+| `posts` | `postId` (TEXT) | Indices on `authorId` and `createdAt` | Twitter-style cricket social posts (text, stats badge, photo, engagement) |
+| `follows` | `followerId`, `followingId` | Composite PK; indices on `followerId` and `followingId` | Bidirectional social graph (following/followers, feed filtering) |
+| `chat_messages` | `messageId` (TEXT) | Indices on `senderId`, `receiverId`, `timestamp` | 1-on-1 direct messages & structured match challenges |
 
 ### 3.2 Exact SQL Table Schemas
 
@@ -274,6 +281,59 @@ CREATE TABLE IF NOT EXISTS looking_for_posts (
     contactPhone TEXT NOT NULL,
     createdAt INTEGER NOT NULL
 );
+```
+
+#### 10. `posts` Table
+```sql
+CREATE TABLE IF NOT EXISTS posts (
+    postId TEXT PRIMARY KEY NOT NULL,
+    authorId TEXT NOT NULL,
+    authorName TEXT NOT NULL,
+    authorRole TEXT NOT NULL,
+    authorCity TEXT NOT NULL,
+    authorTeamName TEXT,
+    authorAvatarUrl TEXT,
+    content TEXT NOT NULL,
+    imageUri TEXT,
+    linkedMatchId TEXT,
+    performanceTag TEXT,
+    likeCount INTEGER NOT NULL DEFAULT 0,
+    commentCount INTEGER NOT NULL DEFAULT 0,
+    repostCount INTEGER NOT NULL DEFAULT 0,
+    isLikedByMe INTEGER NOT NULL DEFAULT 0,
+    createdAt INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS index_posts_authorId ON posts (authorId);
+CREATE INDEX IF NOT EXISTS index_posts_createdAt ON posts (createdAt);
+```
+
+#### 11. `follows` Table
+```sql
+CREATE TABLE IF NOT EXISTS follows (
+    followerId TEXT NOT NULL,
+    followingId TEXT NOT NULL,
+    createdAt INTEGER NOT NULL,
+    PRIMARY KEY(followerId, followingId)
+);
+CREATE INDEX IF NOT EXISTS index_follows_followerId ON follows (followerId);
+CREATE INDEX IF NOT EXISTS index_follows_followingId ON follows (followingId);
+```
+
+#### 12. `chat_messages` Table
+```sql
+CREATE TABLE IF NOT EXISTS chat_messages (
+    messageId TEXT PRIMARY KEY NOT NULL,
+    senderId TEXT NOT NULL,
+    receiverId TEXT NOT NULL,
+    text TEXT NOT NULL,
+    isChallenge INTEGER NOT NULL DEFAULT 0,
+    challengeDetails TEXT,
+    timestamp INTEGER NOT NULL,
+    isRead INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS index_chat_messages_senderId ON chat_messages (senderId);
+CREATE INDEX IF NOT EXISTS index_chat_messages_receiverId ON chat_messages (receiverId);
+CREATE INDEX IF NOT EXISTS index_chat_messages_timestamp ON chat_messages (timestamp);
 ```
 
 ---
@@ -461,3 +521,34 @@ graph TD
   ```bash
   ./gradlew bundleRelease
   ```
+
+---
+
+## 10. Social Pivot Architecture & Individual-Centric Ecosystem
+
+### 10.1 Philosophy & Paradigm Shift
+CricSaga has pivoted from a tournament-centric administration platform into a grassroots social network for cricketers, where individuals are connected through cricket teams and matches.
+
+### 10.2 Core Features
+1. **Cricket Feed (Tab 1 — Home):**
+   - High-contrast live radar ticker showing ongoing matches without clutter.
+   - Quick scoring launchpad with `+ SCORE MATCH` and `TEAMS` shortcuts.
+   - Rich post composer supporting match highlights, performance badges (e.g. `54* (28)`), and photo attachments.
+   - Feed engagement bar: Like, Comment count, Repost, Follow/Following toggle, and Direct Message author shortcut.
+   - Verified Gold badge for verified grassroots players.
+2. **Grassroots Matchmaking (Tab 3 — Discover):**
+   - Strictly individual-centric matchmaking: Need Player, Need Opponent, Need Scorer, Need Umpire.
+   - Filter chip system with "Urgent / Today" quick filter.
+   - Direct connection CTAs: "MESSAGE" opens 1-on-1 direct chat with pre-populated inquiry draft; "WHATSAPP" opens direct wa.me chat.
+   - Grounds and tournaments have been completely removed.
+3. **Direct Messages & Challenges (Tab 4 — Messages):**
+   - Replaces tournaments as the 4th bottom navigation tab.
+   - Real-time conversation inbox with search, unread badges, and "New Chat" player selector.
+   - 1-on-1 direct messaging screen with chronological chat bubbles.
+   - Structured Match Challenge bubble: allows players to challenge opponents with Overs, Ball Type, Venue, and Date & Timing parameters.
+4. **Player Profile & Career (Tab 5 — My Career & Player Detail):**
+   - Hero profile card featuring jersey number, role, batting/bowling style, and live follower/following counts.
+   - 5-tab career record: Overview, Batting, Bowling, Fielding, Matches, and Posts tab showing the player's published feed updates.
+   - Seamless public visiting: tapping any player's name or avatar across Feed, Chat, or Squads navigates to their profile with instant Follow and Message actions.
+5. **Match-to-Feed Bridge:**
+   - On match conclusion, the celebration dialog provides a "POST HIGHLIGHT TO FEED" action button to publish match victory highlights and Player of the Match honors directly onto the Cricket Feed.

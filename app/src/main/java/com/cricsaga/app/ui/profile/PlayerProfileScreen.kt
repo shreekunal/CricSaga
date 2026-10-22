@@ -48,6 +48,9 @@ fun PlayerProfileScreen(
     proManager: ProManager,
     currentUser: UserEntity? = null,
     playerStats: PlayerStatsEntity? = null,
+    posts: List<com.cricsaga.app.data.local.entity.PostEntity> = emptyList(),
+    followersCount: Int = 0,
+    followingCount: Int = 0,
     onRedeemCodeClick: () -> Unit,
     onUpdateProfile: (UserEntity) -> Unit = {},
     onLogout: () -> Unit = {}
@@ -55,7 +58,7 @@ fun PlayerProfileScreen(
     val context = LocalContext.current
     var showEditProfileDialog by remember { mutableStateOf(false) }
     var selectedTab by remember { mutableIntStateOf(0) }
-    val tabs = listOf("Overview", "Batting", "Bowling", "Fielding", "Matches")
+    val tabs = listOf("Overview", "Batting", "Bowling", "Fielding", "Matches", "Posts")
     val subscriptionState by proManager.subscriptionState.collectAsState()
 
     val playerName = currentUser?.fullName?.ifBlank { "Rohit Sharma" } ?: "Rohit Sharma"
@@ -257,6 +260,16 @@ fun PlayerProfileScreen(
                                     style = BodyCaption,
                                     color = TextTertiary
                                 )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text("$followersCount", fontWeight = FontWeight.Black, fontSize = 12.sp, color = TextPrimary)
+                                    Spacer(modifier = Modifier.width(3.dp))
+                                    Text("Followers", fontSize = 11.sp, color = TextSecondary)
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                    Text("$followingCount", fontWeight = FontWeight.Black, fontSize = 12.sp, color = TextPrimary)
+                                    Spacer(modifier = Modifier.width(3.dp))
+                                    Text("Following", fontSize = 11.sp, color = TextSecondary)
+                                }
                             }
 
                             if (currentUser != null) {
@@ -620,6 +633,34 @@ fun PlayerProfileScreen(
                                     }
                                 }
                             }
+                        }
+                    }
+                }
+                5 -> {
+                    // Posts Tab
+                    if (posts.isEmpty()) {
+                        item {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(32.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text("You haven't published any posts yet.", fontSize = 12.sp, color = TextSecondary)
+                            }
+                        }
+                    } else {
+                        items(posts, key = { it.postId }) { p ->
+                            com.cricsaga.app.ui.home.CricketPostCard(
+                                post = p,
+                                isMyPost = true,
+                                isFollowing = false,
+                                onAuthorClick = {},
+                                onToggleFollow = {},
+                                onLikeClick = {},
+                                onMessageAuthor = {},
+                                onMatchClick = {}
+                            )
                         }
                     }
                 }

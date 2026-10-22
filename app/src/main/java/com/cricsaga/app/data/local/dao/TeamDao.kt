@@ -26,6 +26,9 @@ interface TeamDao {
     @Query("SELECT * FROM teams WHERE teamId = :teamId")
     suspend fun getTeamById(teamId: String): TeamEntity?
 
+    @Query("SELECT * FROM team_members")
+    fun getAllTeamMembers(): Flow<List<TeamMemberEntity>>
+
     @Query("SELECT * FROM teams ORDER BY teamName ASC")
     fun getAllTeams(): Flow<List<TeamEntity>>
 

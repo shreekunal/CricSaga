@@ -55,6 +55,17 @@ object ImageUtils {
         }
     }
 
+    fun decodeUriToBitmap(context: Context, uri: Uri): ImageBitmap? {
+        return try {
+            val inputStream = context.contentResolver.openInputStream(uri)
+            val bitmap = BitmapFactory.decodeStream(inputStream)
+            inputStream?.close()
+            bitmap?.asImageBitmap() ?: loadBitmapFromPath(uri.path)
+        } catch (e: Exception) {
+            loadBitmapFromPath(uri.path)
+        }
+    }
+
     /**
      * Loads a file from disk into a Compose ImageBitmap.
      */

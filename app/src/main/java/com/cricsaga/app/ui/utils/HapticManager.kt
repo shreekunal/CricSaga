@@ -68,6 +68,10 @@ class HapticManager(context: Context) {
         vibrateWaveform(timings, amplitudes)
     }
 
+    fun tapBoundaryFour() {
+        tapFour()
+    }
+
     /**
      * Deep double punch for Maximum (6 runs): 60ms - 55ms gap - 65ms
      */

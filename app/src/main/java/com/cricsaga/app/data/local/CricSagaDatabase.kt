@@ -18,11 +18,12 @@ import com.cricsaga.app.data.local.entity.*
         DeliveryEntity::class,
         PlayerStatsEntity::class,
         RedeemCodeEntity::class,
-        TournamentEntity::class,
-        TournamentFixtureEntity::class,
-        LookingForEntity::class
+        LookingForEntity::class,
+        PostEntity::class,
+        FollowEntity::class,
+        ChatMessageEntity::class
     ],
-    version = 7,
+    version = 8,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -35,8 +36,10 @@ abstract class CricSagaDatabase : RoomDatabase() {
     abstract fun deliveryDao(): DeliveryDao
     abstract fun redeemCodeDao(): RedeemCodeDao
     abstract fun playerStatsDao(): PlayerStatsDao
-    abstract fun tournamentDao(): TournamentDao
     abstract fun discoverDao(): DiscoverDao
+    abstract fun postDao(): PostDao
+    abstract fun followDao(): FollowDao
+    abstract fun chatMessageDao(): ChatMessageDao
 
     companion object {
         @Volatile

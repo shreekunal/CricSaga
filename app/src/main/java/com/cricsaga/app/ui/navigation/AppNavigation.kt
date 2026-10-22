@@ -15,11 +15,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.NavType
 import androidx.navigation.compose.*
+import androidx.navigation.navArgument
 import com.cricsaga.app.data.local.AuthManager
 import com.cricsaga.app.data.local.AuthState
 import com.cricsaga.app.data.local.ProManager
+import com.cricsaga.app.data.local.entity.ChatMessageEntity
 import com.cricsaga.app.data.local.entity.LookingForEntity
+import com.cricsaga.app.data.local.entity.PostEntity
 import com.cricsaga.app.data.local.entity.TeamEntity
 import com.cricsaga.app.data.local.entity.UserEntity
 import com.cricsaga.app.domain.model.BallType
@@ -32,8 +36,12 @@ import com.cricsaga.app.ui.discover.DiscoverScreen
 import com.cricsaga.app.ui.discover.LookingForItem
 import com.cricsaga.app.ui.home.HomeScreen
 import com.cricsaga.app.ui.matches.MatchListScreen
+import com.cricsaga.app.ui.messages.ChatScreen
+import com.cricsaga.app.ui.messages.ConversationListScreen
+import com.cricsaga.app.ui.messages.ConversationSummary
 import com.cricsaga.app.ui.profile.PlayerDetailScreen
 import com.cricsaga.app.ui.profile.PlayerProfileScreen
+import com.cricsaga.app.ui.rankings.RankingsScreen
 import com.cricsaga.app.ui.redeem.RedeemCodeScreen
 import com.cricsaga.app.ui.scorecard.FullScorecardScreen
 import com.cricsaga.app.ui.scoring.ScoringScreen
@@ -51,7 +59,6 @@ import com.cricsaga.app.ui.setup.MatchSetupScreen
 import com.cricsaga.app.ui.setup.OpenersSelectionScreen
 import com.cricsaga.app.ui.teams.TeamDetailScreen
 import com.cricsaga.app.ui.teams.TeamsListScreen
-import com.cricsaga.app.ui.tournaments.TournamentListScreen
 import com.cricsaga.app.ui.theme.*
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -78,18 +85,29 @@ fun AppNavigation(
         ThemeMode.LIGHT -> false
         ThemeMode.SYSTEM -> isSystemDark
     }
+    val currentUserId = authManager.getCurrentUserId()
+    val currentUser by scoringViewModel.repository.getUserFlowById(currentUserId).collectAsState(initial = null)
+    val allUsers by scoringViewModel.repository.getAllUsers().collectAsState(initial = emptyList())
+    val allPosts by scoringViewModel.allPosts.collectAsState()
+    val followedUserIdsList by scoringViewModel.repository.getFollowingIds(currentUserId).collectAsState(initial = emptyList())
+    val followedUserIds = remember(followedUserIdsList) { followedUserIdsList.toSet() }
+    val unreadChatCount by scoringViewModel.repository.getUnreadChatCount(currentUserId).collectAsState(initial = 0)
+    val userMessages by scoringViewModel.repository.getAllMessagesForUser(currentUserId).collectAsState(initial = emptyList())
+
     var tempAuthPhone by remember { mutableStateOf("") }
     var tempGoogleName by remember { mutableStateOf("") }
     var tempGoogleEmail by remember { mutableStateOf("") }
     var selectedTeamForDetail by remember { mutableStateOf<TeamEntity?>(null) }
     var selectedUserForDetail by remember { mutableStateOf<UserEntity?>(null) }
+    var selectedChatUser by remember { mutableStateOf<UserEntity?>(null) }
+    var chatDraftText by remember { mutableStateOf("") }
 
     // 5 Primary Bottom Navigation Bar Tabs
     val bottomBarScreens = listOf(
         Screen.Home,
         Screen.Matches,
         Screen.Discover,
-        Screen.Tournaments,
+        Screen.Rankings,
         Screen.Profile
     )
     val showBottomBar = currentRoute in bottomBarScreens.map { it.route } && authState !is AuthState.Unauthenticated
@@ -231,14 +249,16 @@ fun AppNavigation(
                 )
             }
 
-            // Tab 1: Home Screen
+            // Tab 1: Home Cricket Feed Screen
             composable(Screen.Home.route) {
                 val matches by scoringViewModel.allMatches.collectAsState()
-                val topPerformers by scoringViewModel.topPerformers.collectAsState()
                 HomeScreen(
                     isPro = subscriptionState.isActive,
+                    currentUserId = currentUserId,
                     matches = matches,
-                    topPerformers = topPerformers,
+                    posts = allPosts,
+                    followedUserIds = followedUserIds,
+                    unreadMessageCount = unreadChatCount,
                     isDarkTheme = currentDark,
                     onThemeToggleClick = {
                         hapticManager.tapUiClick()
@@ -248,6 +268,14 @@ fun AppNavigation(
                         hapticManager.tapUiClick()
                         navController.navigate(Screen.Settings.route)
                     },
+                    onMessagesClick = {
+                        hapticManager.tapUiClick()
+                        navController.navigate(Screen.Messages.route)
+                    },
+                    onRankingsClick = {
+                        hapticManager.tapUiClick()
+                        navController.navigate(Screen.Rankings.route)
+                    },
                     onStartMatchClick = {
                         hapticManager.tapUiClick()
                         navController.navigate(Screen.MatchSetup.route)
@@ -255,10 +283,6 @@ fun AppNavigation(
                     onManageTeamsClick = {
                         hapticManager.tapUiClick()
                         navController.navigate(Screen.Teams.route)
-                    },
-                    onExploreTournamentsClick = {
-                        hapticManager.tapUiClick()
-                        navController.navigate(Screen.Tournaments.route)
                     },
                     onProBadgeClick = {
                         hapticManager.tapUiClick()
@@ -272,6 +296,59 @@ fun AppNavigation(
                             } else {
                                 navController.navigate(Screen.FullScorecard.route)
                             }
+                        }
+                    },
+                    onPlayerProfileClick = { authorId ->
+                        hapticManager.tapUiClick()
+                        coroutineScope.launch {
+                            val user = scoringViewModel.repository.getUserById(authorId)
+                            if (user != null) {
+                                selectedUserForDetail = user
+                                navController.navigate(Screen.PlayerDetail.route)
+                            }
+                        }
+                    },
+                    onToggleFollow = { authorId ->
+                        hapticManager.tapUiClick()
+                        if (followedUserIds.contains(authorId)) {
+                            scoringViewModel.unfollowPlayer(currentUserId, authorId)
+                        } else {
+                            scoringViewModel.followPlayer(currentUserId, authorId)
+                        }
+                    },
+                    onLikePostClick = { postId ->
+                        hapticManager.tapUiClick()
+                        scoringViewModel.toggleLikePost(postId)
+                    },
+                    onCreatePost = { content, perfTag, imgUri ->
+                        val author = currentUser
+                        val authorName = author?.fullName?.ifBlank { "Grassroots Player" } ?: "Grassroots Player"
+                        val authorRole = author?.playingRole?.name?.replace('_', ' ')?.lowercase()?.replaceFirstChar { it.uppercase() } ?: "All-Rounder"
+                        val authorCity = author?.city?.ifBlank { "Mumbai" } ?: "Mumbai"
+                        scoringViewModel.createPost(
+                            authorId = currentUserId,
+                            authorName = authorName,
+                            authorRole = authorRole,
+                            authorCity = authorCity,
+                            authorTeamName = null,
+                            authorAvatarUrl = null,
+                            content = content,
+                            imageUri = imgUri,
+                            linkedMatchId = null,
+                            performanceTag = perfTag
+                        )
+                    },
+                    onDirectMessageAuthor = { authorId, authorName ->
+                        hapticManager.tapUiClick()
+                        coroutineScope.launch {
+                            val user = scoringViewModel.repository.getUserById(authorId) ?: UserEntity(
+                                userId = authorId,
+                                phoneNumber = "",
+                                fullName = authorName
+                            )
+                            selectedChatUser = user
+                            chatDraftText = ""
+                            navController.navigate("chat/${authorId}")
                         }
                     }
                 )
@@ -299,7 +376,7 @@ fun AppNavigation(
                 )
             }
 
-            // Tab 3: Discover Grassroots Cricket Hub
+            // Tab 3: Discover Grassroots Cricket Hub (Player/Match Matchmaking)
             composable(Screen.Discover.route) {
                 val context = LocalContext.current
                 val lookingForEntities by scoringViewModel.lookingForPosts.collectAsState()
@@ -320,6 +397,10 @@ fun AppNavigation(
                 DiscoverScreen(
                     isPro = subscriptionState.isActive,
                     lookingForList = lookingForItems,
+                    onRankingsClick = {
+                        hapticManager.tapUiClick()
+                        navController.navigate(Screen.Rankings.route)
+                    },
                     onPostRequirement = { type, title, organizer, timing, location, note, phone ->
                         scoringViewModel.createLookingForPost(
                             type = type,
@@ -330,6 +411,20 @@ fun AppNavigation(
                             note = note,
                             contactPhone = phone
                         )
+                    },
+                    onContactDirectChat = { title, organizer, phone ->
+                        hapticManager.tapUiClick()
+                        coroutineScope.launch {
+                            val existingUser = if (phone.isNotBlank()) scoringViewModel.repository.getUserByPhone(phone) else null
+                            val chatUser = existingUser ?: UserEntity(
+                                userId = "lf_user_${phone.filter { it.isDigit() }.ifEmpty { organizer.lowercase().replace(" ", "_") }}",
+                                phoneNumber = phone,
+                                fullName = organizer
+                            )
+                            selectedChatUser = chatUser
+                            chatDraftText = "Hi $organizer! I saw your requirement on Discover for \"$title\". I am interested!"
+                            navController.navigate("chat/${chatUser.userId}")
+                        }
                     },
                     onContactWhatsApp = { phone, message ->
                         hapticManager.tapUiClick()
@@ -357,35 +452,105 @@ fun AppNavigation(
                 )
             }
 
-            // Tab 4: Tournaments & Points Table Center
-            composable(Screen.Tournaments.route) {
-                val tournaments by scoringViewModel.repository.getAllTournaments().collectAsState(initial = emptyList())
-                val matches by scoringViewModel.allMatches.collectAsState()
-                TournamentListScreen(
-                    isPro = subscriptionState.isActive,
-                    tournaments = tournaments,
-                    matches = matches,
-                    onCreateTournament = { name, overs, teams ->
+            // Tab 4: Top Players, Regional Rankings & Team Leaderboards Hub
+            composable(Screen.Rankings.route) {
+                val topBatters by scoringViewModel.topBatters.collectAsState()
+                val topBowlers by scoringViewModel.topBowlers.collectAsState()
+                val topAllRounders by scoringViewModel.topAllRounders.collectAsState()
+                val teamRankings by scoringViewModel.teamRankings.collectAsState()
+                val availableCities by scoringViewModel.availableCities.collectAsState()
+                val selectedCity by scoringViewModel.selectedRankingCity.collectAsState()
+
+                RankingsScreen(
+                    topBatters = topBatters,
+                    topBowlers = topBowlers,
+                    topAllRounders = topAllRounders,
+                    teamRankings = teamRankings,
+                    availableCities = availableCities,
+                    selectedCity = selectedCity,
+                    onSelectCity = { city ->
+                        hapticManager.tapUiClick()
+                        scoringViewModel.setSelectedRankingCity(city)
+                    },
+                    onPlayerClick = { playerId ->
+                        hapticManager.tapUiClick()
                         coroutineScope.launch {
-                            scoringViewModel.repository.createTournament(name, overs, teams)
+                            val user = scoringViewModel.repository.getUserById(playerId)
+                            if (user != null) {
+                                selectedUserForDetail = user
+                                navController.navigate(Screen.PlayerDetail.route)
+                            }
                         }
                     },
-                    onFixtureClick = { _, _, _ ->
+                    onTeamClick = { teamId ->
                         hapticManager.tapUiClick()
-                        navController.navigate(Screen.MatchSetup.route)
+                        coroutineScope.launch {
+                            val team = scoringViewModel.repository.getTeam(teamId)
+                            if (team != null) {
+                                selectedTeamForDetail = team
+                                navController.navigate(Screen.TeamDetail.route)
+                            }
+                        }
+                    }
+                )
+            }
+
+            // Flow: 1-on-1 Direct Messages Hub
+            composable(Screen.Messages.route) {
+                val conversations = remember(userMessages, allUsers, currentUserId) {
+                    val userMap = allUsers.associateBy { it.userId }
+                    val grouped = userMessages.groupBy { msg ->
+                        if (msg.senderId == currentUserId) msg.receiverId else msg.senderId
+                    }
+                    grouped.mapNotNull { (otherId, msgs) ->
+                        val latest = msgs.maxByOrNull { it.timestamp } ?: return@mapNotNull null
+                        val otherUser = userMap[otherId] ?: UserEntity(
+                            userId = otherId,
+                            phoneNumber = "",
+                            fullName = if (otherId.contains("rohit", ignoreCase = true)) "Rohit Sharma"
+                            else if (otherId.contains("jasprit", ignoreCase = true)) "Jasprit Bumrah"
+                            else if (otherId.contains("virat", ignoreCase = true)) "Virat Kohli"
+                            else "Grassroots Cricketer"
+                        )
+                        val unread = msgs.count { it.receiverId == currentUserId && !it.isRead }
+                        ConversationSummary(
+                            otherUser = otherUser,
+                            lastMessage = latest.text,
+                            lastTimestamp = latest.timestamp,
+                            isChallenge = latest.isChallenge,
+                            unreadCount = unread
+                        )
+                    }.sortedByDescending { it.lastTimestamp }
+                }
+
+                ConversationListScreen(
+                    conversations = conversations,
+                    allUsers = allUsers.filter { it.userId != currentUserId },
+                    onConversationClick = { user ->
+                        hapticManager.tapUiClick()
+                        selectedChatUser = user
+                        chatDraftText = ""
+                        navController.navigate("chat/${user.userId}")
                     }
                 )
             }
 
             // Tab 5: My Career Player Profile
             composable(Screen.Profile.route) {
-                val currentUserId = authManager.getCurrentUserId()
-                val currentUser by scoringViewModel.repository.getUserFlowById(currentUserId).collectAsState(initial = null)
                 val playerStats by scoringViewModel.repository.getPlayerStatsFlow(currentUserId).collectAsState(initial = null)
+                val followersCount by scoringViewModel.repository.getFollowersCount(currentUserId).collectAsState(initial = 0)
+                val followingCount by scoringViewModel.repository.getFollowingCount(currentUserId).collectAsState(initial = 0)
+                val myPosts = remember(allPosts, currentUserId) {
+                    allPosts.filter { it.authorId == currentUserId }
+                }
+
                 PlayerProfileScreen(
                     proManager = proManager,
                     currentUser = currentUser,
                     playerStats = playerStats,
+                    posts = myPosts,
+                    followersCount = followersCount,
+                    followingCount = followingCount,
                     onRedeemCodeClick = {
                         hapticManager.tapUiClick()
                         navController.navigate(Screen.Redeem.route)
@@ -472,15 +637,83 @@ fun AppNavigation(
             composable(Screen.PlayerDetail.route) {
                 selectedUserForDetail?.let { player ->
                     val stats by scoringViewModel.repository.getPlayerStatsFlow(player.userId).collectAsState(initial = null)
+                    val followersCount by scoringViewModel.repository.getFollowersCount(player.userId).collectAsState(initial = 0)
+                    val followingCount by scoringViewModel.repository.getFollowingCount(player.userId).collectAsState(initial = 0)
+                    val isFollowingUser by scoringViewModel.repository.isFollowing(currentUserId, player.userId).collectAsState(initial = false)
+                    val playerPosts = remember(allPosts, player.userId) {
+                        allPosts.filter { it.authorId == player.userId }
+                    }
+
                     PlayerDetailScreen(
                         user = player,
                         stats = stats,
+                        posts = playerPosts,
+                        isFollowing = isFollowingUser,
+                        followersCount = followersCount,
+                        followingCount = followingCount,
+                        onToggleFollow = {
+                            hapticManager.tapUiClick()
+                            if (isFollowingUser) {
+                                scoringViewModel.unfollowPlayer(currentUserId, player.userId)
+                            } else {
+                                scoringViewModel.followPlayer(currentUserId, player.userId)
+                            }
+                        },
+                        onMessageClick = {
+                            hapticManager.tapUiClick()
+                            selectedChatUser = player
+                            chatDraftText = ""
+                            navController.navigate("chat/${player.userId}")
+                        },
                         onBackClick = {
                             hapticManager.tapUiClick()
                             navController.popBackStack()
                         }
                     )
                 }
+            }
+
+            // Flow: 1-on-1 Direct Chat Screen
+            composable(
+                route = Screen.Chat.route,
+                arguments = listOf(navArgument("userId") { type = NavType.StringType })
+            ) { backStackEntry ->
+                val targetUserId = backStackEntry.arguments?.getString("userId") ?: ""
+                val chatUser = selectedChatUser ?: allUsers.find { it.userId == targetUserId } ?: UserEntity(
+                    userId = targetUserId,
+                    phoneNumber = "",
+                    fullName = "Cricketer"
+                )
+                val chatMessages by scoringViewModel.repository.getMessagesBetween(currentUserId, targetUserId).collectAsState(initial = emptyList())
+
+                LaunchedEffect(targetUserId) {
+                    scoringViewModel.repository.markConversationAsRead(targetUserId, currentUserId)
+                }
+
+                ChatScreen(
+                    currentUserId = currentUserId,
+                    recipientUser = chatUser,
+                    messages = chatMessages,
+                    initialDraftText = chatDraftText,
+                    onSendMessage = { text, isChallenge, challengeDetails ->
+                        scoringViewModel.sendChatMessage(
+                            senderId = currentUserId,
+                            receiverId = targetUserId,
+                            text = text,
+                            isChallenge = isChallenge,
+                            challengeDetails = challengeDetails
+                        )
+                    },
+                    onViewProfileClick = {
+                        hapticManager.tapUiClick()
+                        selectedUserForDetail = chatUser
+                        navController.navigate(Screen.PlayerDetail.route)
+                    },
+                    onBackClick = {
+                        hapticManager.tapUiClick()
+                        navController.popBackStack()
+                    }
+                )
             }
 
             // Flow: App Settings & Preferences
@@ -699,6 +932,30 @@ fun AppNavigation(
                             hapticManager.tapUiClick()
                             scoringViewModel.dismissMatchResultDialog()
                             navController.navigate(Screen.FullScorecard.route)
+                        },
+                        onShareToFeed = {
+                            hapticManager.tapUiClick()
+                            val author = currentUser
+                            val authorName = author?.fullName?.ifBlank { "Grassroots Captain" } ?: "Grassroots Captain"
+                            val authorRole = author?.playingRole?.name?.replace('_', ' ')?.lowercase()?.replaceFirstChar { it.uppercase() } ?: "Captain"
+                            val authorCity = author?.city?.ifBlank { "Mumbai" } ?: "Mumbai"
+                            val winnerName = uiState.matchResult?.winnerTeamName ?: "Our Team"
+                            val potm = uiState.selectedPlayerOfTheMatch?.fullName
+                            val potmTag = if (potm != null) "POTM: $potm" else null
+                            val content = "Match concluded! ${uiState.matchResult?.resultSummary ?: "$winnerName won the match!"}. What an intense grassroots contest!"
+                            scoringViewModel.createPost(
+                                authorId = currentUserId,
+                                authorName = authorName,
+                                authorRole = authorRole,
+                                authorCity = authorCity,
+                                authorTeamName = winnerName,
+                                authorAvatarUrl = null,
+                                content = content,
+                                imageUri = null,
+                                linkedMatchId = uiState.matchId,
+                                performanceTag = potmTag
+                            )
+                            Toast.makeText(context, "Match highlight shared to Cricket Feed!", Toast.LENGTH_SHORT).show()
                         },
                         onShareToWhatsApp = {
                             hapticManager.tapUiClick()

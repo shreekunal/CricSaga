@@ -5,6 +5,7 @@ import com.cricsaga.app.data.local.entity.*
 import com.cricsaga.app.domain.model.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.withContext
 import java.util.UUID
 
@@ -22,10 +23,246 @@ class MatchRepository(private val database: CricSagaDatabase) {
     private val matchDao = database.matchDao()
     private val inningsDao = database.inningsDao()
     private val deliveryDao = database.deliveryDao()
-    private val tournamentDao = database.tournamentDao()
     private val discoverDao = database.discoverDao()
+    private val postDao = database.postDao()
+    private val followDao = database.followDao()
+    private val chatMessageDao = database.chatMessageDao()
+    private val playerStatsDao = database.playerStatsDao()
 
     fun getAllMatches(): Flow<List<MatchEntity>> = matchDao.getAllMatches()
+
+    fun getTopBatters(cityFilter: String? = null): Flow<List<PlayerRankingItem>> =
+        combine(
+            playerStatsDao.getAllPlayerStats(),
+            userDao.getAllUsers(),
+            teamDao.getAllTeams(),
+            teamDao.getAllTeamMembers()
+        ) { statsList, users, teams, members ->
+            val userMap = users.associateBy { it.userId }
+            val teamMap = teams.associateBy { it.teamId }
+            val memberTeamMap = members.associate { it.userId to (teamMap[it.teamId]?.teamName ?: "Grassroots XI") }
+
+            statsList.filter { stat ->
+                val user = userMap[stat.userId]
+                val matchesCity = if (cityFilter.isNullOrBlank() || cityFilter.equals("All", ignoreCase = true) || cityFilter.equals("All Regions", ignoreCase = true)) {
+                    true
+                } else {
+                    user?.city.equals(cityFilter, ignoreCase = true)
+                }
+                matchesCity && (stat.runsScored > 0 || stat.matches > 0)
+            }.sortedWith(
+                compareByDescending<PlayerStatsEntity> { it.runsScored }
+                    .thenByDescending { it.battingAverage }
+                    .thenByDescending { it.strikeRate }
+            ).mapIndexed { index, stat ->
+                val user = userMap[stat.userId]
+                val name = user?.fullName ?: "Player"
+                val initials = name.split(" ")
+                    .mapNotNull { it.firstOrNull()?.toString() }
+                    .take(2)
+                    .joinToString("")
+                    .uppercase()
+                    .ifEmpty { "CR" }
+                val role = user?.playingRole?.name?.replace('_', ' ')?.lowercase()?.replaceFirstChar { it.uppercase() } ?: "Batter"
+                val teamName = memberTeamMap[stat.userId] ?: ((user?.city?.ifBlank { "Grassroots" } ?: "Grassroots") + " XI")
+
+                PlayerRankingItem(
+                    rank = index + 1,
+                    userId = stat.userId,
+                    playerName = name,
+                    initials = initials,
+                    role = role,
+                    teamName = teamName,
+                    city = user?.city?.ifBlank { "Mumbai" } ?: "Mumbai",
+                    matches = stat.matches,
+                    runs = stat.runsScored,
+                    innings = stat.innings,
+                    battingAverage = stat.battingAverage,
+                    strikeRate = stat.strikeRate,
+                    highestScore = stat.highestScore,
+                    fifties = stat.fifties,
+                    hundreds = stat.hundreds,
+                    fours = stat.fours,
+                    sixes = stat.sixes,
+                    isVerified = true
+                )
+            }
+        }
+
+    fun getTopBowlers(cityFilter: String? = null): Flow<List<PlayerRankingItem>> =
+        combine(
+            playerStatsDao.getAllPlayerStats(),
+            userDao.getAllUsers(),
+            teamDao.getAllTeams(),
+            teamDao.getAllTeamMembers()
+        ) { statsList, users, teams, members ->
+            val userMap = users.associateBy { it.userId }
+            val teamMap = teams.associateBy { it.teamId }
+            val memberTeamMap = members.associate { it.userId to (teamMap[it.teamId]?.teamName ?: "Grassroots XI") }
+
+            statsList.filter { stat ->
+                val user = userMap[stat.userId]
+                val matchesCity = if (cityFilter.isNullOrBlank() || cityFilter.equals("All", ignoreCase = true) || cityFilter.equals("All Regions", ignoreCase = true)) {
+                    true
+                } else {
+                    user?.city.equals(cityFilter, ignoreCase = true)
+                }
+                matchesCity && (stat.wicketsTaken > 0 || stat.legalBallsBowled > 0)
+            }.sortedWith(
+                compareByDescending<PlayerStatsEntity> { it.wicketsTaken }
+                    .thenBy { if (it.bowlingEconomy > 0) it.bowlingEconomy else 999.0 }
+                    .thenByDescending { it.maidens }
+            ).mapIndexed { index, stat ->
+                val user = userMap[stat.userId]
+                val name = user?.fullName ?: "Player"
+                val initials = name.split(" ")
+                    .mapNotNull { it.firstOrNull()?.toString() }
+                    .take(2)
+                    .joinToString("")
+                    .uppercase()
+                    .ifEmpty { "CR" }
+                val role = user?.playingRole?.name?.replace('_', ' ')?.lowercase()?.replaceFirstChar { it.uppercase() } ?: "Bowler"
+                val teamName = memberTeamMap[stat.userId] ?: ((user?.city?.ifBlank { "Grassroots" } ?: "Grassroots") + " XI")
+                val overs = (stat.legalBallsBowled / 6).toDouble() + ((stat.legalBallsBowled % 6).toDouble() * 0.1)
+
+                PlayerRankingItem(
+                    rank = index + 1,
+                    userId = stat.userId,
+                    playerName = name,
+                    initials = initials,
+                    role = role,
+                    teamName = teamName,
+                    city = user?.city?.ifBlank { "Mumbai" } ?: "Mumbai",
+                    matches = stat.matches,
+                    wickets = stat.wicketsTaken,
+                    oversBowled = overs,
+                    bowlingEconomy = stat.bowlingEconomy,
+                    maidens = stat.maidens,
+                    runsConceded = stat.runsConceded,
+                    isVerified = true
+                )
+            }
+        }
+
+    fun getTopAllRounders(cityFilter: String? = null): Flow<List<PlayerRankingItem>> =
+        combine(
+            playerStatsDao.getAllPlayerStats(),
+            userDao.getAllUsers(),
+            teamDao.getAllTeams(),
+            teamDao.getAllTeamMembers()
+        ) { statsList, users, teams, members ->
+            val userMap = users.associateBy { it.userId }
+            val teamMap = teams.associateBy { it.teamId }
+            val memberTeamMap = members.associate { it.userId to (teamMap[it.teamId]?.teamName ?: "Grassroots XI") }
+
+            statsList.filter { stat ->
+                val user = userMap[stat.userId]
+                val matchesCity = if (cityFilter.isNullOrBlank() || cityFilter.equals("All", ignoreCase = true) || cityFilter.equals("All Regions", ignoreCase = true)) {
+                    true
+                } else {
+                    user?.city.equals(cityFilter, ignoreCase = true)
+                }
+                matchesCity && (stat.runsScored > 0 || stat.wicketsTaken > 0)
+            }.map { stat ->
+                val mvp = (stat.runsScored * 1.0) + (stat.sixes * 2.0) + (stat.fours * 1.0) + (stat.wicketsTaken * 25.0) + (stat.maidens * 10.0) + (stat.catches * 10.0)
+                stat to mvp
+            }.sortedByDescending { it.second }
+            .mapIndexed { index, (stat, mvp) ->
+                val user = userMap[stat.userId]
+                val name = user?.fullName ?: "Player"
+                val initials = name.split(" ")
+                    .mapNotNull { it.firstOrNull()?.toString() }
+                    .take(2)
+                    .joinToString("")
+                    .uppercase()
+                    .ifEmpty { "CR" }
+                val role = user?.playingRole?.name?.replace('_', ' ')?.lowercase()?.replaceFirstChar { it.uppercase() } ?: "All-Rounder"
+                val teamName = memberTeamMap[stat.userId] ?: ((user?.city?.ifBlank { "Grassroots" } ?: "Grassroots") + " XI")
+                val overs = (stat.legalBallsBowled / 6).toDouble() + ((stat.legalBallsBowled % 6).toDouble() * 0.1)
+
+                PlayerRankingItem(
+                    rank = index + 1,
+                    userId = stat.userId,
+                    playerName = name,
+                    initials = initials,
+                    role = role,
+                    teamName = teamName,
+                    city = user?.city?.ifBlank { "Mumbai" } ?: "Mumbai",
+                    matches = stat.matches,
+                    runs = stat.runsScored,
+                    wickets = stat.wicketsTaken,
+                    oversBowled = overs,
+                    bowlingEconomy = stat.bowlingEconomy,
+                    strikeRate = stat.strikeRate,
+                    mvpPoints = mvp,
+                    isVerified = true
+                )
+            }
+        }
+
+    fun getTeamRankings(cityFilter: String? = null): Flow<List<TeamRankingItem>> =
+        combine(
+            teamDao.getAllTeams(),
+            matchDao.getAllMatches()
+        ) { teams, matches ->
+            val completedMatches = matches.filter { it.matchStatus == MatchStatus.COMPLETED }
+
+            teams.filter { team ->
+                if (cityFilter.isNullOrBlank() || cityFilter.equals("All", ignoreCase = true) || cityFilter.equals("All Regions", ignoreCase = true)) {
+                    true
+                } else {
+                    team.city.equals(cityFilter, ignoreCase = true)
+                }
+            }.map { team ->
+                val teamMatches = completedMatches.filter { it.teamAId == team.teamId || it.teamBId == team.teamId }
+                val played = teamMatches.size
+                val wins = teamMatches.count { it.winnerTeamId == team.teamId }
+                val losses = teamMatches.count { it.winnerTeamId != null && it.winnerTeamId != team.teamId }
+                val ties = teamMatches.count { it.winnerTeamId == null }
+                val winPct = if (played > 0) (wins.toDouble() / played.toDouble()) * 100.0 else 0.0
+                val points = (wins * 2) + (ties * 1)
+                val form = teamMatches.take(5).map { m ->
+                    if (m.winnerTeamId == team.teamId) MatchOutcome.WIN
+                    else if (m.winnerTeamId != null) MatchOutcome.LOSS
+                    else MatchOutcome.TIE
+                }
+
+                TeamRankingItem(
+                    rank = 0,
+                    teamId = team.teamId,
+                    teamName = team.teamName,
+                    shortCode = team.shortCode,
+                    city = team.city.ifBlank { "India" },
+                    matchesPlayed = played,
+                    wins = wins,
+                    losses = losses,
+                    ties = ties,
+                    winPercentage = winPct,
+                    points = points,
+                    recentForm = form
+                )
+            }.sortedWith(
+                compareByDescending<TeamRankingItem> { it.points }
+                    .thenByDescending { it.winPercentage }
+                    .thenByDescending { it.wins }
+            ).mapIndexed { index, item ->
+                item.copy(rank = index + 1)
+            }
+        }
+
+    fun getAvailableCities(): Flow<List<String>> =
+        combine(
+            userDao.getAllUsers(),
+            teamDao.getAllTeams()
+        ) { users, teams ->
+            val fromUsers = users.map { it.city.trim() }
+            val fromTeams = teams.map { it.city.trim() }
+            val allCities = (fromUsers + fromTeams)
+                .filter { it.isNotBlank() }
+                .distinct()
+                .sorted()
+            listOf("All Regions") + allCities
+        }
 
     suspend fun getMatch(matchId: String): MatchEntity? = withContext(Dispatchers.IO) {
         matchDao.getMatchById(matchId)
@@ -49,11 +286,101 @@ class MatchRepository(private val database: CricSagaDatabase) {
         deliveryDao.getDeliveriesListForInnings(inningsId)
     }
 
-    fun getAllTournaments(): Flow<List<TournamentEntity>> = tournamentDao.getAllTournaments()
-
-    fun getTournamentFixtures(tournamentId: String): Flow<List<TournamentFixtureEntity>> = tournamentDao.getFixturesForTournament(tournamentId)
-
     fun getAllLookingForPosts(): Flow<List<LookingForEntity>> = discoverDao.getAllPosts()
+
+    fun getAllPosts(): Flow<List<PostEntity>> = postDao.getAllPosts()
+
+    fun getFollowingFeed(currentUserId: String): Flow<List<PostEntity>> = postDao.getFollowingFeed(currentUserId)
+
+    fun getPostsByAuthor(authorId: String): Flow<List<PostEntity>> = postDao.getPostsByAuthor(authorId)
+
+    suspend fun createPost(
+        authorId: String,
+        authorName: String,
+        authorRole: String,
+        authorCity: String,
+        authorTeamName: String? = null,
+        authorAvatarUrl: String? = null,
+        content: String,
+        imageUri: String? = null,
+        linkedMatchId: String? = null,
+        performanceTag: String? = null
+    ): String = withContext(Dispatchers.IO) {
+        val postId = "post_${System.currentTimeMillis()}_${UUID.randomUUID().toString().take(6)}"
+        val post = PostEntity(
+            postId = postId,
+            authorId = authorId,
+            authorName = authorName,
+            authorRole = authorRole,
+            authorCity = authorCity,
+            authorTeamName = authorTeamName,
+            authorAvatarUrl = authorAvatarUrl,
+            content = content,
+            imageUri = imageUri,
+            linkedMatchId = linkedMatchId,
+            performanceTag = performanceTag,
+            createdAt = System.currentTimeMillis()
+        )
+        postDao.insertPost(post)
+        postId
+    }
+
+    suspend fun toggleLikePost(postId: String) = withContext(Dispatchers.IO) {
+        val post = postDao.getPostById(postId) ?: return@withContext
+        val newLiked = !post.isLikedByMe
+        val newCount = if (newLiked) post.likeCount + 1 else (post.likeCount - 1).coerceAtLeast(0)
+        postDao.updatePost(post.copy(isLikedByMe = newLiked, likeCount = newCount))
+    }
+
+    suspend fun followUser(followerId: String, followingId: String) = withContext(Dispatchers.IO) {
+        followDao.followUser(FollowEntity(followerId, followingId))
+    }
+
+    suspend fun unfollowUser(followerId: String, followingId: String) = withContext(Dispatchers.IO) {
+        followDao.unfollowUser(followerId, followingId)
+    }
+
+    fun isFollowing(followerId: String, followingId: String): Flow<Boolean> =
+        followDao.isFollowing(followerId, followingId)
+
+    fun getFollowersCount(userId: String): Flow<Int> = followDao.getFollowersCount(userId)
+
+    fun getFollowingCount(userId: String): Flow<Int> = followDao.getFollowingCount(userId)
+
+    fun getFollowingIds(userId: String): Flow<List<String>> = followDao.getFollowingIds(userId)
+
+    fun getMessagesBetween(userA: String, userB: String): Flow<List<ChatMessageEntity>> =
+        chatMessageDao.getMessagesBetween(userA, userB)
+
+    fun getAllMessagesForUser(userId: String): Flow<List<ChatMessageEntity>> =
+        chatMessageDao.getAllMessagesForUser(userId)
+
+    suspend fun sendChatMessage(
+        senderId: String,
+        receiverId: String,
+        text: String,
+        isChallenge: Boolean = false,
+        challengeDetails: String? = null
+    ): String = withContext(Dispatchers.IO) {
+        val messageId = "msg_${System.currentTimeMillis()}_${UUID.randomUUID().toString().take(6)}"
+        val message = ChatMessageEntity(
+            messageId = messageId,
+            senderId = senderId,
+            receiverId = receiverId,
+            text = text,
+            isChallenge = isChallenge,
+            challengeDetails = challengeDetails,
+            timestamp = System.currentTimeMillis()
+        )
+        chatMessageDao.insertMessage(message)
+        messageId
+    }
+
+    suspend fun markConversationAsRead(senderId: String, receiverId: String) = withContext(Dispatchers.IO) {
+        chatMessageDao.markAsRead(senderId, receiverId)
+    }
+
+    fun getUnreadChatCount(userId: String): Flow<Int> = chatMessageDao.getUnreadCount(userId)
 
     suspend fun createLookingForPost(
         type: String,
@@ -115,41 +442,81 @@ class MatchRepository(private val database: CricSagaDatabase) {
         }
     }
 
-    suspend fun createTournament(
-        name: String,
-        overs: Int = 20,
-        teams: List<String>,
-        city: String = "Mumbai"
-    ): String = withContext(Dispatchers.IO) {
-        val tournamentId = UUID.randomUUID().toString()
-        val tournament = TournamentEntity(
-            tournamentId = tournamentId,
-            name = name,
-            overs = overs,
-            city = city,
-            teamNamesCsv = teams.joinToString(", ")
-        )
-        tournamentDao.insertTournament(tournament)
+    suspend fun seedInitialSocialPostsAndMessagesIfEmpty(users: List<UserEntity>) = withContext(Dispatchers.IO) {
+        val rohit = users.find { it.fullName.contains("Rohit", ignoreCase = true) } ?: users.firstOrNull()
+        val jasprit = users.find { it.fullName.contains("Jasprit", ignoreCase = true) } ?: users.getOrNull(1)
+        val virat = users.find { it.fullName.contains("Virat", ignoreCase = true) } ?: users.getOrNull(2)
 
-        val fixtures = mutableListOf<TournamentFixtureEntity>()
-        for (i in teams.indices) {
-            for (j in i + 1 until teams.size) {
-                fixtures.add(
-                    TournamentFixtureEntity(
-                        fixtureId = UUID.randomUUID().toString(),
-                        tournamentId = tournamentId,
-                        stage = "Match ${fixtures.size + 1}",
-                        teamAName = teams[i],
-                        teamBName = teams[j],
-                        scheduledTime = "Scheduled"
-                    )
+        val initialPosts = listOf(
+            PostEntity(
+                postId = "post_seed_1",
+                authorId = rohit?.userId ?: "seed_rohit",
+                authorName = rohit?.fullName ?: "Rohit Sharma",
+                authorRole = "Top-Order Batter",
+                authorCity = "Mumbai",
+                authorTeamName = "Mumbai Warriors XI",
+                content = "Great morning match at Dadar today! The wicket had good bounce early on, but batting settled down nicely after the powerplay. Nothing beats grassroots weekend cricket.",
+                performanceTag = "54* (28) • 5x4, 3x6",
+                likeCount = 14,
+                commentCount = 3,
+                repostCount = 2,
+                createdAt = System.currentTimeMillis() - 3600000 * 2
+            ),
+            PostEntity(
+                postId = "post_seed_2",
+                authorId = jasprit?.userId ?: "seed_jasprit",
+                authorName = jasprit?.fullName ?: "Jasprit Bumrah",
+                authorRole = "Strike Fast Bowler",
+                authorCity = "Ahmedabad",
+                authorTeamName = "Apex Kings",
+                content = "Dialing in the yorkers at the turf nets tonight. Any team looking for an opening bowler or weekend fixture in the western suburbs? Drop a direct message!",
+                performanceTag = "3/14 (4.0) • 1 Maiden",
+                likeCount = 27,
+                commentCount = 8,
+                repostCount = 5,
+                createdAt = System.currentTimeMillis() - 3600000 * 5
+            ),
+            PostEntity(
+                postId = "post_seed_3",
+                authorId = virat?.userId ?: "seed_virat",
+                authorName = virat?.fullName ?: "Virat Kohli",
+                authorRole = "Anchor Batsman",
+                authorCity = "Delhi",
+                authorTeamName = "Delhi Challengers",
+                content = "Intensity on the ground is everything. High chase targets require composure and rotating strike on 1s and 2s. Box cricket teaches quick reflexes like nothing else.",
+                performanceTag = "68 (38) • Chased 142",
+                likeCount = 42,
+                commentCount = 12,
+                repostCount = 9,
+                createdAt = System.currentTimeMillis() - 3600000 * 12
+            )
+        )
+        postDao.insertPosts(initialPosts)
+
+        // Seed sample message between Jasprit and Rohit
+        if (rohit != null && jasprit != null) {
+            val sampleMessages = listOf(
+                ChatMessageEntity(
+                    messageId = "msg_seed_1",
+                    senderId = jasprit.userId,
+                    receiverId = rohit.userId,
+                    text = "Hey Rohit! Are you guys free this Saturday for an 8-over turf match at Apex Arena?",
+                    isChallenge = true,
+                    challengeDetails = "8 Overs • Tennis Ball • Apex Arena Turf • Saturday 8:00 PM",
+                    timestamp = System.currentTimeMillis() - 3600000 * 3,
+                    isRead = true
+                ),
+                ChatMessageEntity(
+                    messageId = "msg_seed_2",
+                    senderId = rohit.userId,
+                    receiverId = jasprit.userId,
+                    text = "Sounds good Jasprit! Count us in. We have 8 players confirmed.",
+                    timestamp = System.currentTimeMillis() - 3600000 * 2,
+                    isRead = true
                 )
-            }
+            )
+            chatMessageDao.insertMessages(sampleMessages)
         }
-        if (fixtures.isNotEmpty()) {
-            tournamentDao.insertFixtures(fixtures)
-        }
-        tournamentId
     }
 
     suspend fun createTeam(name: String, shortCode: String, city: String): String = withContext(Dispatchers.IO) {
@@ -433,12 +800,14 @@ class MatchRepository(private val database: CricSagaDatabase) {
         val matchId = "match_stage1"
         val inningsId = "innings_stage1_1"
 
-        val p1 = UserEntity("user_rohit", "9876543210", "Rohit Sharma", playingRole = PlayingRole.BATSMAN, battingStyle = BattingStyle.RIGHT_HAND)
-        val p2 = UserEntity("user_virat", "9876543211", "Virat Kohli", playingRole = PlayingRole.BATSMAN, battingStyle = BattingStyle.RIGHT_HAND)
-        val p3 = UserEntity("user_bumrah", "9876543212", "Jasprit Bumrah", playingRole = PlayingRole.BOWLER, bowlingStyle = BowlingStyle.RIGHT_ARM_FAST)
-        val p4 = UserEntity("user_surya", "9876543213", "Suryakumar Yadav", playingRole = PlayingRole.BATSMAN, battingStyle = BattingStyle.RIGHT_HAND)
-        val p5 = UserEntity("user_hardik", "9876543214", "Hardik Pandya", playingRole = PlayingRole.ALL_ROUNDER, battingStyle = BattingStyle.RIGHT_HAND)
-        val p6 = UserEntity("user_shami", "9876543215", "Mohammed Shami", playingRole = PlayingRole.BOWLER, bowlingStyle = BowlingStyle.RIGHT_ARM_FAST)
+        val p1 = UserEntity("user_rohit", "9876543210", "Rohit Sharma", playingRole = PlayingRole.BATSMAN, battingStyle = BattingStyle.RIGHT_HAND, city = "Mumbai", jerseyNumber = "45")
+        val p2 = UserEntity("user_virat", "9876543211", "Virat Kohli", playingRole = PlayingRole.BATSMAN, battingStyle = BattingStyle.RIGHT_HAND, city = "Delhi", jerseyNumber = "18")
+        val p3 = UserEntity("user_bumrah", "9876543212", "Jasprit Bumrah", playingRole = PlayingRole.BOWLER, bowlingStyle = BowlingStyle.RIGHT_ARM_FAST, city = "Ahmedabad", jerseyNumber = "93")
+        val p4 = UserEntity("user_surya", "9876543213", "Suryakumar Yadav", playingRole = PlayingRole.BATSMAN, battingStyle = BattingStyle.RIGHT_HAND, city = "Mumbai", jerseyNumber = "63")
+        val p5 = UserEntity("user_hardik", "9876543214", "Hardik Pandya", playingRole = PlayingRole.ALL_ROUNDER, battingStyle = BattingStyle.RIGHT_HAND, city = "Vadodara", jerseyNumber = "33")
+        val p6 = UserEntity("user_shami", "9876543215", "Mohammed Shami", playingRole = PlayingRole.BOWLER, bowlingStyle = BowlingStyle.RIGHT_ARM_FAST, city = "Kolkata", jerseyNumber = "11")
+        val p7 = UserEntity("user_kl", "9876543216", "KL Rahul", playingRole = PlayingRole.BATSMAN, battingStyle = BattingStyle.RIGHT_HAND, city = "Bengaluru", jerseyNumber = "1")
+        val p8 = UserEntity("user_pant", "9876543217", "Rishabh Pant", playingRole = PlayingRole.WICKET_KEEPER, battingStyle = BattingStyle.LEFT_HAND, city = "Delhi", jerseyNumber = "17")
 
         val existingMatch = matchDao.getMatchById(matchId)
         val existingTeamA = teamDao.getTeamById(teamAId)
@@ -462,22 +831,213 @@ class MatchRepository(private val database: CricSagaDatabase) {
             )
         }
 
-        userDao.insertUsers(listOf(p1, p2, p3, p4, p5, p6))
+        userDao.insertUsers(listOf(p1, p2, p3, p4, p5, p6, p7, p8))
 
-        val teamA = TeamEntity(teamAId, "Warriors", "WAR", "Mumbai", captainId = p1.userId)
-        val teamB = TeamEntity(teamBId, "Tigers", "TIG", "Delhi", captainId = p3.userId)
+        val teamA = TeamEntity(teamAId, "Mumbai Warriors", "WAR", "Mumbai", captainId = p1.userId)
+        val teamB = TeamEntity(teamBId, "Delhi Tigers", "TIG", "Delhi", captainId = p2.userId)
+        val teamC = TeamEntity("team_kings", "Apex Kings", "KNG", "Ahmedabad", captainId = p3.userId)
+        val teamD = TeamEntity("team_blasters", "Bangalore Blasters", "BLR", "Bengaluru", captainId = p7.userId)
 
-        teamDao.insertTeams(listOf(teamA, teamB))
+        teamDao.insertTeams(listOf(teamA, teamB, teamC, teamD))
 
         // Populate team rosters
         teamDao.insertTeamMembers(listOf(
             TeamMemberEntity(teamAId, p1.userId, 45),
-            TeamMemberEntity(teamAId, p2.userId, 18),
             TeamMemberEntity(teamAId, p4.userId, 63),
-            TeamMemberEntity(teamBId, p3.userId, 93),
-            TeamMemberEntity(teamBId, p5.userId, 33),
-            TeamMemberEntity(teamBId, p6.userId, 11)
+            TeamMemberEntity(teamAId, p5.userId, 33),
+            TeamMemberEntity(teamBId, p2.userId, 18),
+            TeamMemberEntity(teamBId, p6.userId, 11),
+            TeamMemberEntity(teamBId, p8.userId, 17),
+            TeamMemberEntity(teamC.teamId, p3.userId, 93),
+            TeamMemberEntity(teamC.teamId, p5.userId, 33),
+            TeamMemberEntity(teamD.teamId, p7.userId, 1),
+            TeamMemberEntity(teamD.teamId, p8.userId, 17)
         ))
+
+        // Seed realistic starter career stats
+        val initialStats = listOf(
+            PlayerStatsEntity(
+                userId = p2.userId,
+                matches = 10,
+                innings = 9,
+                runsScored = 482,
+                ballsFaced = 312,
+                highestScore = 102,
+                fifties = 4,
+                hundreds = 1,
+                fours = 46,
+                sixes = 14
+            ),
+            PlayerStatsEntity(
+                userId = p1.userId,
+                matches = 9,
+                innings = 9,
+                runsScored = 420,
+                ballsFaced = 265,
+                highestScore = 89,
+                fifties = 3,
+                hundreds = 0,
+                fours = 42,
+                sixes = 18
+            ),
+            PlayerStatsEntity(
+                userId = p4.userId,
+                matches = 8,
+                innings = 8,
+                runsScored = 395,
+                ballsFaced = 225,
+                highestScore = 76,
+                fifties = 3,
+                hundreds = 0,
+                fours = 34,
+                sixes = 22
+            ),
+            PlayerStatsEntity(
+                userId = p7.userId,
+                matches = 8,
+                innings = 8,
+                runsScored = 350,
+                ballsFaced = 240,
+                highestScore = 84,
+                fifties = 3,
+                hundreds = 0,
+                fours = 30,
+                sixes = 10
+            ),
+            PlayerStatsEntity(
+                userId = p8.userId,
+                matches = 7,
+                innings = 7,
+                runsScored = 295,
+                ballsFaced = 185,
+                highestScore = 78,
+                fifties = 2,
+                hundreds = 0,
+                fours = 28,
+                sixes = 12
+            ),
+            PlayerStatsEntity(
+                userId = p5.userId,
+                matches = 8,
+                innings = 7,
+                runsScored = 280,
+                ballsFaced = 160,
+                highestScore = 65,
+                fifties = 2,
+                hundreds = 0,
+                fours = 20,
+                sixes = 16,
+                wicketsTaken = 14,
+                legalBallsBowled = 168,
+                runsConceded = 196,
+                maidens = 1
+            ),
+            PlayerStatsEntity(
+                userId = p3.userId,
+                matches = 9,
+                innings = 3,
+                runsScored = 18,
+                ballsFaced = 15,
+                highestScore = 12,
+                wicketsTaken = 24,
+                legalBallsBowled = 204,
+                runsConceded = 176,
+                maidens = 4
+            ),
+            PlayerStatsEntity(
+                userId = p6.userId,
+                matches = 8,
+                innings = 2,
+                runsScored = 12,
+                ballsFaced = 10,
+                highestScore = 8,
+                wicketsTaken = 19,
+                legalBallsBowled = 180,
+                runsConceded = 185,
+                maidens = 3
+            )
+        )
+        playerStatsDao.insertAll(initialStats)
+
+        // Seed finished tournament/league matches for team rankings
+        val historicalMatches = listOf(
+            MatchEntity(
+                matchId = "match_hist_1",
+                matchTitle = "Mumbai Warriors vs Delhi Tigers",
+                teamAId = teamAId,
+                teamBId = teamBId,
+                totalOvers = 20,
+                ballType = BallType.TENNIS_LIGHT,
+                tossWinnerTeamId = teamAId,
+                tossDecision = TossDecision.BAT,
+                matchStatus = MatchStatus.COMPLETED,
+                winnerTeamId = teamAId,
+                resultSummary = "Mumbai Warriors won by 18 runs",
+                playerOfTheMatchId = p1.userId,
+                createdAt = System.currentTimeMillis() - 86400000L * 4
+            ),
+            MatchEntity(
+                matchId = "match_hist_2",
+                matchTitle = "Mumbai Warriors vs Apex Kings",
+                teamAId = teamAId,
+                teamBId = teamC.teamId,
+                totalOvers = 20,
+                ballType = BallType.TENNIS_LIGHT,
+                tossWinnerTeamId = teamC.teamId,
+                tossDecision = TossDecision.BAT,
+                matchStatus = MatchStatus.COMPLETED,
+                winnerTeamId = teamAId,
+                resultSummary = "Mumbai Warriors won by 4 wickets",
+                playerOfTheMatchId = p4.userId,
+                createdAt = System.currentTimeMillis() - 86400000L * 3
+            ),
+            MatchEntity(
+                matchId = "match_hist_3",
+                matchTitle = "Delhi Tigers vs Bangalore Blasters",
+                teamAId = teamBId,
+                teamBId = teamD.teamId,
+                totalOvers = 20,
+                ballType = BallType.TENNIS_LIGHT,
+                tossWinnerTeamId = teamBId,
+                tossDecision = TossDecision.BAT,
+                matchStatus = MatchStatus.COMPLETED,
+                winnerTeamId = teamBId,
+                resultSummary = "Delhi Tigers won by 24 runs",
+                playerOfTheMatchId = p2.userId,
+                createdAt = System.currentTimeMillis() - 86400000L * 2
+            ),
+            MatchEntity(
+                matchId = "match_hist_4",
+                matchTitle = "Apex Kings vs Bangalore Blasters",
+                teamAId = teamC.teamId,
+                teamBId = teamD.teamId,
+                totalOvers = 20,
+                ballType = BallType.TENNIS_LIGHT,
+                tossWinnerTeamId = teamD.teamId,
+                tossDecision = TossDecision.BAT,
+                matchStatus = MatchStatus.COMPLETED,
+                winnerTeamId = teamC.teamId,
+                resultSummary = "Apex Kings won by 5 wickets",
+                playerOfTheMatchId = p3.userId,
+                createdAt = System.currentTimeMillis() - 86400000L * 1
+            ),
+            MatchEntity(
+                matchId = "match_hist_5",
+                matchTitle = "Mumbai Warriors vs Bangalore Blasters",
+                teamAId = teamAId,
+                teamBId = teamD.teamId,
+                totalOvers = 20,
+                ballType = BallType.TENNIS_LIGHT,
+                tossWinnerTeamId = teamAId,
+                tossDecision = TossDecision.BAT,
+                matchStatus = MatchStatus.COMPLETED,
+                winnerTeamId = teamD.teamId,
+                resultSummary = "Bangalore Blasters won by 6 wickets",
+                playerOfTheMatchId = p7.userId,
+                createdAt = System.currentTimeMillis() - 43200000L
+            )
+        )
+        historicalMatches.forEach { matchDao.insertMatch(it) }
 
         val match = MatchEntity(
             matchId = matchId,
@@ -504,6 +1064,8 @@ class MatchRepository(private val database: CricSagaDatabase) {
             targetRuns = null
         )
         inningsDao.insertInnings(innings)
+
+        seedInitialSocialPostsAndMessagesIfEmpty(listOf(p1, p2, p3, p4))
 
         SeededMatchData(
             matchId = matchId,
