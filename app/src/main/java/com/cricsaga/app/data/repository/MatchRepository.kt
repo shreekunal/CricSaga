@@ -2,6 +2,7 @@ package com.cricsaga.app.data.repository
 
 import com.cricsaga.app.data.local.CricSagaDatabase
 import com.cricsaga.app.data.local.entity.*
+import com.cricsaga.app.data.remote.SupabaseClient
 import com.cricsaga.app.domain.model.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -337,6 +338,9 @@ class MatchRepository(private val database: CricSagaDatabase) {
             createdAt = System.currentTimeMillis()
         )
         postDao.insertPost(post)
+        try {
+            SupabaseClient.createPost(post)
+        } catch (_: Exception) {}
         postId
     }
 
@@ -598,6 +602,9 @@ class MatchRepository(private val database: CricSagaDatabase) {
         val teamId = UUID.randomUUID().toString()
         val team = TeamEntity(teamId = teamId, teamName = name, shortCode = shortCode, city = city)
         teamDao.insertTeam(team)
+        try {
+            SupabaseClient.createTeam(team)
+        } catch (_: Exception) {}
 
         val defaultRoster = listOf(
             Triple("Batter 1", PlayingRole.BATSMAN, "07"),
@@ -720,6 +727,9 @@ class MatchRepository(private val database: CricSagaDatabase) {
             targetRuns = null
         )
         inningsDao.insertInnings(innings)
+        try {
+            SupabaseClient.createMatch(match, innings)
+        } catch (_: Exception) {}
 
         MatchCreationResult(
             matchId = matchId,
@@ -746,6 +756,9 @@ class MatchRepository(private val database: CricSagaDatabase) {
                 )
             )
         }
+        try {
+            SupabaseClient.recordDelivery(delivery, newTotalRuns, newTotalWickets, newTotalBalls)
+        } catch (_: Exception) {}
     }
 
     suspend fun undoLastDelivery(
@@ -825,6 +838,9 @@ class MatchRepository(private val database: CricSagaDatabase) {
 
     suspend fun insertUser(user: UserEntity) = withContext(Dispatchers.IO) {
         userDao.insertUser(user)
+        try {
+            SupabaseClient.signUpUser(user)
+        } catch (_: Exception) {}
     }
 
     suspend fun updateUser(user: UserEntity) = withContext(Dispatchers.IO) {

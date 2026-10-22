@@ -21,6 +21,7 @@ import androidx.navigation.navArgument
 import com.cricsaga.app.data.local.AuthManager
 import com.cricsaga.app.data.local.AuthState
 import com.cricsaga.app.data.local.ProManager
+import com.cricsaga.app.data.remote.SupabaseClient
 import com.cricsaga.app.data.local.entity.ChatMessageEntity
 import com.cricsaga.app.data.local.entity.LookingForEntity
 import com.cricsaga.app.data.local.entity.PostEntity
@@ -225,16 +226,27 @@ fun AppNavigation(
                 PhoneLoginScreen(
                     onSignIn = { phone, password, onError ->
                         coroutineScope.launch {
-                            val user = scoringViewModel.repository.authenticateUser(phone, password)
+                            val cleanPhone = phone.filter { it.isDigit() }.takeLast(10)
+                            // 1. Authenticate against Supabase central database
+                            val remoteAuth = SupabaseClient.authenticateUser(cleanPhone, password)
+                            val user = if (remoteAuth.isSuccess && remoteAuth.getOrNull() != null) {
+                                val remoteUser = remoteAuth.getOrNull()!!
+                                scoringViewModel.repository.insertUser(remoteUser)
+                                remoteUser
+                            } else {
+                                // Fallback to local Room SQLite cache (offline support)
+                                scoringViewModel.repository.authenticateUser(phone, password)
+                                    ?: scoringViewModel.repository.authenticateUser(cleanPhone, password)
+                            }
+
                             if (user != null) {
                                 authManager.setLoggedIn(user.userId, user.phoneNumber)
                                 navController.navigate(Screen.Home.route) {
                                     popUpTo(0) { inclusive = true }
                                 }
                             } else {
-                                val cleanPhone = phone.filter { it.isDigit() }.takeLast(10)
                                 val existing = scoringViewModel.repository.getUserByPhone(cleanPhone)
-                                    ?: scoringViewModel.repository.getUserByPhone(phone)
+                                    ?: SupabaseClient.getUserByPhone(cleanPhone).getOrNull()
                                 if (existing != null) {
                                     onError("Incorrect password. Please try again.")
                                 } else {
@@ -246,9 +258,11 @@ fun AppNavigation(
                     onSignUp = { fullName, phone, password, onError ->
                         coroutineScope.launch {
                             val cleanPhone = phone.filter { it.isDigit() }.takeLast(10)
-                            val existing = scoringViewModel.repository.getUserByPhone(cleanPhone)
-                                ?: scoringViewModel.repository.getUserByPhone(phone)
-                            if (existing != null) {
+                            // Check both remote Supabase and local cache
+                            val remoteExisting = SupabaseClient.getUserByPhone(cleanPhone).getOrNull()
+                            val localExisting = scoringViewModel.repository.getUserByPhone(cleanPhone)
+
+                            if (remoteExisting != null || localExisting != null) {
                                 onError("An account already exists with this phone number. Please Sign In.")
                             } else {
                                 val newUserId = "user_${cleanPhone}"
@@ -262,6 +276,9 @@ fun AppNavigation(
                                     bowlingStyle = com.cricsaga.app.domain.model.BowlingStyle.RIGHT_ARM_MEDIUM,
                                     city = "Mumbai"
                                 )
+                                // Save to Supabase Central Database
+                                SupabaseClient.signUpUser(newUser)
+                                // Save to local Room Database
                                 scoringViewModel.repository.insertUser(newUser)
                                 authManager.setLoggedIn(newUserId, cleanPhone)
                                 navController.navigate(Screen.Home.route) {

@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CricSaga Admin Portal</title>
+    <meta name="description" content="Central administration dashboard for CricSaga user management and Pro tier promotion.">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        pitch: {
+                            dark: '#0B0F19',
+                            card: '#151C2C',
+                            border: '#2A3650',
+                            green: '#059669',
+                            greenHover: '#10B981',
+                            amber: '#F59E0B',
+                            crimson: '#E11D48'
+                        }
+                    },
+                    fontFamily: {
+                        condensed: ['"Barlow Condensed"', 'sans-serif'],
+                        sans: ['"DM Sans"', 'sans-serif']
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { font-family: 'DM Sans', sans-serif; background-color: #0B0F19; color: #F8FAFC; }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+    <!-- Top Navigation Bar -->
+    <header class="bg-[#151C2C] border-b border-[#2A3650] px-6 py-4 flex items-center justify-between">
+        <div class="flex items-center space-x-3">
+            <div class="w-9 h-9 bg-pitch-crimson rounded-lg flex items-center justify-center font-condensed font-extrabold text-white text-xl">
+                CS
+            </div>
+            <div>
+                <span class="font-condensed font-extrabold text-2xl tracking-wider text-white">CRICSAGA</span>
+                <span class="text-xs bg-[#2A3650] text-gray-300 px-2 py-0.5 rounded ml-2 uppercase font-mono">Central Admin</span>
+            </div>
+        </div>
+        <div class="flex items-center space-x-4">
+            <span class="inline-flex items-center gap-1.5 text-xs text-pitch-green bg-pitch-green/10 border border-pitch-green/30 px-3 py-1 rounded-full font-medium">
+                <span class="w-2 h-2 rounded-full bg-pitch-green animate-pulse"></span>
+                Connected: wyycmghdkcgdmoaaleki
+            </span>
+            <button onclick="refreshAllData()" class="bg-[#2A3650] hover:bg-[#374563] text-sm text-white px-3 py-1.5 rounded-lg transition font-medium">
+                Refresh
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="flex-1 max-w-7xl w-full mx-auto p-6 space-y-6">
+
+        <!-- Metrics Overview Grid -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div class="bg-[#151C2C] border border-[#2A3650] rounded-xl p-5">
+                <div class="text-gray-400 text-xs font-semibold uppercase tracking-wider">Total Users</div>
+                <div id="statTotalUsers" class="font-condensed text-4xl font-bold text-white mt-1">--</div>
+                <div class="text-xs text-gray-400 mt-1">Grassroots players registered</div>
+            </div>
+            <div class="bg-[#151C2C] border border-[#2A3650] rounded-xl p-5">
+                <div class="text-gray-400 text-xs font-semibold uppercase tracking-wider">Pro Members</div>
+                <div id="statProUsers" class="font-condensed text-4xl font-bold text-pitch-amber mt-1">--</div>
+                <div class="text-xs text-gray-400 mt-1">Active paid subscriptions</div>
+            </div>
+            <div class="bg-[#151C2C] border border-[#2A3650] rounded-xl p-5">
+                <div class="text-gray-400 text-xs font-semibold uppercase tracking-wider">Total Matches</div>
+                <div id="statTotalMatches" class="font-condensed text-4xl font-bold text-pitch-green mt-1">--</div>
+                <div class="text-xs text-gray-400 mt-1">Tournaments & club matches</div>
+            </div>
+            <div class="bg-[#151C2C] border border-[#2A3650] rounded-xl p-5">
+                <div class="text-gray-400 text-xs font-semibold uppercase tracking-wider">Total Teams</div>
+                <div id="statTotalTeams" class="font-condensed text-4xl font-bold text-white mt-1">--</div>
+                <div class="text-xs text-gray-400 mt-1">Squads in central database</div>
+            </div>
+        </div>
+
+        <!-- Users Table & Pro Management -->
+        <div class="bg-[#151C2C] border border-[#2A3650] rounded-xl overflow-hidden shadow-lg">
+            <div class="px-6 py-4 border-b border-[#2A3650] flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                <div>
+                    <h2 class="font-condensed text-xl font-bold text-white uppercase tracking-wide">Player Directory & Pro Management</h2>
+                    <p class="text-xs text-gray-400 mt-0.5">Promote users to CricSaga Pro, manage memberships, and search accounts.</p>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <input 
+                        type="text" 
+                        id="userSearchInput" 
+                        placeholder="Search phone or name..." 
+                        oninput="filterUsers()"
+                        class="bg-[#0B0F19] border border-[#2A3650] text-sm text-white px-3 py-1.5 rounded-lg focus:outline-none focus:border-pitch-green w-64"
+                    />
+                </div>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-[#0B0F19]/50 text-gray-400 text-xs uppercase tracking-wider border-b border-[#2A3650]">
+                            <th class="py-3 px-6">Player Name</th>
+                            <th class="py-3 px-6">Phone Number</th>
+                            <th class="py-3 px-6">Role / City</th>
+                            <th class="py-3 px-6">Pro Status</th>
+                            <th class="py-3 px-6 text-right">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="userTableBody" class="divide-y divide-[#2A3650] text-sm">
+                        <tr>
+                            <td colspan="5" class="py-8 text-center text-gray-400">Loading user data from central database...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Matches & Teams Section -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <!-- Matches Overview -->
+            <div class="bg-[#151C2C] border border-[#2A3650] rounded-xl p-5">
+                <h3 class="font-condensed text-lg font-bold text-white uppercase tracking-wide mb-3">Recent Matches</h3>
+                <div id="matchesContainer" class="space-y-2 text-sm text-gray-300">
+                    <div class="py-4 text-center text-gray-500">Loading match records...</div>
+                </div>
+            </div>
+
+            <!-- Teams Overview -->
+            <div class="bg-[#151C2C] border border-[#2A3650] rounded-xl p-5">
+                <h3 class="font-condensed text-lg font-bold text-white uppercase tracking-wide mb-3">Registered Teams</h3>
+                <div id="teamsContainer" class="space-y-2 text-sm text-gray-300">
+                    <div class="py-4 text-center text-gray-500">Loading registered squads...</div>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Pro Upgrade Modal -->
+    <div id="proModal" class="fixed inset-0 bg-black/75 flex items-center justify-center p-4 hidden z-50">
+        <div class="bg-[#151C2C] border border-[#2A3650] rounded-xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+            <h3 class="font-condensed text-2xl font-bold text-white uppercase">Assign Pro Membership</h3>
+            <p id="proModalSubtitle" class="text-sm text-gray-400">Promote user to CricSaga Pro tier.</p>
+            
+            <div class="space-y-2">
+                <label class="block text-xs uppercase font-semibold text-gray-400">Select Pro Tier</label>
+                <div class="space-y-2">
+                    <label class="flex items-center p-3 bg-[#0B0F19] border border-[#2A3650] rounded-lg cursor-pointer hover:border-pitch-green">
+                        <input type="radio" name="proTierRadio" value="ONE_MONTH" checked class="text-pitch-green focus:ring-0">
+                        <div class="ml-3">
+                            <div class="text-sm font-bold text-white">1 Month Access — ₹99</div>
+                            <div class="text-xs text-gray-400">Valid for 30 calendar days</div>
+                        </div>
+                    </label>
+                    <label class="flex items-center p-3 bg-[#0B0F19] border border-[#2A3650] rounded-lg cursor-pointer hover:border-pitch-green">
+                        <input type="radio" name="proTierRadio" value="ONE_YEAR" class="text-pitch-green focus:ring-0">
+                        <div class="ml-3">
+                            <div class="text-sm font-bold text-pitch-amber">1 Year Access — ₹199 (Popular)</div>
+                            <div class="text-xs text-gray-400">Valid for 365 calendar days</div>
+                        </div>
+                    </label>
+                    <label class="flex items-center p-3 bg-[#0B0F19] border border-[#2A3650] rounded-lg cursor-pointer hover:border-pitch-green">
+                        <input type="radio" name="proTierRadio" value="LIFETIME" class="text-pitch-green focus:ring-0">
+                        <div class="ml-3">
+                            <div class="text-sm font-bold text-pitch-green">Lifetime VIP — ₹1,999</div>
+                            <div class="text-xs text-gray-400">Permanent access with zero expiration</div>
+                        </div>
+                    </label>
+                </div>
+            </div>
+
+            <div class="flex justify-end space-x-3 pt-3">
+                <button onclick="closeProModal()" class="px-4 py-2 bg-[#2A3650] hover:bg-[#374563] text-sm text-gray-300 rounded-lg">Cancel</button>
+                <button onclick="confirmProUpgrade()" class="px-5 py-2 bg-pitch-green hover:bg-pitch-greenHover text-sm font-bold text-white rounded-lg">Confirm Pro Upgrade</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Client Script -->
+    <script>
+        const SUPABASE_URL = "https://wyycmghdkcgdmoaaleki.supabase.co/rest/v1";
+        const SUPABASE_KEY = "sb_secret_NbYbuHhvgmyKi9Vgt1A9PA_TfNI04-K";
+
+        let allUsers = [];
+        let selectedUserId = null;
+
+        const headers = {
+            "apikey": SUPABASE_KEY,
+            "Authorization": "Bearer " + SUPABASE_KEY,
+            "Content-Type": "application/json",
+            "Prefer": "return=representation"
+        };
+
+        async function fetchJson(endpoint, options = {}) {
+            const res = await fetch(`${SUPABASE_URL}/${endpoint}`, {
+                ...options,
+                headers: { ...headers, ...(options.headers || {}) }
+            });
+            if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+            return res.json();
+        }
+
+        async function loadUsers() {
+            try {
+                allUsers = await fetchJson("users?order=created_at.desc&select=*");
+                document.getElementById('statTotalUsers').innerText = allUsers.length;
+                const proCount = allUsers.filter(u => u.is_pro).length;
+                document.getElementById('statProUsers').innerText = proCount;
+                renderUsers(allUsers);
+            } catch (err) {
+                console.error("Failed to load users:", err);
+                document.getElementById('userTableBody').innerHTML = `
+                    <tr><td colspan="5" class="py-6 text-center text-red-400">Error loading users from Supabase: ${err.message}</td></tr>
+                `;
+            }
+        }
+
+        async function loadMatches() {
+            try {
+                const matches = await fetchJson("matches?order=created_at.desc&limit=5&select=*");
+                document.getElementById('statTotalMatches').innerText = matches.length;
+                const container = document.getElementById('matchesContainer');
+                if (matches.length === 0) {
+                    container.innerHTML = '<div class="py-4 text-center text-gray-500">No matches scored yet.</div>';
+                    return;
+                }
+                container.innerHTML = matches.map(m => `
+                    <div class="flex items-center justify-between p-3 bg-[#0B0F19] border border-[#2A3650] rounded-lg">
+                        <div>
+                            <div class="font-bold text-white">${escapeHtml(m.match_title)}</div>
+                            <div class="text-xs text-gray-400">${m.total_overs} Overs • ${m.ball_type}</div>
+                        </div>
+                        <span class="text-xs px-2 py-0.5 rounded font-mono ${m.match_status === 'LIVE' ? 'bg-pitch-green/20 text-pitch-green border border-pitch-green/40' : 'bg-[#2A3650] text-gray-300'}">
+                            ${m.match_status}
+                        </span>
+                    </div>
+                `).join('');
+            } catch (err) {
+                console.error("Failed to load matches:", err);
+            }
+        }
+
+        async function loadTeams() {
+            try {
+                const teams = await fetchJson("teams?order=created_at.desc&limit=5&select=*");
+                document.getElementById('statTotalTeams').innerText = teams.length;
+                const container = document.getElementById('teamsContainer');
+                if (teams.length === 0) {
+                    container.innerHTML = '<div class="py-4 text-center text-gray-500">No teams created yet.</div>';
+                    return;
+                }
+                container.innerHTML = teams.map(t => `
+                    <div class="flex items-center justify-between p-3 bg-[#0B0F19] border border-[#2A3650] rounded-lg">
+                        <div>
+                            <div class="font-bold text-white">${escapeHtml(t.team_name)}</div>
+                            <div class="text-xs text-gray-400">${escapeHtml(t.city || 'Grassroots')} • [${escapeHtml(t.short_code)}]</div>
+                        </div>
+                        <span class="text-xs bg-[#2A3650] text-gray-300 px-2 py-0.5 rounded font-mono">
+                            ${escapeHtml(t.short_code)}
+                        </span>
+                    </div>
+                `).join('');
+            } catch (err) {
+                console.error("Failed to load teams:", err);
+            }
+        }
+
+        function renderUsers(users) {
+            const tbody = document.getElementById('userTableBody');
+            if (users.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="py-8 text-center text-gray-400">No users found. Register accounts via the CricSaga mobile app.</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = users.map(user => {
+                const isPro = user.is_pro === true;
+                const planTag = isPro ? (user.pro_plan || 'PRO') : 'FREE';
+                return `
+                    <tr class="hover:bg-[#1E283D]/50 transition">
+                        <td class="py-3 px-6 font-semibold text-white">${escapeHtml(user.full_name)}</td>
+                        <td class="py-3 px-6 text-gray-300 font-mono">${escapeHtml(user.phone_number)}</td>
+                        <td class="py-3 px-6 text-gray-400 text-xs">${escapeHtml(user.playing_role)} • ${escapeHtml(user.city || 'Mumbai')}</td>
+                        <td class="py-3 px-6">
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold ${isPro ? 'bg-pitch-amber/20 text-pitch-amber border border-pitch-amber/40' : 'bg-gray-800 text-gray-400'}">
+                                ${planTag}
+                            </span>
+                        </td>
+                        <td class="py-3 px-6 text-right space-x-2">
+                            ${isPro ? `
+                                <button onclick="revokePro('${user.user_id}')" class="text-xs text-red-400 hover:text-red-300 font-medium px-2 py-1 rounded border border-red-500/30 hover:border-red-500 transition">
+                                    Revoke Pro
+                                </button>
+                            ` : `
+                                <button onclick="openProModal('${user.user_id}', '${escapeHtml(user.full_name)}') " class="text-xs text-pitch-green hover:text-pitch-greenHover font-medium px-2.5 py-1 rounded bg-pitch-green/10 border border-pitch-green/30 hover:border-pitch-green transition">
+                                    + Promote to Pro
+                                </button>
+                            `}
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function filterUsers() {
+            const query = document.getElementById('userSearchInput').value.trim().toLowerCase();
+            if (!query) {
+                renderUsers(allUsers);
+                return;
+            }
+            const filtered = allUsers.filter(u => 
+                (u.full_name && u.full_name.toLowerCase().includes(query)) ||
+                (u.phone_number && u.phone_number.includes(query))
+            );
+            renderUsers(filtered);
+        }
+
+        function openProModal(userId, userName) {
+            selectedUserId = userId;
+            document.getElementById('proModalSubtitle').innerText = `Promote ${userName} to CricSaga Pro tier.`;
+            document.getElementById('proModal').classList.remove('hidden');
+        }
+
+        function closeProModal() {
+            selectedUserId = null;
+            document.getElementById('proModal').classList.add('hidden');
+        }
+
+        async function confirmProUpgrade() {
+            if (!selectedUserId) return;
+            const radios = document.getElementsByName('proTierRadio');
+            let plan = 'ONE_MONTH';
+            for (const r of radios) {
+                if (r.checked) { plan = r.value; break; }
+            }
+
+            const now = Date.now();
+            let expiresAt = now + (30 * 24 * 60 * 60 * 1000);
+            if (plan === 'ONE_YEAR') expiresAt = now + (365 * 24 * 60 * 60 * 1000);
+            if (plan === 'LIFETIME') expiresAt = 9999999999999;
+
+            try {
+                await fetchJson(`users?user_id=eq.${selectedUserId}`, {
+                    method: 'PATCH',
+                    body: JSON.stringify({
+                        is_pro: true,
+                        pro_plan: plan,
+                        pro_expires_at: expiresAt
+                    })
+                });
+                closeProModal();
+                await loadUsers();
+            } catch (err) {
+                alert("Failed to update Pro status: " + err.message);
+            }
+        }
+
+        async function revokePro(userId) {
+            if (!confirm("Are you sure you want to revoke Pro status for this player?")) return;
+            try {
+                await fetchJson(`users?user_id=eq.${userId}`, {
+                    method: 'PATCH',
+                    body: JSON.stringify({
+                        is_pro: false,
+                        pro_plan: null,
+                        pro_expires_at: 0
+                    })
+                });
+                await loadUsers();
+            } catch (err) {
+                alert("Failed to revoke Pro status: " + err.message);
+            }
+        }
+
+        function refreshAllData() {
+            loadUsers();
+            loadMatches();
+            loadTeams();
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+        }
+
+        // Initial Load
+        refreshAllData();
+    </script>
+
+</body>
+</html>
