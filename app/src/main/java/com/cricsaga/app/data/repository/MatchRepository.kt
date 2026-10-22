@@ -28,6 +28,7 @@ class MatchRepository(private val database: CricSagaDatabase) {
     private val followDao = database.followDao()
     private val chatMessageDao = database.chatMessageDao()
     private val playerStatsDao = database.playerStatsDao()
+    private val commentDao = database.commentDao()
 
     fun getAllMatches(): Flow<List<MatchEntity>> = matchDao.getAllMatches()
 
@@ -332,6 +333,30 @@ class MatchRepository(private val database: CricSagaDatabase) {
         postDao.updatePost(post.copy(isLikedByMe = newLiked, likeCount = newCount))
     }
 
+    fun getCommentsFlow(postId: String): Flow<List<CommentEntity>> =
+        commentDao.getCommentsForPost(postId)
+
+    suspend fun addComment(
+        postId: String,
+        authorId: String,
+        authorName: String,
+        text: String,
+        authorAvatarUrl: String? = null
+    ): CommentEntity = withContext(Dispatchers.IO) {
+        val comment = CommentEntity(
+            commentId = "cmt_${System.currentTimeMillis()}_${UUID.randomUUID().toString().take(6)}",
+            postId = postId,
+            authorId = authorId,
+            authorName = authorName,
+            authorAvatarUrl = authorAvatarUrl,
+            text = text,
+            createdAt = System.currentTimeMillis()
+        )
+        commentDao.insertComment(comment)
+        postDao.incrementCommentCount(postId)
+        comment
+    }
+
     suspend fun followUser(followerId: String, followingId: String) = withContext(Dispatchers.IO) {
         followDao.followUser(FollowEntity(followerId, followingId))
     }
@@ -492,6 +517,34 @@ class MatchRepository(private val database: CricSagaDatabase) {
             )
         )
         postDao.insertPosts(initialPosts)
+
+        val sampleComments = listOf(
+            CommentEntity(
+                commentId = "cmt_seed_1",
+                postId = "post_seed_1",
+                authorId = jasprit?.userId ?: "seed_jasprit",
+                authorName = jasprit?.fullName ?: "Jasprit Bumrah",
+                text = "Top knock Rohit bhai! Dadar pitch was really flying.",
+                createdAt = System.currentTimeMillis() - 3600000
+            ),
+            CommentEntity(
+                commentId = "cmt_seed_2",
+                postId = "post_seed_1",
+                authorId = virat?.userId ?: "seed_virat",
+                authorName = virat?.fullName ?: "Virat Kohli",
+                text = "Class timing! See you at the ground next weekend.",
+                createdAt = System.currentTimeMillis() - 1800000
+            ),
+            CommentEntity(
+                commentId = "cmt_seed_3",
+                postId = "post_seed_2",
+                authorId = rohit?.userId ?: "seed_rohit",
+                authorName = rohit?.fullName ?: "Rohit Sharma",
+                text = "Nets looking sharp! We will set up a match next Saturday.",
+                createdAt = System.currentTimeMillis() - 7200000
+            )
+        )
+        commentDao.insertComments(sampleComments)
 
         // Seed sample message between Jasprit and Rohit
         if (rohit != null && jasprit != null) {
@@ -809,29 +862,11 @@ class MatchRepository(private val database: CricSagaDatabase) {
         val p7 = UserEntity("user_kl", "9876543216", "KL Rahul", playingRole = PlayingRole.BATSMAN, battingStyle = BattingStyle.RIGHT_HAND, city = "Bengaluru", jerseyNumber = "1")
         val p8 = UserEntity("user_pant", "9876543217", "Rishabh Pant", playingRole = PlayingRole.WICKET_KEEPER, battingStyle = BattingStyle.LEFT_HAND, city = "Delhi", jerseyNumber = "17")
 
-        val existingMatch = matchDao.getMatchById(matchId)
-        val existingTeamA = teamDao.getTeamById(teamAId)
-        val existingTeamB = teamDao.getTeamById(teamBId)
-
-        if (existingMatch != null && existingTeamA != null && existingTeamB != null) {
-            val striker = userDao.getUserById(p1.userId) ?: p1
-            val nonStriker = userDao.getUserById(p2.userId) ?: p2
-            val bowler = userDao.getUserById(p3.userId) ?: p3
-            val incomingBatsman = userDao.getUserById(p4.userId) ?: p4
-
-            return@withContext SeededMatchData(
-                matchId = matchId,
-                inningsId = inningsId,
-                teamAName = existingTeamA.teamName,
-                teamBName = existingTeamB.teamName,
-                striker = striker,
-                nonStriker = nonStriker,
-                bowler = bowler,
-                incomingBatsman = incomingBatsman
-            )
+        val initialUsers = listOf(p1, p2, p3, p4, p5, p6, p7, p8)
+        userDao.insertUsers(initialUsers)
+        initialUsers.forEach { u ->
+            userDao.updateUserCity(u.userId, u.city)
         }
-
-        userDao.insertUsers(listOf(p1, p2, p3, p4, p5, p6, p7, p8))
 
         val teamA = TeamEntity(teamAId, "Mumbai Warriors", "WAR", "Mumbai", captainId = p1.userId)
         val teamB = TeamEntity(teamBId, "Delhi Tigers", "TIG", "Delhi", captainId = p2.userId)
@@ -854,190 +889,218 @@ class MatchRepository(private val database: CricSagaDatabase) {
             TeamMemberEntity(teamD.teamId, p8.userId, 17)
         ))
 
-        // Seed realistic starter career stats
-        val initialStats = listOf(
-            PlayerStatsEntity(
-                userId = p2.userId,
-                matches = 10,
-                innings = 9,
-                runsScored = 482,
-                ballsFaced = 312,
-                highestScore = 102,
-                fifties = 4,
-                hundreds = 1,
-                fours = 46,
-                sixes = 14
-            ),
-            PlayerStatsEntity(
-                userId = p1.userId,
-                matches = 9,
-                innings = 9,
-                runsScored = 420,
-                ballsFaced = 265,
-                highestScore = 89,
-                fifties = 3,
-                hundreds = 0,
-                fours = 42,
-                sixes = 18
-            ),
-            PlayerStatsEntity(
-                userId = p4.userId,
-                matches = 8,
-                innings = 8,
-                runsScored = 395,
-                ballsFaced = 225,
-                highestScore = 76,
-                fifties = 3,
-                hundreds = 0,
-                fours = 34,
-                sixes = 22
-            ),
-            PlayerStatsEntity(
-                userId = p7.userId,
-                matches = 8,
-                innings = 8,
-                runsScored = 350,
-                ballsFaced = 240,
-                highestScore = 84,
-                fifties = 3,
-                hundreds = 0,
-                fours = 30,
-                sixes = 10
-            ),
-            PlayerStatsEntity(
-                userId = p8.userId,
-                matches = 7,
-                innings = 7,
-                runsScored = 295,
-                ballsFaced = 185,
-                highestScore = 78,
-                fifties = 2,
-                hundreds = 0,
-                fours = 28,
-                sixes = 12
-            ),
-            PlayerStatsEntity(
-                userId = p5.userId,
-                matches = 8,
-                innings = 7,
-                runsScored = 280,
-                ballsFaced = 160,
-                highestScore = 65,
-                fifties = 2,
-                hundreds = 0,
-                fours = 20,
-                sixes = 16,
-                wicketsTaken = 14,
-                legalBallsBowled = 168,
-                runsConceded = 196,
-                maidens = 1
-            ),
-            PlayerStatsEntity(
-                userId = p3.userId,
-                matches = 9,
-                innings = 3,
-                runsScored = 18,
-                ballsFaced = 15,
-                highestScore = 12,
-                wicketsTaken = 24,
-                legalBallsBowled = 204,
-                runsConceded = 176,
-                maidens = 4
-            ),
-            PlayerStatsEntity(
-                userId = p6.userId,
-                matches = 8,
-                innings = 2,
-                runsScored = 12,
-                ballsFaced = 10,
-                highestScore = 8,
-                wicketsTaken = 19,
-                legalBallsBowled = 180,
-                runsConceded = 185,
-                maidens = 3
+        // Seed realistic starter career stats if not present
+        if (playerStatsDao.getStatsCount() == 0) {
+            val initialStats = listOf(
+                PlayerStatsEntity(
+                    userId = p2.userId,
+                    matches = 10,
+                    innings = 9,
+                    runsScored = 482,
+                    ballsFaced = 312,
+                    highestScore = 102,
+                    fifties = 4,
+                    hundreds = 1,
+                    fours = 46,
+                    sixes = 14
+                ),
+                PlayerStatsEntity(
+                    userId = p1.userId,
+                    matches = 9,
+                    innings = 9,
+                    runsScored = 420,
+                    ballsFaced = 265,
+                    highestScore = 89,
+                    fifties = 3,
+                    hundreds = 0,
+                    fours = 42,
+                    sixes = 18
+                ),
+                PlayerStatsEntity(
+                    userId = p4.userId,
+                    matches = 8,
+                    innings = 8,
+                    runsScored = 395,
+                    ballsFaced = 225,
+                    highestScore = 76,
+                    fifties = 3,
+                    hundreds = 0,
+                    fours = 34,
+                    sixes = 22
+                ),
+                PlayerStatsEntity(
+                    userId = p7.userId,
+                    matches = 8,
+                    innings = 8,
+                    runsScored = 350,
+                    ballsFaced = 240,
+                    highestScore = 84,
+                    fifties = 3,
+                    hundreds = 0,
+                    fours = 30,
+                    sixes = 10
+                ),
+                PlayerStatsEntity(
+                    userId = p8.userId,
+                    matches = 7,
+                    innings = 7,
+                    runsScored = 295,
+                    ballsFaced = 185,
+                    highestScore = 78,
+                    fifties = 2,
+                    hundreds = 0,
+                    fours = 28,
+                    sixes = 12
+                ),
+                PlayerStatsEntity(
+                    userId = p5.userId,
+                    matches = 8,
+                    innings = 7,
+                    runsScored = 280,
+                    ballsFaced = 160,
+                    highestScore = 65,
+                    fifties = 2,
+                    hundreds = 0,
+                    fours = 20,
+                    sixes = 16,
+                    wicketsTaken = 14,
+                    legalBallsBowled = 168,
+                    runsConceded = 196,
+                    maidens = 1
+                ),
+                PlayerStatsEntity(
+                    userId = p3.userId,
+                    matches = 9,
+                    innings = 3,
+                    runsScored = 18,
+                    ballsFaced = 15,
+                    highestScore = 12,
+                    wicketsTaken = 24,
+                    legalBallsBowled = 204,
+                    runsConceded = 176,
+                    maidens = 4
+                ),
+                PlayerStatsEntity(
+                    userId = p6.userId,
+                    matches = 8,
+                    innings = 2,
+                    runsScored = 12,
+                    ballsFaced = 10,
+                    highestScore = 8,
+                    wicketsTaken = 19,
+                    legalBallsBowled = 180,
+                    runsConceded = 185,
+                    maidens = 3
+                )
             )
-        )
-        playerStatsDao.insertAll(initialStats)
+            playerStatsDao.insertAll(initialStats)
+        }
 
         // Seed finished tournament/league matches for team rankings
-        val historicalMatches = listOf(
-            MatchEntity(
-                matchId = "match_hist_1",
-                matchTitle = "Mumbai Warriors vs Delhi Tigers",
-                teamAId = teamAId,
-                teamBId = teamBId,
-                totalOvers = 20,
-                ballType = BallType.TENNIS_LIGHT,
-                tossWinnerTeamId = teamAId,
-                tossDecision = TossDecision.BAT,
-                matchStatus = MatchStatus.COMPLETED,
-                winnerTeamId = teamAId,
-                resultSummary = "Mumbai Warriors won by 18 runs",
-                playerOfTheMatchId = p1.userId,
-                createdAt = System.currentTimeMillis() - 86400000L * 4
-            ),
-            MatchEntity(
-                matchId = "match_hist_2",
-                matchTitle = "Mumbai Warriors vs Apex Kings",
-                teamAId = teamAId,
-                teamBId = teamC.teamId,
-                totalOvers = 20,
-                ballType = BallType.TENNIS_LIGHT,
-                tossWinnerTeamId = teamC.teamId,
-                tossDecision = TossDecision.BAT,
-                matchStatus = MatchStatus.COMPLETED,
-                winnerTeamId = teamAId,
-                resultSummary = "Mumbai Warriors won by 4 wickets",
-                playerOfTheMatchId = p4.userId,
-                createdAt = System.currentTimeMillis() - 86400000L * 3
-            ),
-            MatchEntity(
-                matchId = "match_hist_3",
-                matchTitle = "Delhi Tigers vs Bangalore Blasters",
-                teamAId = teamBId,
-                teamBId = teamD.teamId,
-                totalOvers = 20,
-                ballType = BallType.TENNIS_LIGHT,
-                tossWinnerTeamId = teamBId,
-                tossDecision = TossDecision.BAT,
-                matchStatus = MatchStatus.COMPLETED,
-                winnerTeamId = teamBId,
-                resultSummary = "Delhi Tigers won by 24 runs",
-                playerOfTheMatchId = p2.userId,
-                createdAt = System.currentTimeMillis() - 86400000L * 2
-            ),
-            MatchEntity(
-                matchId = "match_hist_4",
-                matchTitle = "Apex Kings vs Bangalore Blasters",
-                teamAId = teamC.teamId,
-                teamBId = teamD.teamId,
-                totalOvers = 20,
-                ballType = BallType.TENNIS_LIGHT,
-                tossWinnerTeamId = teamD.teamId,
-                tossDecision = TossDecision.BAT,
-                matchStatus = MatchStatus.COMPLETED,
-                winnerTeamId = teamC.teamId,
-                resultSummary = "Apex Kings won by 5 wickets",
-                playerOfTheMatchId = p3.userId,
-                createdAt = System.currentTimeMillis() - 86400000L * 1
-            ),
-            MatchEntity(
-                matchId = "match_hist_5",
-                matchTitle = "Mumbai Warriors vs Bangalore Blasters",
-                teamAId = teamAId,
-                teamBId = teamD.teamId,
-                totalOvers = 20,
-                ballType = BallType.TENNIS_LIGHT,
-                tossWinnerTeamId = teamAId,
-                tossDecision = TossDecision.BAT,
-                matchStatus = MatchStatus.COMPLETED,
-                winnerTeamId = teamD.teamId,
-                resultSummary = "Bangalore Blasters won by 6 wickets",
-                playerOfTheMatchId = p7.userId,
-                createdAt = System.currentTimeMillis() - 43200000L
+        if (matchDao.getMatchById("match_hist_1") == null) {
+            val historicalMatches = listOf(
+                MatchEntity(
+                    matchId = "match_hist_1",
+                    matchTitle = "Mumbai Warriors vs Delhi Tigers",
+                    teamAId = teamAId,
+                    teamBId = teamBId,
+                    totalOvers = 20,
+                    ballType = BallType.TENNIS_LIGHT,
+                    tossWinnerTeamId = teamAId,
+                    tossDecision = TossDecision.BAT,
+                    matchStatus = MatchStatus.COMPLETED,
+                    winnerTeamId = teamAId,
+                    resultSummary = "Mumbai Warriors won by 18 runs",
+                    playerOfTheMatchId = p1.userId,
+                    createdAt = System.currentTimeMillis() - 86400000L * 4
+                ),
+                MatchEntity(
+                    matchId = "match_hist_2",
+                    matchTitle = "Mumbai Warriors vs Apex Kings",
+                    teamAId = teamAId,
+                    teamBId = teamC.teamId,
+                    totalOvers = 20,
+                    ballType = BallType.TENNIS_LIGHT,
+                    tossWinnerTeamId = teamC.teamId,
+                    tossDecision = TossDecision.BAT,
+                    matchStatus = MatchStatus.COMPLETED,
+                    winnerTeamId = teamAId,
+                    resultSummary = "Mumbai Warriors won by 4 wickets",
+                    playerOfTheMatchId = p4.userId,
+                    createdAt = System.currentTimeMillis() - 86400000L * 3
+                ),
+                MatchEntity(
+                    matchId = "match_hist_3",
+                    matchTitle = "Delhi Tigers vs Bangalore Blasters",
+                    teamAId = teamBId,
+                    teamBId = teamD.teamId,
+                    totalOvers = 20,
+                    ballType = BallType.TENNIS_LIGHT,
+                    tossWinnerTeamId = teamBId,
+                    tossDecision = TossDecision.BAT,
+                    matchStatus = MatchStatus.COMPLETED,
+                    winnerTeamId = teamBId,
+                    resultSummary = "Delhi Tigers won by 24 runs",
+                    playerOfTheMatchId = p2.userId,
+                    createdAt = System.currentTimeMillis() - 86400000L * 2
+                ),
+                MatchEntity(
+                    matchId = "match_hist_4",
+                    matchTitle = "Apex Kings vs Bangalore Blasters",
+                    teamAId = teamC.teamId,
+                    teamBId = teamD.teamId,
+                    totalOvers = 20,
+                    ballType = BallType.TENNIS_LIGHT,
+                    tossWinnerTeamId = teamD.teamId,
+                    tossDecision = TossDecision.BAT,
+                    matchStatus = MatchStatus.COMPLETED,
+                    winnerTeamId = teamC.teamId,
+                    resultSummary = "Apex Kings won by 5 wickets",
+                    playerOfTheMatchId = p3.userId,
+                    createdAt = System.currentTimeMillis() - 86400000L * 1
+                ),
+                MatchEntity(
+                    matchId = "match_hist_5",
+                    matchTitle = "Mumbai Warriors vs Bangalore Blasters",
+                    teamAId = teamAId,
+                    teamBId = teamD.teamId,
+                    totalOvers = 20,
+                    ballType = BallType.TENNIS_LIGHT,
+                    tossWinnerTeamId = teamAId,
+                    tossDecision = TossDecision.BAT,
+                    matchStatus = MatchStatus.COMPLETED,
+                    winnerTeamId = teamD.teamId,
+                    resultSummary = "Bangalore Blasters won by 6 wickets",
+                    playerOfTheMatchId = p7.userId,
+                    createdAt = System.currentTimeMillis() - 43200000L
+                )
             )
-        )
-        historicalMatches.forEach { matchDao.insertMatch(it) }
+            historicalMatches.forEach { matchDao.insertMatch(it) }
+        }
+
+        seedInitialSocialPostsAndMessagesIfEmpty(listOf(p1, p2, p3, p4))
+
+        val existingMatch = matchDao.getMatchById(matchId)
+        val existingTeamA = teamDao.getTeamById(teamAId)
+        val existingTeamB = teamDao.getTeamById(teamBId)
+
+        if (existingMatch != null && existingTeamA != null && existingTeamB != null) {
+            val striker = userDao.getUserById(p1.userId) ?: p1
+            val nonStriker = userDao.getUserById(p2.userId) ?: p2
+            val bowler = userDao.getUserById(p3.userId) ?: p3
+            val incomingBatsman = userDao.getUserById(p4.userId) ?: p4
+
+            return@withContext SeededMatchData(
+                matchId = matchId,
+                inningsId = inningsId,
+                teamAName = existingTeamA.teamName,
+                teamBName = existingTeamB.teamName,
+                striker = striker,
+                nonStriker = nonStriker,
+                bowler = bowler,
+                incomingBatsman = incomingBatsman
+            )
+        }
 
         val match = MatchEntity(
             matchId = matchId,

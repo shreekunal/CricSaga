@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cricsaga.app.data.local.ProManager
 import com.cricsaga.app.data.local.entity.PlayerStatsEntity
+import com.cricsaga.app.data.local.entity.TeamEntity
 import com.cricsaga.app.data.local.entity.UserEntity
 import com.cricsaga.app.domain.model.PlayingRole
 import com.cricsaga.app.ui.profile.dialog.EditProfileDialog
@@ -48,17 +49,20 @@ fun PlayerProfileScreen(
     proManager: ProManager,
     currentUser: UserEntity? = null,
     playerStats: PlayerStatsEntity? = null,
+    teams: List<TeamEntity> = emptyList(),
     posts: List<com.cricsaga.app.data.local.entity.PostEntity> = emptyList(),
     followersCount: Int = 0,
     followingCount: Int = 0,
     onRedeemCodeClick: () -> Unit,
     onUpdateProfile: (UserEntity) -> Unit = {},
+    onTeamClick: (String) -> Unit = {},
+    onCreateOrJoinTeamClick: () -> Unit = {},
     onLogout: () -> Unit = {}
 ) {
     val context = LocalContext.current
     var showEditProfileDialog by remember { mutableStateOf(false) }
     var selectedTab by remember { mutableIntStateOf(0) }
-    val tabs = listOf("Overview", "Batting", "Bowling", "Fielding", "Matches", "Posts")
+    val tabs = listOf("Overview", "Stats", "Teams", "Highlights", "Posts")
     val subscriptionState by proManager.subscriptionState.collectAsState()
 
     val playerName = currentUser?.fullName?.ifBlank { "Rohit Sharma" } ?: "Rohit Sharma"
@@ -334,10 +338,11 @@ fun PlayerProfileScreen(
 
             // 2. Tabs Row for Career Records
             item {
-                TabRow(
+                ScrollableTabRow(
                     selectedTabIndex = selectedTab,
                     containerColor = CharcoalBackgroundDark,
                     contentColor = CrimsonPrimaryDark,
+                    edgePadding = 16.dp,
                     divider = { HorizontalDivider(color = DividerDark, thickness = 0.5.dp) },
                     indicator = { tabPositions ->
                         TabRowDefaults.SecondaryIndicator(
@@ -358,7 +363,8 @@ fun PlayerProfileScreen(
                                 Text(
                                     text = title,
                                     style = if (selectedTab == index) PlayerNameSecondary else BodyCaption,
-                                    color = if (selectedTab == index) TextPrimary else TextSecondary
+                                    color = if (selectedTab == index) TextPrimary else TextSecondary,
+                                    maxLines = 1
                                 )
                             }
                         )
@@ -489,154 +495,315 @@ fun PlayerProfileScreen(
                 }
 
                 1 -> {
-                    // Batting Table
+                    // Unified Stats Tab (Batting, Bowling, and Fielding)
                     item {
-                        Card(
+                        Column(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(16.dp),
-                            colors = CardDefaults.cardColors(containerColor = SlateSurfaceDark),
-                            shape = RoundedCornerShape(10.dp),
-                            border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(CardBorderDark))
+                            verticalArrangement = Arrangement.spacedBy(14.dp)
                         ) {
-                            Column(modifier = Modifier.padding(14.dp)) {
-                                Text("BATTING CAREER", style = SectionLabel, color = TextSecondary)
-                                Spacer(modifier = Modifier.height(10.dp))
-                                TableStatRow("Innings Batted", "$totalInnings")
-                                TableStatRow("Not Outs (NO)", "3")
-                                TableStatRow("Total Runs", "$totalRuns")
-                                TableStatRow("Balls Faced", "$totalBalls")
-                                TableStatRow("Highest Score", "$highestScore*")
-                                TableStatRow("Batting Average", batAvg)
-                                TableStatRow("Strike Rate", batSr)
-                                TableStatRow("Fifties (50s)", "$totalFifties")
-                                TableStatRow("Hundreds (100s)", "$totalHundreds")
-                                TableStatRow("Fours / Sixes", "$totalFours / $totalSixes")
+                            // 1. Batting Career Card
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = CardDefaults.cardColors(containerColor = SlateSurfaceDark),
+                                shape = RoundedCornerShape(10.dp),
+                                border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(CardBorderDark))
+                            ) {
+                                Column(modifier = Modifier.padding(14.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text("BATTING CAREER", style = SectionLabel, color = BoundaryAmber)
+                                        Icon(Icons.Default.SportsCricket, contentDescription = null, tint = BoundaryAmber, modifier = Modifier.size(16.dp))
+                                    }
+                                    Spacer(modifier = Modifier.height(10.dp))
+                                    TableStatRow("Innings Batted", "$totalInnings")
+                                    TableStatRow("Not Outs (NO)", "3")
+                                    TableStatRow("Total Runs", "$totalRuns")
+                                    TableStatRow("Balls Faced", "$totalBalls")
+                                    TableStatRow("Highest Score", "$highestScore*")
+                                    TableStatRow("Batting Average", batAvg)
+                                    TableStatRow("Strike Rate", batSr)
+                                    TableStatRow("Fifties (50s)", "$totalFifties")
+                                    TableStatRow("Hundreds (100s)", "$totalHundreds")
+                                    TableStatRow("Fours / Sixes", "$totalFours / $totalSixes")
+                                }
+                            }
+
+                            // 2. Bowling Career Card
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = CardDefaults.cardColors(containerColor = SlateSurfaceDark),
+                                shape = RoundedCornerShape(10.dp),
+                                border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(CardBorderDark))
+                            ) {
+                                Column(modifier = Modifier.padding(14.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text("BOWLING CAREER", style = SectionLabel, color = ForestSixPrimary)
+                                        Icon(Icons.Default.SportsBaseball, contentDescription = null, tint = ForestSixPrimary, modifier = Modifier.size(16.dp))
+                                    }
+                                    Spacer(modifier = Modifier.height(10.dp))
+                                    TableStatRow("Overs Bowled", "$oversBowledFormatted ov")
+                                    TableStatRow("Maiden Overs", "$totalMaidens")
+                                    TableStatRow("Runs Conceded", "$totalRunsConceded")
+                                    TableStatRow("Wickets Taken", "$totalWickets")
+                                    TableStatRow("Best Bowling", "3/16 (4.0 ov)")
+                                    TableStatRow("Bowling Average", bowlAvg)
+                                    TableStatRow("Economy Rate", bowlEcon)
+                                }
+                            }
+
+                            // 3. Fielding Career Card
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = CardDefaults.cardColors(containerColor = SlateSurfaceDark),
+                                shape = RoundedCornerShape(10.dp),
+                                border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(CardBorderDark))
+                            ) {
+                                Column(modifier = Modifier.padding(14.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text("FIELDING CAREER", style = SectionLabel, color = TextSecondary)
+                                        Icon(Icons.Default.Shield, contentDescription = null, tint = TextSecondary, modifier = Modifier.size(16.dp))
+                                    }
+                                    Spacer(modifier = Modifier.height(10.dp))
+                                    TableStatRow("Catches", "12")
+                                    TableStatRow("Direct Run Outs", "3")
+                                    TableStatRow("Assisted Run Outs", "2")
+                                    TableStatRow("Stumpings", "0")
+                                }
                             }
                         }
                     }
                 }
 
                 2 -> {
-                    // Bowling Table
-                    item {
-                        Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(16.dp),
-                            colors = CardDefaults.cardColors(containerColor = SlateSurfaceDark),
-                            shape = RoundedCornerShape(10.dp),
-                            border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(CardBorderDark))
-                        ) {
-                            Column(modifier = Modifier.padding(14.dp)) {
-                                Text("BOWLING CAREER", style = SectionLabel, color = TextSecondary)
-                                Spacer(modifier = Modifier.height(10.dp))
-                                TableStatRow("Overs Bowled", "$oversBowledFormatted ov")
-                                TableStatRow("Maiden Overs", "$totalMaidens")
-                                TableStatRow("Runs Conceded", "$totalRunsConceded")
-                                TableStatRow("Wickets Taken", "$totalWickets")
-                                TableStatRow("Best Bowling", "3/16 (4.0 ov)")
-                                TableStatRow("Bowling Average", bowlAvg)
-                                TableStatRow("Economy Rate", bowlEcon)
+                    // Teams Tab (Player's Clubs, Squads & Roles)
+                    if (teams.isEmpty()) {
+                        item {
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
+                                colors = CardDefaults.cardColors(containerColor = SlateSurfaceDark),
+                                shape = RoundedCornerShape(10.dp),
+                                border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(CardBorderDark))
+                            ) {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(24.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Groups,
+                                        contentDescription = null,
+                                        tint = TextSecondary,
+                                        modifier = Modifier.size(40.dp)
+                                    )
+                                    Spacer(modifier = Modifier.height(10.dp))
+                                    Text(
+                                        text = "No Teams Joined Yet",
+                                        style = PlayerNameSecondary,
+                                        color = TextPrimary
+                                    )
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        text = "Join your local cricket club or create a new squad to represent your colors in tournaments and matches.",
+                                        style = BodyCaption,
+                                        color = TextSecondary,
+                                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                                    )
+                                    Spacer(modifier = Modifier.height(14.dp))
+                                    Button(
+                                        onClick = onCreateOrJoinTeamClick,
+                                        colors = ButtonDefaults.buttonColors(containerColor = CrimsonPrimaryDark),
+                                        shape = RoundedCornerShape(8.dp)
+                                    ) {
+                                        Text("Manage & Join Teams", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 12.sp)
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        items(teams, key = { it.teamId }) { team ->
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 6.dp)
+                                    .clickable { onTeamClick(team.teamId) },
+                                colors = CardDefaults.cardColors(containerColor = SlateSurfaceDark),
+                                shape = RoundedCornerShape(10.dp),
+                                border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(CardBorderDark))
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(14.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(44.dp)
+                                            .background(CrimsonPrimaryDark.copy(alpha = 0.15f), CircleShape),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = team.shortCode.ifBlank { team.teamName.take(2).uppercase() },
+                                            fontWeight = FontWeight.Black,
+                                            fontSize = 15.sp,
+                                            color = CrimsonPrimaryDark
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = team.teamName,
+                                            style = PlayerNameSecondary,
+                                            color = TextPrimary
+                                        )
+                                        val roleInTeam = if (team.captainId == currentUser?.userId) "Team Captain" else "Squad Member"
+                                        Text(
+                                            text = "${team.city.ifBlank { "Mumbai" }} • $roleInTeam",
+                                            style = BodyCaption,
+                                            color = TextSecondary
+                                        )
+                                    }
+                                    Icon(
+                                        imageVector = Icons.Default.ChevronRight,
+                                        contentDescription = null,
+                                        tint = TextTertiary,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            }
+                        }
+                        item {
+                            Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp)) {
+                                OutlinedButton(
+                                    onClick = onCreateOrJoinTeamClick,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(8.dp),
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, CrimsonPrimaryDark)
+                                ) {
+                                    Icon(Icons.Default.Add, contentDescription = null, tint = CrimsonPrimaryDark, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Create or Join Another Team", color = CrimsonPrimaryDark, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                }
                             }
                         }
                     }
                 }
 
                 3 -> {
-                    // Fielding Table
+                    // Highlights Tab (Milestones & Standout Match Performances)
                     item {
-                        Card(
+                        Column(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(16.dp),
-                            colors = CardDefaults.cardColors(containerColor = SlateSurfaceDark),
-                            shape = RoundedCornerShape(10.dp),
-                            border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(CardBorderDark))
+                            verticalArrangement = Arrangement.spacedBy(14.dp)
                         ) {
-                            Column(modifier = Modifier.padding(14.dp)) {
-                                Text("FIELDING CAREER", style = SectionLabel, color = TextSecondary)
-                                Spacer(modifier = Modifier.height(10.dp))
-                                TableStatRow("Catches", "12")
-                                TableStatRow("Direct Run Outs", "3")
-                                TableStatRow("Assisted Run Outs", "2")
-                                TableStatRow("Stumpings", "0")
+                            // Major Milestones Grid
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = CardDefaults.cardColors(containerColor = SlateSurfaceDark),
+                                shape = RoundedCornerShape(10.dp),
+                                border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(CardBorderDark))
+                            ) {
+                                Column(modifier = Modifier.padding(14.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text("CAREER HIGHLIGHTS & HONOURS", style = SectionLabel, color = BoundaryAmber)
+                                        Icon(Icons.Default.MilitaryTech, contentDescription = null, tint = BoundaryAmber, modifier = Modifier.size(18.dp))
+                                    }
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        HonourBadgeCard(
+                                            icon = Icons.Default.EmojiEvents,
+                                            title = "CENTURY CLUB",
+                                            subtitle = if (totalHundreds > 0) "$totalHundreds Centuries" else "1 Unlocked (102*)",
+                                            isUnlocked = true,
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                        HonourBadgeCard(
+                                            icon = Icons.Default.GpsFixed,
+                                            title = "5-WICKET HAUL",
+                                            subtitle = if (totalWickets >= 5) "5/24 (Best)" else "3/16 (Personal Best)",
+                                            isUnlocked = true,
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        HonourBadgeCard(
+                                            icon = Icons.Default.Bolt,
+                                            title = "STRIKE ACCELERATOR",
+                                            subtitle = "SR $batSr",
+                                            isUnlocked = true,
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                        HonourBadgeCard(
+                                            icon = Icons.Default.Shield,
+                                            title = "MATCH WINNER",
+                                            subtitle = "4x Player of Match",
+                                            isUnlocked = true,
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                    }
+                                }
+                            }
+
+                            // Standout Knocks & Spells Shelf
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = CardDefaults.cardColors(containerColor = SlateSurfaceDark),
+                                shape = RoundedCornerShape(10.dp),
+                                border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(CardBorderDark))
+                            ) {
+                                Column(modifier = Modifier.padding(14.dp)) {
+                                    Text("STANDOUT INNINGS & NOTABLE SPELLS", style = SectionLabel, color = TextSecondary)
+                                    Spacer(modifier = Modifier.height(10.dp))
+                                    HighlightInningsRow(
+                                        title = "102* (48) vs Delhi Challengers",
+                                        meta = "Super Over Thriller • Match MVP • S/R 212.5",
+                                        badge = "MATCH WINNING KNOCK",
+                                        badgeColor = BoundaryAmber
+                                    )
+                                    HorizontalDivider(color = DividerDark, thickness = 0.5.dp, modifier = Modifier.padding(vertical = 8.dp))
+                                    HighlightInningsRow(
+                                        title = "3/16 (4.0 ov) vs Royal Club Pune",
+                                        meta = "Death Overs Economy: 4.00 • 2 Bowled",
+                                        badge = "CLUTCH SPELL",
+                                        badgeColor = ForestSixPrimary
+                                    )
+                                    HorizontalDivider(color = DividerDark, thickness = 0.5.dp, modifier = Modifier.padding(vertical = 8.dp))
+                                    HighlightInningsRow(
+                                        title = "56 (29) vs Bandra Blasters",
+                                        meta = "Chasing 175 • 4 Fours, 4 Sixes",
+                                        badge = "FIFTY",
+                                        badgeColor = CrimsonPrimaryDark
+                                    )
+                                }
                             }
                         }
                     }
                 }
 
                 4 -> {
-                    // Match History
-                    if (matchHistory.isEmpty()) {
-                        item {
-                            Card(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                                colors = CardDefaults.cardColors(containerColor = SlateSurfaceDark),
-                                shape = RoundedCornerShape(8.dp),
-                                border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(CardBorderDark))
-                            ) {
-                                Column(
-                                    modifier = Modifier.padding(24.dp),
-                                    horizontalAlignment = Alignment.CenterHorizontally
-                                ) {
-                                    Text(
-                                        text = "No matches recorded yet",
-                                        style = PlayerNameSecondary,
-                                        color = TextPrimary
-                                    )
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                    Text(
-                                        text = "Completed matches where this player participates will appear in this career history log.",
-                                        style = BodyCaption,
-                                        color = TextSecondary,
-                                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                                    )
-                                }
-                            }
-                        }
-                    } else {
-                        items(matchHistory) { record ->
-                            Card(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 16.dp, vertical = 5.dp),
-                                colors = CardDefaults.cardColors(containerColor = SlateSurfaceDark),
-                                shape = RoundedCornerShape(8.dp),
-                                border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(CardBorderDark))
-                            ) {
-                                Column(modifier = Modifier.padding(12.dp)) {
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Text(record.matchTitle, style = PlayerNameSecondary, color = TextPrimary)
-                                        Text(
-                                            text = if (record.resultWon) "WON" else "LOST",
-                                            color = if (record.resultWon) BoundaryGreen else TextTertiary,
-                                            style = MicroTag
-                                        )
-                                    }
-
-                                    Text(record.dateText, style = BodyCaption, color = TextTertiary)
-                                    Spacer(modifier = Modifier.height(6.dp))
-
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween
-                                    ) {
-                                        Text("Bat: ${record.battingPerformance}", style = BodyCaption, color = TextSecondary)
-                                        Text("Bowl: ${record.bowlingPerformance}", style = BodyCaption, color = TextSecondary)
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-                5 -> {
                     // Posts Tab
                     if (posts.isEmpty()) {
                         item {
@@ -756,4 +923,35 @@ fun TableStatRow(label: String, value: String) {
         Text(value, style = StatTableValue, color = TextPrimary)
     }
     HorizontalDivider(color = DividerDark, thickness = 0.5.dp)
+}
+
+@Composable
+private fun HighlightInningsRow(
+    title: String,
+    meta: String,
+    badge: String,
+    badgeColor: Color
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(title, style = PlayerNameSecondary, color = TextPrimary)
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(meta, style = BodyCaption, color = TextSecondary)
+        }
+        Surface(
+            color = badgeColor.copy(alpha = 0.15f),
+            shape = RoundedCornerShape(4.dp)
+        ) {
+            Text(
+                text = badge,
+                style = MicroTag,
+                color = badgeColor,
+                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+            )
+        }
+    }
 }

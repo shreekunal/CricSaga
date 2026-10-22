@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.cricsaga.app.data.local.CricSagaDatabase
+import com.cricsaga.app.data.local.entity.CommentEntity
 import com.cricsaga.app.data.local.entity.DeliveryEntity
 import com.cricsaga.app.data.local.entity.LookingForEntity
 import com.cricsaga.app.data.local.entity.MatchEntity
@@ -210,6 +211,21 @@ class ScoringViewModel(application: Application) : AndroidViewModel(application)
     fun toggleLikePost(postId: String) {
         viewModelScope.launch {
             repository.toggleLikePost(postId)
+        }
+    }
+
+    fun getCommentsForPost(postId: String): Flow<List<CommentEntity>> =
+        repository.getCommentsFlow(postId)
+
+    fun addComment(
+        postId: String,
+        authorId: String,
+        authorName: String,
+        text: String,
+        authorAvatarUrl: String? = null
+    ) {
+        viewModelScope.launch {
+            repository.addComment(postId, authorId, authorName, text, authorAvatarUrl)
         }
     }
 

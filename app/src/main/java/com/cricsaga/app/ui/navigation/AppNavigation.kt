@@ -140,12 +140,14 @@ fun AppNavigation(
                             selected = isSelected,
                             onClick = {
                                 hapticManager.tapUiClick()
-                                navController.navigate(screen.route) {
-                                    popUpTo(navController.graph.findStartDestination().id) {
-                                        saveState = true
+                                if (currentRoute != screen.route) {
+                                    navController.navigate(screen.route) {
+                                        popUpTo(Screen.Home.route) {
+                                            saveState = (screen.route != Screen.Home.route)
+                                        }
+                                        launchSingleTop = true
+                                        restoreState = true
                                     }
-                                    launchSingleTop = true
-                                    restoreState = true
                                 }
                             },
                             icon = {
@@ -252,11 +254,46 @@ fun AppNavigation(
             // Tab 1: Home Cricket Feed Screen
             composable(Screen.Home.route) {
                 val matches by scoringViewModel.allMatches.collectAsState()
+                val topBatters by scoringViewModel.topBatters.collectAsState()
+                val topBowlers by scoringViewModel.topBowlers.collectAsState()
+                val topPlayersToFollow = remember(topBatters, topBowlers, allUsers, currentUserId) {
+                    val ranked = (topBatters + topBowlers)
+                        .distinctBy { it.userId }
+                        .filter { it.userId != currentUserId }
+                    if (ranked.isNotEmpty()) {
+                        ranked
+                    } else {
+                        allUsers.filter { it.userId != currentUserId }.mapIndexed { idx, u ->
+                            val initials = u.fullName.split(" ")
+                                .filter { it.isNotBlank() }
+                                .take(2)
+                                .map { it.first().uppercaseChar() }
+                                .joinToString("")
+                                .ifEmpty { "P" }
+                            com.cricsaga.app.domain.model.PlayerRankingItem(
+                                rank = idx + 1,
+                                userId = u.userId,
+                                playerName = u.fullName,
+                                initials = initials,
+                                role = u.playingRole.name.replace("_", " ").lowercase().replaceFirstChar { it.uppercase() },
+                                teamName = u.city.ifBlank { "Mumbai" },
+                                city = u.city.ifBlank { "Mumbai" },
+                                matches = 5 + idx * 2,
+                                runs = 180 + idx * 35,
+                                wickets = 6 + idx,
+                                isVerified = true
+                            )
+                        }
+                    }
+                }
                 HomeScreen(
                     isPro = subscriptionState.isActive,
                     currentUserId = currentUserId,
+                    currentUserName = currentUser?.fullName ?: "Rohit Sharma",
+                    currentUserAvatarUrl = currentUser?.profilePhotoUrl,
                     matches = matches,
                     posts = allPosts,
+                    topPlayersToFollow = topPlayersToFollow,
                     followedUserIds = followedUserIds,
                     unreadMessageCount = unreadChatCount,
                     isDarkTheme = currentDark,
@@ -271,6 +308,14 @@ fun AppNavigation(
                     onMessagesClick = {
                         hapticManager.tapUiClick()
                         navController.navigate(Screen.Messages.route)
+                    },
+                    onProfileClick = {
+                        hapticManager.tapUiClick()
+                        navController.navigate(Screen.Profile.route)
+                    },
+                    onJoinPlusClick = {
+                        hapticManager.tapUiClick()
+                        navController.navigate(Screen.Redeem.route)
                     },
                     onRankingsClick = {
                         hapticManager.tapUiClick()
@@ -320,7 +365,7 @@ fun AppNavigation(
                         hapticManager.tapUiClick()
                         scoringViewModel.toggleLikePost(postId)
                     },
-                    onCreatePost = { content, perfTag, imgUri ->
+                    onCreatePost = { content, perfTag ->
                         val author = currentUser
                         val authorName = author?.fullName?.ifBlank { "Grassroots Player" } ?: "Grassroots Player"
                         val authorRole = author?.playingRole?.name?.replace('_', ' ')?.lowercase()?.replaceFirstChar { it.uppercase() } ?: "All-Rounder"
@@ -331,11 +376,24 @@ fun AppNavigation(
                             authorRole = authorRole,
                             authorCity = authorCity,
                             authorTeamName = null,
-                            authorAvatarUrl = null,
+                            authorAvatarUrl = author?.profilePhotoUrl,
                             content = content,
-                            imageUri = imgUri,
+                            imageUri = null,
                             linkedMatchId = null,
                             performanceTag = perfTag
+                        )
+                    },
+                    getCommentsForPost = { postId ->
+                        scoringViewModel.getCommentsForPost(postId)
+                    },
+                    onAddComment = { postId, text ->
+                        val author = currentUser
+                        scoringViewModel.addComment(
+                            postId = postId,
+                            authorId = currentUserId,
+                            authorName = author?.fullName?.ifBlank { "Rohit Sharma" } ?: "Rohit Sharma",
+                            text = text,
+                            authorAvatarUrl = author?.profilePhotoUrl
                         )
                     },
                     onDirectMessageAuthor = { authorId, authorName ->
@@ -538,6 +596,7 @@ fun AppNavigation(
             // Tab 5: My Career Player Profile
             composable(Screen.Profile.route) {
                 val playerStats by scoringViewModel.repository.getPlayerStatsFlow(currentUserId).collectAsState(initial = null)
+                val userTeams by scoringViewModel.allTeams.collectAsState()
                 val followersCount by scoringViewModel.repository.getFollowersCount(currentUserId).collectAsState(initial = 0)
                 val followingCount by scoringViewModel.repository.getFollowingCount(currentUserId).collectAsState(initial = 0)
                 val myPosts = remember(allPosts, currentUserId) {
@@ -548,12 +607,27 @@ fun AppNavigation(
                     proManager = proManager,
                     currentUser = currentUser,
                     playerStats = playerStats,
+                    teams = userTeams,
                     posts = myPosts,
                     followersCount = followersCount,
                     followingCount = followingCount,
                     onRedeemCodeClick = {
                         hapticManager.tapUiClick()
                         navController.navigate(Screen.Redeem.route)
+                    },
+                    onTeamClick = { teamId ->
+                        hapticManager.tapUiClick()
+                        coroutineScope.launch {
+                            val team = scoringViewModel.repository.getTeam(teamId)
+                            if (team != null) {
+                                selectedTeamForDetail = team
+                                navController.navigate(Screen.TeamDetail.route)
+                            }
+                        }
+                    },
+                    onCreateOrJoinTeamClick = {
+                        hapticManager.tapUiClick()
+                        navController.navigate(Screen.Teams.route)
                     },
                     onUpdateProfile = { updated ->
                         coroutineScope.launch {
@@ -643,11 +717,13 @@ fun AppNavigation(
                     val playerPosts = remember(allPosts, player.userId) {
                         allPosts.filter { it.authorId == player.userId }
                     }
+                    val teams by scoringViewModel.allTeams.collectAsState()
 
                     PlayerDetailScreen(
                         user = player,
                         stats = stats,
                         posts = playerPosts,
+                        teams = teams,
                         isFollowing = isFollowingUser,
                         followersCount = followersCount,
                         followingCount = followingCount,
@@ -664,6 +740,10 @@ fun AppNavigation(
                             selectedChatUser = player
                             chatDraftText = ""
                             navController.navigate("chat/${player.userId}")
+                        },
+                        onTeamClick = { teamId ->
+                            hapticManager.tapUiClick()
+                            navController.navigate("team_detail/${teamId}")
                         },
                         onBackClick = {
                             hapticManager.tapUiClick()
@@ -852,6 +932,11 @@ fun AppNavigation(
                     onViewScorecardClick = {
                         hapticManager.tapUiClick()
                         navController.navigate(Screen.FullScorecard.route)
+                    },
+                    isDark = currentDark,
+                    onThemeToggleClick = {
+                        hapticManager.tapUiClick()
+                        themeManager.toggleTheme(currentDark)
                     }
                 )
 

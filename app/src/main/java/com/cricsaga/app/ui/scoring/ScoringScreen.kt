@@ -12,6 +12,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -35,7 +37,9 @@ fun ScoringScreen(
     onWicketTapped: () -> Unit,
     onUndoTapped: () -> Unit,
     onRotateStrikeTapped: () -> Unit,
-    onViewScorecardClick: () -> Unit = {}
+    onViewScorecardClick: () -> Unit = {},
+    isDark: Boolean = true,
+    onThemeToggleClick: () -> Unit = {}
 ) {
     val scrollState = rememberScrollState()
 
@@ -57,6 +61,13 @@ fun ScoringScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = onThemeToggleClick) {
+                        Icon(
+                            imageVector = if (isDark) Icons.Default.LightMode else Icons.Default.DarkMode,
+                            contentDescription = "Toggle Theme",
+                            tint = if (isDark) BoundaryAmber else TextPrimary
+                        )
+                    }
                     TextButton(onClick = onViewScorecardClick) {
                         Text(
                             text = "SCORECARD",
@@ -331,10 +342,10 @@ fun ScoringScreen(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        KeypadButton("4", BoundaryAmber, Color.Black, Modifier.weight(1f)) { onBallTapped(4) }
-                        KeypadButton("6", BoundaryGreen, Color.Black, Modifier.weight(1f)) { onBallTapped(6) }
-                        KeypadButton("WD", ExtraBlue, Color.Black, Modifier.weight(1f)) { onExtraTapped(ExtraType.WIDE) }
-                        KeypadButton("NB", ExtraBlue, Color.Black, Modifier.weight(1f)) { onExtraTapped(ExtraType.NO_BALL) }
+                        KeypadButton("4", BoundaryAmber, Color.White, Modifier.weight(1f)) { onBallTapped(4) }
+                        KeypadButton("6", BoundaryGreen, Color.White, Modifier.weight(1f)) { onBallTapped(6) }
+                        KeypadButton("WD", ExtraBlue, Color.White, Modifier.weight(1f)) { onExtraTapped(ExtraType.WIDE) }
+                        KeypadButton("NB", ExtraBlue, Color.White, Modifier.weight(1f)) { onExtraTapped(ExtraType.NO_BALL) }
                     }
 
                     // Row 3: Bye, Leg Bye, OUT, UNDO
@@ -345,7 +356,7 @@ fun ScoringScreen(
                         KeypadButton("BYE", ElevatedSurfaceDark, TextPrimary, Modifier.weight(1f)) { onExtraTapped(ExtraType.BYE) }
                         KeypadButton("LB", ElevatedSurfaceDark, TextPrimary, Modifier.weight(1f)) { onExtraTapped(ExtraType.LEG_BYE) }
                         KeypadButton("OUT / W", DismissalRed, Color.White, Modifier.weight(1f)) { onWicketTapped() }
-                        KeypadButton("UNDO", ElevatedSurfaceDark, BoundaryAmber, Modifier.weight(1f)) { onUndoTapped() }
+                        KeypadButton("UNDO", ElevatedSurfaceDark, CrimsonPrimaryDark, Modifier.weight(1f)) { onUndoTapped() }
                     }
 
                     // Row 4: Action & Telemetry Strip
@@ -372,14 +383,14 @@ fun ScoringScreen(
                                 Icon(
                                     imageVector = Icons.Default.SwapHoriz,
                                     contentDescription = null,
-                                    tint = Color.White,
+                                    tint = TextPrimary,
                                     modifier = Modifier.size(16.dp)
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text(
                                     text = "ROTATE STRIKE",
                                     style = MicroTag,
-                                    color = Color.White
+                                    color = TextPrimary
                                 )
                             }
                         }
@@ -621,6 +632,7 @@ fun KeypadButton(
     backgroundColor: Color,
     textColor: Color,
     modifier: Modifier = Modifier,
+    borderColor: Color = CardBorderDark,
     onClick: () -> Unit
 ) {
     Box(
@@ -628,6 +640,7 @@ fun KeypadButton(
             .height(44.dp)
             .clip(RoundedCornerShape(8.dp))
             .background(backgroundColor)
+            .border(0.75.dp, borderColor, RoundedCornerShape(8.dp))
             .clickable { onClick() },
         contentAlignment = Alignment.Center
     ) {

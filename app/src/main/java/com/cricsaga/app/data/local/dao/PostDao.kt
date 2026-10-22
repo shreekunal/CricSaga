@@ -33,4 +33,7 @@ interface PostDao {
 
     @Query("SELECT * FROM posts WHERE postId = :postId LIMIT 1")
     suspend fun getPostById(postId: String): PostEntity?
+
+    @Query("UPDATE posts SET commentCount = commentCount + 1 WHERE postId = :postId")
+    suspend fun incrementCommentCount(postId: String)
 }

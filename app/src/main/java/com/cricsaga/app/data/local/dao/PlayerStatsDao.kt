@@ -23,4 +23,7 @@ interface PlayerStatsDao {
 
     @Query("SELECT * FROM player_stats ORDER BY runsScored DESC")
     fun getAllPlayerStats(): Flow<List<PlayerStatsEntity>>
+
+    @Query("SELECT COUNT(*) FROM player_stats")
+    suspend fun getStatsCount(): Int
 }

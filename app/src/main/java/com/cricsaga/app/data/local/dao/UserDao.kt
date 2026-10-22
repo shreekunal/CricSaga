@@ -29,4 +29,7 @@ interface UserDao {
 
     @Query("SELECT * FROM users ORDER BY fullName ASC")
     fun getAllUsers(): Flow<List<UserEntity>>
+
+    @Query("UPDATE users SET city = :city WHERE userId = :userId")
+    suspend fun updateUserCity(userId: String, city: String)
 }

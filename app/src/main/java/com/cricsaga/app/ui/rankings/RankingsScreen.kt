@@ -178,26 +178,44 @@ private fun BattersLeaderboard(
         return
     }
 
+    val top3 = players.take(3)
+    val rest = players.drop(3)
+
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        items(players) { player ->
-            PlayerRankingCard(
-                player = player,
+        item {
+            ChampionshipPodium(
+                top3 = top3,
                 primaryStatLabel = "RUNS",
-                primaryStatValue = player.runs.toString(),
-                statLine1 = "Avg: ${String.format(Locale.US, "%.1f", player.battingAverage)} • SR: ${String.format(Locale.US, "%.1f", player.strikeRate)}",
-                statLine2 = "HS: ${player.highestScore} • 50s: ${player.fifties} • 100s: ${player.hundreds}",
-                accentColor = when (player.rank) {
-                    1 -> Color(0xFFD97706) // Gold
-                    2 -> Color(0xFF94A3B8) // Silver
-                    3 -> Color(0xFFB45309) // Bronze
-                    else -> MaterialTheme.colorScheme.outline
-                },
-                onPlayerClick = { onPlayerClick(player.userId) }
+                onPlayerClick = onPlayerClick
             )
+        }
+
+        if (rest.isNotEmpty()) {
+            item {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "STANDINGS (#4 - #${players.size})",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Black,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    letterSpacing = 1.sp
+                )
+            }
+            items(rest) { player ->
+                PlayerRankingCard(
+                    player = player,
+                    primaryStatLabel = "RUNS",
+                    primaryStatValue = player.runs.toString(),
+                    statLine1 = "Avg: ${String.format(Locale.US, "%.1f", player.battingAverage)} • SR: ${String.format(Locale.US, "%.1f", player.strikeRate)}",
+                    statLine2 = "HS: ${player.highestScore} • 50s: ${player.fifties} • 100s: ${player.hundreds}",
+                    accentColor = MaterialTheme.colorScheme.outlineVariant,
+                    onPlayerClick = { onPlayerClick(player.userId) }
+                )
+            }
         }
     }
 }
@@ -212,26 +230,44 @@ private fun BowlersLeaderboard(
         return
     }
 
+    val top3 = players.take(3)
+    val rest = players.drop(3)
+
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        items(players) { player ->
-            PlayerRankingCard(
-                player = player,
+        item {
+            ChampionshipPodium(
+                top3 = top3,
                 primaryStatLabel = "WICKETS",
-                primaryStatValue = player.wickets.toString(),
-                statLine1 = "Econ: ${String.format(Locale.US, "%.2f", player.bowlingEconomy)} • Overs: ${String.format(Locale.US, "%.1f", player.oversBowled)}",
-                statLine2 = "Maidens: ${player.maidens} • Runs Conceded: ${player.runsConceded}",
-                accentColor = when (player.rank) {
-                    1 -> Color(0xFFD97706)
-                    2 -> Color(0xFF94A3B8)
-                    3 -> Color(0xFFB45309)
-                    else -> MaterialTheme.colorScheme.outline
-                },
-                onPlayerClick = { onPlayerClick(player.userId) }
+                onPlayerClick = onPlayerClick
             )
+        }
+
+        if (rest.isNotEmpty()) {
+            item {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "STANDINGS (#4 - #${players.size})",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Black,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    letterSpacing = 1.sp
+                )
+            }
+            items(rest) { player ->
+                PlayerRankingCard(
+                    player = player,
+                    primaryStatLabel = "WICKETS",
+                    primaryStatValue = player.wickets.toString(),
+                    statLine1 = "Econ: ${String.format(Locale.US, "%.2f", player.bowlingEconomy)} • Overs: ${String.format(Locale.US, "%.1f", player.oversBowled)}",
+                    statLine2 = "Maidens: ${player.maidens} • Runs Conceded: ${player.runsConceded}",
+                    accentColor = MaterialTheme.colorScheme.outlineVariant,
+                    onPlayerClick = { onPlayerClick(player.userId) }
+                )
+            }
         }
     }
 }
@@ -246,26 +282,44 @@ private fun AllRoundersLeaderboard(
         return
     }
 
+    val top3 = players.take(3)
+    val rest = players.drop(3)
+
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        items(players) { player ->
-            PlayerRankingCard(
-                player = player,
+        item {
+            ChampionshipPodium(
+                top3 = top3,
                 primaryStatLabel = "MVP PTS",
-                primaryStatValue = player.mvpPoints.toInt().toString(),
-                statLine1 = "${player.runs} Runs • ${player.wickets} Wickets",
-                statLine2 = "SR: ${String.format(Locale.US, "%.1f", player.strikeRate)} • Econ: ${String.format(Locale.US, "%.2f", player.bowlingEconomy)}",
-                accentColor = when (player.rank) {
-                    1 -> Color(0xFFD97706)
-                    2 -> Color(0xFF94A3B8)
-                    3 -> Color(0xFFB45309)
-                    else -> MaterialTheme.colorScheme.outline
-                },
-                onPlayerClick = { onPlayerClick(player.userId) }
+                onPlayerClick = onPlayerClick
             )
+        }
+
+        if (rest.isNotEmpty()) {
+            item {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "STANDINGS (#4 - #${players.size})",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Black,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    letterSpacing = 1.sp
+                )
+            }
+            items(rest) { player ->
+                PlayerRankingCard(
+                    player = player,
+                    primaryStatLabel = "MVP PTS",
+                    primaryStatValue = player.mvpPoints.toInt().toString(),
+                    statLine1 = "${player.runs} Runs • ${player.wickets} Wickets",
+                    statLine2 = "SR: ${String.format(Locale.US, "%.1f", player.strikeRate)} • Econ: ${String.format(Locale.US, "%.2f", player.bowlingEconomy)}",
+                    accentColor = MaterialTheme.colorScheme.outlineVariant,
+                    onPlayerClick = { onPlayerClick(player.userId) }
+                )
+            }
         }
     }
 }
@@ -329,6 +383,11 @@ private fun PlayerRankingCard(
                             else -> MaterialTheme.colorScheme.surfaceVariant
                         },
                         shape = CircleShape
+                    )
+                    .border(
+                        width = 0.75.dp,
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
+                        shape = CircleShape
                     ),
                 contentAlignment = Alignment.Center
             ) {
@@ -340,25 +399,33 @@ private fun PlayerRankingCard(
                         1 -> Color(0xFFD97706)
                         2 -> Color(0xFF94A3B8)
                         3 -> Color(0xFFB45309)
-                        else -> MaterialTheme.colorScheme.onSurfaceVariant
+                        else -> MaterialTheme.colorScheme.onSurface
                     }
                 )
             }
 
             Spacer(modifier = Modifier.width(12.dp))
 
-            // Player Avatar & Information
+            // Player Avatar & Information with high-contrast tinted container
             Box(
                 modifier = Modifier
                     .size(42.dp)
-                    .background(CharcoalBackgroundDark, CircleShape),
+                    .background(
+                        color = CrimsonPrimaryDark.copy(alpha = 0.12f),
+                        shape = CircleShape
+                    )
+                    .border(
+                        width = 1.dp,
+                        color = CrimsonPrimaryDark.copy(alpha = 0.3f),
+                        shape = CircleShape
+                    ),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     text = player.initials,
                     fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
+                    fontWeight = FontWeight.Black,
+                    color = CrimsonPrimaryDark
                 )
             }
 
@@ -384,7 +451,7 @@ private fun PlayerRankingCard(
                 }
 
                 Text(
-                    text = "${player.role} • ${player.teamName}",
+                    text = "${player.role} • ${player.city}",
                     fontSize = 11.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1
@@ -635,6 +702,241 @@ private fun EmptyLeaderboardPlaceholder(message: String) {
                 fontWeight = FontWeight.Medium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+        }
+    }
+}
+
+@Composable
+fun ChampionshipPodium(
+    top3: List<PlayerRankingItem>,
+    primaryStatLabel: String,
+    onPlayerClick: (String) -> Unit
+) {
+    if (top3.isEmpty()) return
+
+    val first = top3.getOrNull(0)
+    val second = top3.getOrNull(1)
+    val third = top3.getOrNull(2)
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 2.dp),
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = CardDefaults.outlinedCardBorder().copy(
+            brush = androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+        )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 10.dp, start = 8.dp, end = 8.dp, bottom = 8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.EmojiEvents,
+                    contentDescription = null,
+                    tint = Color(0xFFFFB800),
+                    modifier = Modifier.size(15.dp)
+                )
+                Spacer(modifier = Modifier.width(5.dp))
+                Text(
+                    text = "CHAMPIONSHIP PODIUM",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Black,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    letterSpacing = 0.8.sp
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // 3-Column Compact Podium Display
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.Bottom
+            ) {
+                // #2 Silver (Left)
+                if (second != null) {
+                    PodiumPillar(
+                        player = second,
+                        rank = 2,
+                        pillarHeight = 44.dp,
+                        accentColor = Color(0xFF94A3B8),
+                        rankLabel = "2ND",
+                        primaryStatLabel = primaryStatLabel,
+                        modifier = Modifier.weight(1f),
+                        onPlayerClick = { onPlayerClick(second.userId) }
+                    )
+                } else {
+                    Spacer(modifier = Modifier.weight(1f))
+                }
+
+                // #1 Gold (Center)
+                if (first != null) {
+                    PodiumPillar(
+                        player = first,
+                        rank = 1,
+                        pillarHeight = 56.dp,
+                        accentColor = Color(0xFFFFB800),
+                        rankLabel = "1ST",
+                        primaryStatLabel = primaryStatLabel,
+                        modifier = Modifier.weight(1.08f),
+                        isChampion = true,
+                        onPlayerClick = { onPlayerClick(first.userId) }
+                    )
+                }
+
+                // #3 Bronze (Right)
+                if (third != null) {
+                    PodiumPillar(
+                        player = third,
+                        rank = 3,
+                        pillarHeight = 36.dp,
+                        accentColor = Color(0xFFD97706),
+                        rankLabel = "3RD",
+                        primaryStatLabel = primaryStatLabel,
+                        modifier = Modifier.weight(1f),
+                        onPlayerClick = { onPlayerClick(third.userId) }
+                    )
+                } else {
+                    Spacer(modifier = Modifier.weight(1f))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun PodiumPillar(
+    player: PlayerRankingItem,
+    rank: Int,
+    pillarHeight: androidx.compose.ui.unit.Dp,
+    accentColor: Color,
+    rankLabel: String,
+    primaryStatLabel: String,
+    modifier: Modifier = Modifier,
+    isChampion: Boolean = false,
+    onPlayerClick: () -> Unit
+) {
+    val statValue = when (primaryStatLabel) {
+        "RUNS" -> "${player.runs}"
+        "WICKETS" -> "${player.wickets}"
+        "MVP PTS" -> "${player.mvpPoints.toInt()}"
+        else -> "${player.runs}"
+    }
+
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(10.dp))
+            .clickable(onClick = onPlayerClick)
+            .padding(horizontal = 2.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        if (isChampion) {
+            Icon(
+                imageVector = Icons.Default.MilitaryTech,
+                contentDescription = "Champion",
+                tint = Color(0xFFFFB800),
+                modifier = Modifier.size(18.dp)
+            )
+        } else {
+            Spacer(modifier = Modifier.height(4.dp))
+        }
+
+        Box(contentAlignment = Alignment.BottomCenter) {
+            Box(
+                modifier = Modifier
+                    .size(if (isChampion) 44.dp else 36.dp)
+                    .clip(CircleShape)
+                    .background(accentColor.copy(alpha = 0.15f))
+                    .border(1.5.dp, accentColor, CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = player.initials,
+                    fontSize = if (isChampion) 14.sp else 12.sp,
+                    fontWeight = FontWeight.Black,
+                    color = accentColor
+                )
+            }
+            Surface(
+                color = accentColor,
+                shape = CircleShape,
+                modifier = Modifier
+                    .offset(y = 4.dp)
+                    .size(15.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Text(
+                        text = "$rank",
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Black,
+                        color = Color.White
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(6.dp))
+
+        Text(
+            text = player.playerName,
+            fontSize = if (isChampion) 11.sp else 10.sp,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+        )
+
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = statValue,
+                fontSize = if (isChampion) 12.sp else 11.sp,
+                fontWeight = FontWeight.Black,
+                color = accentColor
+            )
+            Spacer(modifier = Modifier.width(2.dp))
+            Text(
+                text = primaryStatLabel,
+                fontSize = 7.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
+        Spacer(modifier = Modifier.height(4.dp))
+
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(pillarHeight),
+            shape = RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp),
+            color = accentColor.copy(alpha = if (isChampion) 0.22f else 0.14f),
+            border = androidx.compose.foundation.BorderStroke(1.dp, accentColor.copy(alpha = 0.5f))
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = rankLabel,
+                        fontSize = if (isChampion) 13.sp else 11.sp,
+                        fontWeight = FontWeight.Black,
+                        color = accentColor
+                    )
+                    Text(
+                        text = player.city.ifBlank { "Mumbai" },
+                        fontSize = 8.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1
+                    )
+                }
+            }
         }
     }
 }

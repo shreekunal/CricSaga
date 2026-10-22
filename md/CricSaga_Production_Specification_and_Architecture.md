@@ -404,18 +404,20 @@ To inspect past completed matches or resume interrupted games, `ScoringViewModel
 ```mermaid
 graph TD
     AppNav["AppNavigation (Jetpack Compose Scaffold)"]
-    AppNav --> Tab1["Tab 1: Home Screen"]
+    AppNav --> Tab1["Tab 1: Home Feed"]
     AppNav --> Tab2["Tab 2: Matches Hub"]
     AppNav --> Tab3["Tab 3: Discover Hub"]
-    AppNav --> Tab4["Tab 4: Tournaments Hub"]
+    AppNav --> Tab4["Tab 4: Rankings & Leaderboards"]
     AppNav --> Tab5["Tab 5: My Career Hub"]
+    AppNav -.-> DM["Direct Messages & 1-on-1 Chat"]
 ```
 
 ### Tab 1: Home Screen (`HomeScreen.kt`)
+- **Twitter-Style Grassroots Social Feed:** Dual tabs ("For You" algorithmic regional feed & "Following" network feed) with likes, comments, reposts, follow buttons, and direct messaging.
 - **Live Match Radar:** Carousel displaying ongoing matches with current scores (`142/4 in 16.2 ov`), CRR, and dynamic chase equations. Shows a clean empty state card when no games are live.
-- **Scorer Launchpad:** Primary CTA `+ START NEW MATCH`, quick actions for `My Teams` and `Tournaments`.
-- **Top Performers (Grassroots Heroes):** Real-time StateFlow ranking top players from Room `PlayerStatsEntity` by composite score `(runs + wickets * 25)`. Displays a dedicated empty state card on clean databases.
-- **Sponsor Banner:** Minimal text banner shown only to free users; disappears entirely for Pro members.
+- **Header Launchpad:** Primary CTA `+ SCORE MATCH`, `RANKINGS` chip navigating directly to leaderboards, and `TEAMS` chip.
+- **Top App Bar Icons:** Direct Messages inbox icon with unread badge counter, theme switcher, and settings.
+- **Rich Post Composer:** Modal dialog to publish grassroots match stories with optional batting/bowling performance tags and image attachments.
 
 ### Tab 2: Matches Hub (`MatchListScreen.kt` & `ScoringScreen.kt`)
 - **Match Ledger:** Segmented list of Live and Completed matches.
@@ -423,20 +425,32 @@ graph TD
 - **Match Setup (`MatchSetupScreen.kt`):** Select Team A, Team B, overs limit, pitch surface, ball type, and toss decisions. Features an inline quick team creation modal so users never have to exit the setup flow.
 
 ### Tab 3: Discover Hub (`DiscoverScreen.kt`)
-- **Looking For Matchmaker:** Community recruitment board for weekend opponents, box cricket players, and certified umpires.
-- **One-Tap WhatsApp Action:** Direct `wa.me/<phone>` integration with pre-filled match details and system dialer fallback.
+- **Individual-Centric Matchmaker:** Pure grassroots talent recruitment board for Players, Opponents, Scorers, and Umpires. Ground bookings and external tournaments completely removed.
+- **Regional Rankings Scout Banner:** Prominent banner linking directly to the Rankings & Leaderboards hub.
+- **Quick Role Filter Chips:** `All`, `Urgent / Today`, `Players`, `Opponents`, `Scorer / Umpire`.
+- **Direct Action Buttons:** `MESSAGE` (opens 1-on-1 chat) and `WHATSAPP` (`wa.me/<phone>` integration).
 - **Persistent Posting:** Modal dialog persists new user requirements directly to Room SQLite (`looking_for_posts` table).
-- **Turfs & Grounds Directory:** List of local sports arenas with floodlights, turf surface, and hourly booking prices.
 
-### Tab 4: Tournaments Hub (`TournamentListScreen.kt`)
-- **Live Points Table:** Automatically calculates Played (P), Won (W), Lost (L), Points (PTS), and official ICC Net Run Rate (NRR) from match results.
-- **Leaderboards:** Orange Cap (leading run-scorers) and Purple Cap (leading wicket-takers).
-- **Interactive Creation:** Modal dialog to create tournaments with overs configuration and team selections.
+### Tab 4: Rankings & Leaderboards (`RankingsScreen.kt`)
+- **Top Batters Leaderboard:** Ranked by total runs scored, batting average, and strike rate. Displays matches, innings, HS, 50s, 100s, 4s, and 6s.
+- **Top Bowlers Leaderboard:** Ranked by wickets taken, economy rate, maidens, and runs conceded.
+- **MVP All-Rounders Leaderboard:** Combined performance index scoring runs, wickets, strike rate, and bowling economy.
+- **Team Standings Leaderboard:** Club rankings tracking Played (P), Won (W), Lost (L), Tied (T), Win %, Points, and 3-match form guide pills (`W`, `L`, `T`).
+- **Regional City Filter Chips:** Dynamic chip selector (`All Regions`, `Mumbai`, `Delhi`, `Ahmedabad`, `Bengaluru`, `Pune`, etc.) with active pill highlight.
+- **Podium Visuals:** Top 3 entries feature Gold (`#1`), Silver (`#2`), and Bronze (`#3`) badges with distinct card styling.
+- **Interactive Routing:** Tapping any player navigates to their `PlayerDetailScreen`; tapping any team navigates to `TeamDetailScreen`.
 
 ### Tab 5: My Career Hub (`PlayerProfileScreen.kt`)
-- **Player Hero Header:** Name, jersey number, playing role, city, and Gold Founder badge.
-- **Pro Membership Showcase:** Highlights the 3 pricing tiers with direct promo code redemption button.
+- **Player Hero Header:** Name, jersey number, playing role, city, and live Follower & Following count pills.
+- **Authored Posts Tab:** Direct feed of all updates, match moments, and stories authored by the user.
 - **5-Tab Statistical Ledger:** Overview, Batting, Bowling, Fielding, and Match History. All figures are 100% computed from Room SQLite entities with zero hardcoded baseline offsets.
+- **Pro Membership Showcase:** Highlights the 3 pricing tiers with direct promo code redemption button.
+
+### Direct Messages (`ConversationListScreen.kt` & `ChatScreen.kt`)
+- **Inbox:** Conversation list with latest snippet, timestamps, and search.
+- **1-on-1 Chat:** Real-time messaging bubbles with auto-scroll.
+- **Structured Match Challenges:** Send and receive match challenges with format, overs, ball type, venue, date, and time.
+- **Accessible Everywhere:** Accessible from Home top bar, Player Profile "MESSAGE" button, and Discover requirement cards.
 
 ---
 

@@ -1,10 +1,10 @@
 package com.cricsaga.app.ui.home
 
 import android.net.Uri
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -14,6 +14,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Chat
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -24,13 +25,17 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.cricsaga.app.data.local.entity.CommentEntity
 import com.cricsaga.app.data.local.entity.MatchEntity
 import com.cricsaga.app.data.local.entity.PostEntity
 import com.cricsaga.app.domain.model.MatchStatus
+import com.cricsaga.app.domain.model.PlayerRankingItem
 import com.cricsaga.app.ui.theme.*
 import com.cricsaga.app.ui.utils.ImageUtils
+import kotlinx.coroutines.flow.Flow
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -51,6 +56,7 @@ data class LiveRadarItem(
     val oversText: String,
     val crrText: String,
     val equationText: String,
+    val ballType: String = "Tennis Light",
     val isLive: Boolean = true
 )
 
@@ -59,14 +65,20 @@ data class LiveRadarItem(
 fun HomeScreen(
     isPro: Boolean,
     currentUserId: String,
+    currentUserName: String = "Rohit Sharma",
+    currentUserAvatarUrl: String? = null,
     matches: List<MatchEntity>,
     posts: List<PostEntity>,
+    topPlayersToFollow: List<PlayerRankingItem> = emptyList(),
     followedUserIds: Set<String> = emptySet(),
     unreadMessageCount: Int = 0,
     isDarkTheme: Boolean = true,
     onThemeToggleClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
     onMessagesClick: () -> Unit = {},
+    onNotificationsClick: () -> Unit = {},
+    onProfileClick: () -> Unit = {},
+    onJoinPlusClick: () -> Unit = {},
     onRankingsClick: () -> Unit = {},
     onStartMatchClick: () -> Unit,
     onManageTeamsClick: () -> Unit,
@@ -75,12 +87,27 @@ fun HomeScreen(
     onPlayerProfileClick: (String) -> Unit,
     onToggleFollow: (String) -> Unit,
     onLikePostClick: (String) -> Unit,
-    onCreatePost: (content: String, performanceTag: String?, imageUri: String?) -> Unit,
-    onDirectMessageAuthor: (authorId: String, authorName: String) -> Unit
+    onCreatePost: (content: String, performanceTag: String?) -> Unit,
+    onDirectMessageAuthor: (authorId: String, authorName: String) -> Unit,
+    getCommentsForPost: ((String) -> Flow<List<CommentEntity>>)? = null,
+    onAddComment: ((String, String) -> Unit)? = null
 ) {
     var selectedFeedTab by remember { mutableIntStateOf(0) } // 0: For You, 1: Following
     var showCreatePostDialog by remember { mutableStateOf(false) }
+    var showNotificationsDialog by remember { mutableStateOf(false) }
+    var activeCommentPost by remember { mutableStateOf<PostEntity?>(null) }
     val hapticManager = com.cricsaga.app.ui.utils.LocalHapticManager.current
+
+    val commentsForActivePost by produceState<List<CommentEntity>>(initialValue = emptyList(), activeCommentPost) {
+        val currentPost = activeCommentPost
+        if (currentPost != null && getCommentsForPost != null) {
+            getCommentsForPost(currentPost.postId).collect { list ->
+                value = list
+            }
+        } else {
+            value = emptyList()
+        }
+    }
 
     val activeRadarMatches = remember(matches) {
         val liveOrRecent = matches.filter { it.matchStatus == MatchStatus.LIVE || it.matchStatus == MatchStatus.COMPLETED }
@@ -88,14 +115,16 @@ fun HomeScreen(
             val parts = m.matchTitle.split(" vs ")
             val teamA = parts.getOrNull(0) ?: "Team A"
             val teamB = parts.getOrNull(1) ?: "Team B"
+            val ballTypeStr = m.ballType.name.replace("_", " ").lowercase().replaceFirstChar { it.uppercase() }
             LiveRadarItem(
                 matchId = m.matchId,
                 teamA = teamA,
                 teamB = teamB,
-                scoreText = if (m.matchStatus == MatchStatus.COMPLETED) m.resultSummary?.take(18) ?: "Final" else "Live",
+                scoreText = if (m.matchStatus == MatchStatus.COMPLETED) m.resultSummary?.take(25) ?: "Match Completed" else "In Progress",
                 oversText = "${m.totalOvers} ov",
-                crrText = m.ballType.name.replace("_", " "),
+                crrText = ballTypeStr,
                 equationText = m.resultSummary ?: "${m.totalOvers} overs match",
+                ballType = ballTypeStr,
                 isLive = m.matchStatus == MatchStatus.LIVE
             )
         }
@@ -114,38 +143,98 @@ fun HomeScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Column {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                text = "CricSaga",
-                                fontWeight = FontWeight.Black,
-                                fontSize = 20.sp,
-                                color = MaterialTheme.colorScheme.onBackground
-                            )
-                            if (isPro) {
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Surface(
-                                    color = AmberFourPrimary.copy(alpha = 0.2f),
-                                    shape = RoundedCornerShape(4.dp)
-                                ) {
-                                    Text(
-                                        text = "PRO",
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 9.sp,
-                                        color = AmberFourPrimary,
-                                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
-                                    )
-                                }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Left: Profile Avatar (Clickable to My Career)
+                        val initials = currentUserName.split(" ")
+                            .mapNotNull { it.firstOrNull()?.toString() }
+                            .take(2)
+                            .joinToString("")
+                            .uppercase()
+                            .ifEmpty { "CR" }
+
+                        val avatarBitmap = remember(currentUserAvatarUrl) {
+                            ImageUtils.loadBitmapFromPath(currentUserAvatarUrl)
+                        }
+
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.surfaceVariant)
+                                .border(1.5.dp, CrimsonPrimaryDark, CircleShape)
+                                .clickable {
+                                    hapticManager?.tapUiClick()
+                                    onProfileClick()
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (avatarBitmap != null) {
+                                Image(
+                                    bitmap = avatarBitmap,
+                                    contentDescription = "My Profile",
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentScale = ContentScale.Crop
+                                )
+                            } else {
+                                Text(
+                                    text = initials,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Black,
+                                    color = CrimsonPrimaryDark
+                                )
                             }
                         }
-                        Text(
-                            text = "Grassroots Cricket Social Feed",
-                            fontSize = 11.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+
+                        Spacer(modifier = Modifier.width(10.dp))
+
+                        // Join Plus Button (with Gap to right actions)
+                        Surface(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(16.dp))
+                                .clickable {
+                                    hapticManager?.tapUiClick()
+                                    onJoinPlusClick()
+                                },
+                            color = AmberFourPrimary.copy(alpha = 0.15f),
+                            border = BorderStroke(1.dp, AmberFourPrimary.copy(alpha = 0.7f))
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.WorkspacePremium,
+                                    contentDescription = null,
+                                    tint = AmberFourPrimary,
+                                    modifier = Modifier.size(13.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = if (isPro) "Plus Active" else "Join Plus",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = AmberFourPrimary
+                                )
+                            }
+                        }
                     }
                 },
                 actions = {
+                    // Theme Switcher Toggle
+                    IconButton(onClick = {
+                        hapticManager?.tapUiClick()
+                        onThemeToggleClick()
+                    }) {
+                        Icon(
+                            imageVector = if (isDarkTheme) Icons.Default.LightMode else Icons.Default.DarkMode,
+                            contentDescription = "Toggle Theme",
+                            tint = if (isDarkTheme) AmberFourPrimary else TextPrimaryLight
+                        )
+                    }
+
                     // Direct Messages Icon with Unread Badge
                     Box(contentAlignment = Alignment.TopEnd) {
                         IconButton(onClick = {
@@ -176,15 +265,16 @@ fun HomeScreen(
                         }
                     }
 
-                    // Theme Switcher Toggle
+                    // Notifications Icon
                     IconButton(onClick = {
                         hapticManager?.tapUiClick()
-                        onThemeToggleClick()
+                        showNotificationsDialog = true
+                        onNotificationsClick()
                     }) {
                         Icon(
-                            imageVector = if (isDarkTheme) Icons.Default.LightMode else Icons.Default.DarkMode,
-                            contentDescription = "Toggle Theme",
-                            tint = if (isDarkTheme) AmberFourPrimary else TextPrimaryLight
+                            Icons.Default.Notifications,
+                            contentDescription = "Notifications",
+                            tint = MaterialTheme.colorScheme.onBackground
                         )
                     }
 
@@ -222,92 +312,49 @@ fun HomeScreen(
                 .padding(paddingValues),
             contentPadding = PaddingValues(bottom = 80.dp)
         ) {
-            // Section 1: Compact Live Match & Scorer Ticker
+            // Section 1: Clear Live Score Header & Sleek + Match Action
             item {
                 Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "LIVE RADAR & SCORING",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Black,
-                            letterSpacing = 0.5.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            text = "Live Score",
+                            fontSize = 17.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onBackground
                         )
 
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Surface(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(14.dp))
-                                    .clickable {
-                                        hapticManager?.tapUiClick()
-                                        onRankingsClick()
-                                    },
-                                color = AmberFourPrimary.copy(alpha = 0.18f)
+                        Surface(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(16.dp))
+                                .clickable {
+                                    hapticManager?.tapBoundaryFour()
+                                    onStartMatchClick()
+                                },
+                            color = CrimsonPrimaryDark
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.EmojiEvents,
-                                        contentDescription = null,
-                                        tint = AmberFourPrimary,
-                                        modifier = Modifier.size(12.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(3.dp))
-                                    Text(
-                                        text = "RANKINGS",
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = AmberFourPrimary
-                                    )
-                                }
-                            }
-
-                            Surface(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(14.dp))
-                                    .clickable {
-                                        hapticManager?.tapUiClick()
-                                        onManageTeamsClick()
-                                    },
-                                color = MaterialTheme.colorScheme.surfaceVariant
-                            ) {
-                                Text(
-                                    text = "TEAMS",
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                Icon(
+                                    imageVector = Icons.Default.Add,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(13.dp),
+                                    tint = Color.White
                                 )
-                            }
-
-                            Surface(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(14.dp))
-                                    .clickable {
-                                        hapticManager?.tapBoundaryFour()
-                                        onStartMatchClick()
-                                    },
-                                color = CrimsonPrimaryDark
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(12.dp), tint = Color.White)
-                                    Spacer(modifier = Modifier.width(3.dp))
-                                    Text(
-                                        text = "SCORE MATCH",
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color.White
-                                    )
-                                }
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = "+ Match",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White
+                                )
                             }
                         }
                     }
@@ -342,6 +389,19 @@ fun HomeScreen(
                             }
                         }
                     }
+                }
+            }
+
+            // Section 1.5: Top Players to Follow Carousel
+            if (topPlayersToFollow.isNotEmpty()) {
+                item {
+                    TopPlayersFollowCarousel(
+                        players = topPlayersToFollow,
+                        followedUserIds = followedUserIds,
+                        onPlayerClick = onPlayerProfileClick,
+                        onToggleFollow = onToggleFollow,
+                        onViewRankingsClick = onRankingsClick
+                    )
                 }
             }
 
@@ -462,19 +522,95 @@ fun HomeScreen(
                         onToggleFollow = { onToggleFollow(post.authorId) },
                         onLikeClick = { onLikePostClick(post.postId) },
                         onMessageAuthor = { onDirectMessageAuthor(post.authorId, post.authorName) },
-                        onMatchClick = { post.linkedMatchId?.let { onMatchClick(it) } }
+                        onMatchClick = { post.linkedMatchId?.let { onMatchClick(it) } },
+                        onCommentClick = { activeCommentPost = post }
                     )
                 }
             }
         }
     }
 
+    if (showNotificationsDialog) {
+        AlertDialog(
+            onDismissRequest = { showNotificationsDialog = false },
+            title = {
+                Text(
+                    text = "Match & Community Updates",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp
+                )
+            },
+            text = {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Surface(
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(10.dp)) {
+                            Text(
+                                text = "Challenge Request",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp,
+                                color = CrimsonPrimaryDark
+                            )
+                            Text(
+                                text = "Warriors challenged your squad to an 8-over weekend fixture.",
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    Surface(
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(10.dp)) {
+                            Text(
+                                text = "Leaderboard Alert",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp,
+                                color = AmberFourPrimary
+                            )
+                            Text(
+                                text = "You are in the Top 5 grassroots all-rounders in Mumbai!",
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showNotificationsDialog = false }) {
+                    Text("OK", fontWeight = FontWeight.Bold, color = CrimsonPrimaryDark)
+                }
+            }
+        )
+    }
+
     if (showCreatePostDialog) {
         CreatePostDialog(
             onDismiss = { showCreatePostDialog = false },
-            onPost = { content, statTag, imageUri ->
-                onCreatePost(content, statTag, imageUri)
+            onPost = { content, statTag ->
+                onCreatePost(content, statTag)
                 showCreatePostDialog = false
+            }
+        )
+    }
+
+    activeCommentPost?.let { post ->
+        CommentsBottomSheet(
+            post = post,
+            comments = commentsForActivePost,
+            onDismissRequest = { activeCommentPost = null },
+            onAddComment = { text ->
+                onAddComment?.invoke(post.postId, text)
             }
         )
     }
@@ -487,32 +623,350 @@ fun CompactMatchRadarCard(
 ) {
     Card(
         modifier = Modifier
-            .width(220.dp)
+            .width(320.dp)
             .clickable(onClick = onClick),
-        shape = RoundedCornerShape(10.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = CardDefaults.outlinedCardBorder().copy(
+            brush = androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+        )
     ) {
-        Column(modifier = Modifier.padding(10.dp)) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            // Header Row: Teams, Ball Type & Live Badge
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = "${item.teamA} vs ${item.teamB}",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 12.sp,
-                    maxLines = 1,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(24.dp)
+                            .background(CrimsonPrimaryDark.copy(alpha = 0.15f), CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = item.teamA.take(1).uppercase(),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Black,
+                            color = CrimsonPrimaryDark
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "vs",
+                        fontSize = 10.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontWeight = FontWeight.Medium
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Box(
+                        modifier = Modifier
+                            .size(24.dp)
+                            .background(MaterialTheme.colorScheme.surfaceVariant, CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = item.teamB.take(1).uppercase(),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Black,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "${item.teamA} vs ${item.teamB}",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.sp,
+                        maxLines = 1,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+                Spacer(modifier = Modifier.width(8.dp))
                 if (item.isLive) {
-                    Surface(color = CrimsonPrimaryDark, shape = RoundedCornerShape(4.dp)) {
-                        Text("LIVE", color = Color.White, fontSize = 8.sp, fontWeight = FontWeight.Black, modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp))
+                    Surface(
+                        color = CrimsonPrimaryDark,
+                        shape = RoundedCornerShape(4.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(5.dp)
+                                    .background(Color.White, CircleShape)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "LIVE",
+                                color = Color.White,
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Black
+                            )
+                        }
+                    }
+                } else {
+                    Surface(
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        shape = RoundedCornerShape(4.dp)
+                    ) {
+                        Text(
+                            text = "FINAL",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
                     }
                 }
             }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Body: Match Equation & Format Strip
+            Surface(
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                shape = RoundedCornerShape(8.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 10.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = item.equationText,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "${item.oversText} • ${item.ballType}",
+                            fontSize = 10.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Icon(
+                        imageVector = Icons.Default.ChevronRight,
+                        contentDescription = "View Scorecard",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun TopPlayersFollowCarousel(
+    players: List<PlayerRankingItem>,
+    followedUserIds: Set<String>,
+    onPlayerClick: (String) -> Unit,
+    onToggleFollow: (String) -> Unit,
+    onViewRankingsClick: () -> Unit
+) {
+    if (players.isEmpty()) return
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.Stars,
+                        contentDescription = null,
+                        tint = AmberFourPrimary,
+                        modifier = Modifier.size(15.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "TOP PLAYERS TO FOLLOW",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Black,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                }
+                Text(
+                    text = "Discover top performers and connect with talent",
+                    fontSize = 10.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            TextButton(
+                onClick = onViewRankingsClick,
+                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)
+            ) {
+                Text(
+                    text = "See Rankings",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = CrimsonPrimaryDark
+                )
+                Spacer(modifier = Modifier.width(2.dp))
+                Icon(
+                    imageVector = Icons.Default.ChevronRight,
+                    contentDescription = null,
+                    tint = CrimsonPrimaryDark,
+                    modifier = Modifier.size(14.dp)
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            contentPadding = PaddingValues(horizontal = 16.dp)
+        ) {
+            items(players, key = { it.userId }) { player ->
+                val isFollowing = player.userId in followedUserIds
+                TopPlayerFollowCard(
+                    player = player,
+                    isFollowing = isFollowing,
+                    onCardClick = { onPlayerClick(player.userId) },
+                    onToggleFollow = { onToggleFollow(player.userId) }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun TopPlayerFollowCard(
+    player: PlayerRankingItem,
+    isFollowing: Boolean,
+    onCardClick: () -> Unit,
+    onToggleFollow: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .width(150.dp)
+            .clickable(onClick = onCardClick),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = CardDefaults.outlinedCardBorder().copy(
+            brush = androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+        )
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Box(contentAlignment = Alignment.BottomEnd) {
+                Box(
+                    modifier = Modifier
+                        .size(46.dp)
+                        .background(
+                            color = when (player.rank) {
+                                1 -> Color(0xFFD97706).copy(alpha = 0.2f)
+                                2 -> Color(0xFF94A3B8).copy(alpha = 0.2f)
+                                3 -> Color(0xFFB45309).copy(alpha = 0.2f)
+                                else -> CrimsonPrimaryDark.copy(alpha = 0.15f)
+                            },
+                            shape = CircleShape
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = player.initials,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = when (player.rank) {
+                            1 -> Color(0xFFD97706)
+                            2 -> Color(0xFF94A3B8)
+                            3 -> Color(0xFFB45309)
+                            else -> CrimsonPrimaryDark
+                        }
+                    )
+                }
+                if (player.isVerified) {
+                    Icon(
+                        imageVector = Icons.Default.Verified,
+                        contentDescription = "Verified",
+                        tint = AmberFourPrimary,
+                        modifier = Modifier
+                            .size(15.dp)
+                            .background(MaterialTheme.colorScheme.surface, CircleShape)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            Text(
+                text = player.playerName,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+            )
+
+            Text(
+                text = player.role,
+                fontSize = 10.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+            )
+
             Spacer(modifier = Modifier.height(4.dp))
-            Text(item.equationText, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+
+            Surface(
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                shape = RoundedCornerShape(4.dp)
+            ) {
+                Text(
+                    text = if (player.runs > 0) "${player.runs} Runs" else "${player.wickets} Wkts",
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Surface(
+                onClick = onToggleFollow,
+                shape = RoundedCornerShape(6.dp),
+                color = if (isFollowing) MaterialTheme.colorScheme.surfaceVariant else CrimsonPrimaryDark,
+                border = if (isFollowing) androidx.compose.foundation.BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant) else null,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(28.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Text(
+                        text = if (isFollowing) "Following" else "+ Follow",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isFollowing) MaterialTheme.colorScheme.onSurfaceVariant else Color.White
+                    )
+                }
+            }
         }
     }
 }
@@ -526,7 +980,8 @@ fun CricketPostCard(
     onToggleFollow: () -> Unit,
     onLikeClick: () -> Unit,
     onMessageAuthor: () -> Unit,
-    onMatchClick: () -> Unit
+    onMatchClick: () -> Unit,
+    onCommentClick: () -> Unit = {}
 ) {
     val hapticManager = com.cricsaga.app.ui.utils.LocalHapticManager.current
     val formattedTime = remember(post.createdAt) {
@@ -731,7 +1186,13 @@ fun CricketPostCard(
                 }
 
                 // Comment Button
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.clickable {
+                        hapticManager?.tapUiClick()
+                        onCommentClick()
+                    }
+                ) {
                     Icon(
                         imageVector = Icons.Default.ChatBubbleOutline,
                         contentDescription = "Comments",
@@ -785,18 +1246,23 @@ fun CricketPostCard(
 @Composable
 fun CreatePostDialog(
     onDismiss: () -> Unit,
-    onPost: (content: String, performanceTag: String?, imageUri: String?) -> Unit
+    onPost: (content: String, performanceTag: String?) -> Unit
 ) {
     var contentText by remember { mutableStateOf("") }
     var performanceTagText by remember { mutableStateOf("") }
-    var selectedImageUri by remember { mutableStateOf<Uri?>(null) }
     val hapticManager = com.cricsaga.app.ui.utils.LocalHapticManager.current
 
-    val photoPickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
-    ) { uri ->
-        selectedImageUri = uri
-    }
+    val guidedTags = listOf(
+        "50* (28)",
+        "100* (54)",
+        "3/18 (4.0)",
+        "5/12 (3.4)",
+        "Hat-trick",
+        "Captain's Knock",
+        "Match Winner",
+        "Finisher 32* (12)",
+        "Maiden Over"
+    )
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -806,7 +1272,7 @@ fun CreatePostDialog(
         text = {
             Column(
                 modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 OutlinedTextField(
                     value = contentText,
@@ -814,40 +1280,53 @@ fun CreatePostDialog(
                     placeholder = { Text("What happened on the pitch today? Share match highlights, thoughts, or banter...", fontSize = 12.sp) },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(100.dp),
+                        .height(110.dp),
                     shape = RoundedCornerShape(8.dp)
                 )
 
-                OutlinedTextField(
-                    value = performanceTagText,
-                    onValueChange = { performanceTagText = it },
-                    label = { Text("Match Performance Tag (optional)") },
-                    placeholder = { Text("e.g. 54* (28) • 4/18", fontSize = 12.sp) },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    shape = RoundedCornerShape(8.dp)
-                )
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    OutlinedButton(
-                        onClick = {
-                            hapticManager?.tapUiClick()
-                            photoPickerLauncher.launch("image/*")
-                        },
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        text = "Match Performance Tag",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    OutlinedTextField(
+                        value = performanceTagText,
+                        onValueChange = { performanceTagText = it },
+                        placeholder = { Text("e.g. 54* (28) • 4/18", fontSize = 12.sp) },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
                         shape = RoundedCornerShape(8.dp)
-                    ) {
-                        Icon(Icons.Default.PhotoCamera, contentDescription = null, modifier = Modifier.size(14.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(if (selectedImageUri != null) "Photo Attached" else "Attach Photo", fontSize = 11.sp)
-                    }
-
-                    if (selectedImageUri != null) {
-                        TextButton(onClick = { selectedImageUri = null }) {
-                            Text("Remove", fontSize = 11.sp, color = CrimsonPrimaryDark)
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = "Quick Presets:",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        items(guidedTags) { tag ->
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = if (performanceTagText == tag) CrimsonPrimaryDark.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceVariant,
+                                border = if (performanceTagText == tag) BorderStroke(1.dp, CrimsonPrimaryDark) else null,
+                                modifier = Modifier.clickable {
+                                    hapticManager?.tapUiClick()
+                                    performanceTagText = tag
+                                }
+                            ) {
+                                Text(
+                                    text = tag,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = if (performanceTagText == tag) CrimsonPrimaryDark else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                )
+                            }
                         }
                     }
                 }
@@ -861,8 +1340,7 @@ fun CreatePostDialog(
                         hapticManager?.tapBoundaryFour()
                         onPost(
                             trimmed,
-                            performanceTagText.trim().ifEmpty { null },
-                            selectedImageUri?.toString()
+                            performanceTagText.trim().ifEmpty { null }
                         )
                     }
                 },
@@ -879,4 +1357,182 @@ fun CreatePostDialog(
             }
         }
     )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun CommentsBottomSheet(
+    post: PostEntity,
+    comments: List<CommentEntity>,
+    onDismissRequest: () -> Unit,
+    onAddComment: (String) -> Unit
+) {
+    var newCommentText by remember { mutableStateOf("") }
+    val hapticManager = com.cricsaga.app.ui.utils.LocalHapticManager.current
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    ModalBottomSheet(
+        onDismissRequest = onDismissRequest,
+        sheetState = sheetState,
+        containerColor = MaterialTheme.colorScheme.surface,
+        dragHandle = { BottomSheetDefaults.DragHandle() }
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
+                .padding(bottom = 24.dp)
+        ) {
+            // Header
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = "Comments (${comments.size})",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = "by ${post.authorName}",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Post content snippet
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Text(
+                    text = post.content,
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(10.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Comments List
+            if (comments.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(120.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(
+                            imageVector = Icons.Default.ChatBubbleOutline,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                            modifier = Modifier.size(28.dp)
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = "No comments yet. Start the conversation!",
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 240.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    items(comments, key = { it.commentId }) { comment ->
+                        Row(modifier = Modifier.fillMaxWidth()) {
+                            val authorInitials = comment.authorName.split(" ")
+                                .mapNotNull { it.firstOrNull()?.toString() }
+                                .take(2)
+                                .joinToString("")
+                                .uppercase()
+                                .ifEmpty { "P" }
+
+                            Box(
+                                modifier = Modifier
+                                    .size(30.dp)
+                                    .background(CrimsonPrimaryDark.copy(alpha = 0.12f), CircleShape)
+                                    .border(0.75.dp, CrimsonPrimaryDark.copy(alpha = 0.3f), CircleShape),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = authorInitials,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = CrimsonPrimaryDark
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.width(10.dp))
+
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = comment.authorName,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = comment.text,
+                                    fontSize = 12.sp,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Add Comment Input Row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                OutlinedTextField(
+                    value = newCommentText,
+                    onValueChange = { newCommentText = it },
+                    placeholder = { Text("Add a comment...", fontSize = 12.sp) },
+                    modifier = Modifier.weight(1f),
+                    singleLine = true,
+                    shape = RoundedCornerShape(20.dp)
+                )
+
+                Spacer(modifier = Modifier.width(8.dp))
+
+                IconButton(
+                    onClick = {
+                        val text = newCommentText.trim()
+                        if (text.isNotEmpty()) {
+                            hapticManager?.tapUiClick()
+                            onAddComment(text)
+                            newCommentText = ""
+                        }
+                    },
+                    enabled = newCommentText.trim().isNotEmpty()
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.Send,
+                        contentDescription = "Send Comment",
+                        tint = if (newCommentText.trim().isNotEmpty()) CrimsonPrimaryDark else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+                    )
+                }
+            }
+        }
+    }
 }

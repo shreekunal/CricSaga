@@ -21,9 +21,10 @@ import com.cricsaga.app.data.local.entity.*
         LookingForEntity::class,
         PostEntity::class,
         FollowEntity::class,
-        ChatMessageEntity::class
+        ChatMessageEntity::class,
+        CommentEntity::class
     ],
-    version = 8,
+    version = 9,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -40,6 +41,7 @@ abstract class CricSagaDatabase : RoomDatabase() {
     abstract fun postDao(): PostDao
     abstract fun followDao(): FollowDao
     abstract fun chatMessageDao(): ChatMessageDao
+    abstract fun commentDao(): CommentDao
 
     companion object {
         @Volatile
