@@ -8,6 +8,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.AddComment
 import androidx.compose.material.icons.filled.Close
@@ -40,7 +41,8 @@ data class ConversationSummary(
 fun ConversationListScreen(
     conversations: List<ConversationSummary>,
     allUsers: List<UserEntity>,
-    onConversationClick: (UserEntity) -> Unit
+    onConversationClick: (UserEntity) -> Unit,
+    onBackClick: () -> Unit = {}
 ) {
     var searchQuery by remember { mutableStateOf("") }
     var showNewChatDialog by remember { mutableStateOf(false) }
@@ -63,6 +65,18 @@ fun ConversationListScreen(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
+                navigationIcon = {
+                    IconButton(onClick = {
+                        hapticManager?.tapUiClick()
+                        onBackClick()
+                    }) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back",
+                            tint = MaterialTheme.colorScheme.onBackground
+                        )
+                    }
+                },
                 title = {
                     Column {
                         Text(

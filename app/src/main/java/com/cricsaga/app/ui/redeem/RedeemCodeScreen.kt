@@ -6,6 +6,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CardMembership
 import androidx.compose.material.icons.filled.Lock
@@ -26,7 +27,10 @@ import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun RedeemCodeScreen(proManager: ProManager) {
+fun RedeemCodeScreen(
+    proManager: ProManager,
+    onBackClick: () -> Unit = {}
+) {
     var codeInput by remember { mutableStateOf("") }
     var feedbackMessage by remember { mutableStateOf<String?>(null) }
     var isSuccess by remember { mutableStateOf(false) }
@@ -45,6 +49,15 @@ fun RedeemCodeScreen(proManager: ProManager) {
                         color = TextPrimary,
                         fontSize = 18.sp
                     )
+                },
+                navigationIcon = {
+                    IconButton(onClick = onBackClick) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back",
+                            tint = TextPrimary
+                        )
+                    }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = CharcoalBackgroundDark)
             )

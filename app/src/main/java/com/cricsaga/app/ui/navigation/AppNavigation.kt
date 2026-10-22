@@ -120,6 +120,7 @@ fun AppNavigation(
     var tempBallType by remember { mutableStateOf(BallType.TENNIS_LIGHT) }
     var tempTossWinnerId by remember { mutableStateOf("") }
     var tempTossDecision by remember { mutableStateOf(TossDecision.BAT) }
+    var tempMaxOversPerBowler by remember { mutableIntStateOf(4) }
 
     var tempBattingSquad by remember { mutableStateOf<List<UserEntity>>(emptyList()) }
     var tempBowlingSquad by remember { mutableStateOf<List<UserEntity>>(emptyList()) }
@@ -437,6 +438,10 @@ fun AppNavigation(
                                 navController.navigate(Screen.FullScorecard.route)
                             }
                         }
+                    },
+                    onManageTeamsClick = {
+                        hapticManager.tapUiClick()
+                        navController.navigate(Screen.Teams.route)
                     }
                 )
             }
@@ -596,6 +601,10 @@ fun AppNavigation(
                         selectedChatUser = user
                         chatDraftText = ""
                         navController.navigate("chat/${user.userId}")
+                    },
+                    onBackClick = {
+                        hapticManager.tapUiClick()
+                        navController.popBackStack()
                     }
                 )
             }
@@ -670,6 +679,10 @@ fun AppNavigation(
                         coroutineScope.launch {
                             scoringViewModel.repository.addPlayerToTeam(teamId, name, role = role)
                         }
+                    },
+                    onBackClick = {
+                        hapticManager.tapUiClick()
+                        navController.popBackStack()
                     }
                 )
             }
@@ -750,7 +763,13 @@ fun AppNavigation(
                         },
                         onTeamClick = { teamId ->
                             hapticManager.tapUiClick()
-                            navController.navigate("team_detail/${teamId}")
+                            coroutineScope.launch {
+                                val team = scoringViewModel.repository.getTeam(teamId)
+                                if (team != null) {
+                                    selectedTeamForDetail = team
+                                    navController.navigate(Screen.TeamDetail.route)
+                                }
+                            }
                         },
                         onBackClick = {
                             hapticManager.tapUiClick()
@@ -824,7 +843,13 @@ fun AppNavigation(
 
             // Flow: Pro Redeem Code & Pricing Screen
             composable(Screen.Redeem.route) {
-                RedeemCodeScreen(proManager = proManager)
+                RedeemCodeScreen(
+                    proManager = proManager,
+                    onBackClick = {
+                        hapticManager.tapUiClick()
+                        navController.popBackStack()
+                    }
+                )
             }
 
             // Flow: Match Setup Form
@@ -841,7 +866,7 @@ fun AppNavigation(
                             scoringViewModel.repository.createTeam(name, code, "Mumbai")
                         }
                     },
-                    onProceedToOpeners = { title, teamA, teamB, overs, ballType, tossWinner, decision ->
+                    onProceedToOpeners = { title, teamA, teamB, overs, ballType, tossWinner, decision, maxOversPerBowler ->
                         tempTitle = title
                         tempTeamAId = teamA
                         tempTeamBId = teamB
@@ -849,6 +874,7 @@ fun AppNavigation(
                         tempBallType = ballType
                         tempTossWinnerId = tossWinner
                         tempTossDecision = decision
+                        tempMaxOversPerBowler = maxOversPerBowler
 
                         // Resolve Batting vs Bowling Squads
                         val battingTeamId = if (decision == TossDecision.BAT) tossWinner else (if (tossWinner == teamA) teamB else teamA)
@@ -860,17 +886,12 @@ fun AppNavigation(
                         tempBowlingTeamName = if (bowlingTeamId == teamA) teamAObj?.teamName ?: "Team A" else teamBObj?.teamName ?: "Team B"
 
                         coroutineScope.launch {
-                            scoringViewModel.repository.getTeamMembers(battingTeamId).collect { bSquad ->
-                                tempBattingSquad = bSquad
-                            }
+                            val bSquad = scoringViewModel.repository.getTeamMembersList(battingTeamId)
+                            val bowSquad = scoringViewModel.repository.getTeamMembersList(bowlingTeamId)
+                            tempBattingSquad = bSquad
+                            tempBowlingSquad = bowSquad
+                            navController.navigate(Screen.OpenersSelection.route)
                         }
-                        coroutineScope.launch {
-                            scoringViewModel.repository.getTeamMembers(bowlingTeamId).collect { bowSquad ->
-                                tempBowlingSquad = bowSquad
-                            }
-                        }
-
-                        navController.navigate(Screen.OpenersSelection.route)
                     }
                 )
             }
@@ -887,9 +908,18 @@ fun AppNavigation(
                     bowlingSquad = currentBowlingSquad,
                     onBackClick = { navController.popBackStack() },
                     onStartMatch = { strikerId, nonStrikerId, bowlerId ->
-                        val striker = currentBattingSquad.find { it.userId == strikerId } ?: currentBattingSquad.first()
-                        val nonStriker = currentBattingSquad.find { it.userId == nonStrikerId } ?: currentBattingSquad[1]
-                        val bowler = currentBowlingSquad.find { it.userId == bowlerId } ?: currentBowlingSquad.first()
+                        val fallbackUser = currentBattingSquad.firstOrNull() ?: UserEntity(
+                            userId = "guest_batter",
+                            phoneNumber = "0000000000",
+                            fullName = "Opening Batter"
+                        )
+                        val striker = currentBattingSquad.find { it.userId == strikerId } ?: currentBattingSquad.firstOrNull() ?: fallbackUser
+                        val nonStriker = currentBattingSquad.find { it.userId == nonStrikerId } ?: currentBattingSquad.getOrNull(1) ?: striker
+                        val bowler = currentBowlingSquad.find { it.userId == bowlerId } ?: currentBowlingSquad.firstOrNull() ?: UserEntity(
+                            userId = "guest_bowler",
+                            phoneNumber = "0000000000",
+                            fullName = "Opening Bowler"
+                        )
 
                         scoringViewModel.startCustomMatch(
                             title = tempTitle.ifEmpty { "Match" },
@@ -903,7 +933,8 @@ fun AppNavigation(
                             nonStriker = nonStriker,
                             bowler = bowler,
                             battingSquad = currentBattingSquad,
-                            bowlingSquad = currentBowlingSquad
+                            bowlingSquad = currentBowlingSquad,
+                            maxOversPerBowler = tempMaxOversPerBowler
                         )
                         navController.navigate(Screen.LiveScoring.route) {
                             popUpTo(Screen.Home.route)
@@ -971,9 +1002,14 @@ fun AppNavigation(
 
                 // End of Over Bowler Selection Dialog
                 if (uiState.showBowlerDialog) {
+                    val bowlerOvers = remember(uiState.scoreState.bowlers) {
+                        uiState.scoreState.bowlers.mapValues { it.value.legalBalls / 6 }
+                    }
                     BowlerSelectionDialog(
                         lastBowlerId = uiState.lastCompletedBowlerId,
                         bowlingSquad = uiState.bowlingSquad,
+                        maxOversPerBowler = uiState.maxOversPerBowler,
+                        bowlerOversMap = bowlerOvers,
                         onBowlerSelected = { nextBowler ->
                             hapticManager.tapUiClick()
                             scoringViewModel.onNextBowlerSelected(nextBowler)

@@ -53,6 +53,7 @@ data class ScoringUiState(
     val playerOfTheMatchCandidates: List<UserEntity> = emptyList(),
     val selectedPlayerOfTheMatch: UserEntity? = null,
     val lastCompletedBowlerId: String = "",
+    val maxOversPerBowler: Int = 4,
     val lastActionMessage: String = "Ready to score",
     val currentInningsDeliveries: List<DeliveryRecord> = emptyList(),
     val innings1Deliveries: List<DeliveryRecord> = emptyList()
@@ -214,6 +215,18 @@ class ScoringViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    fun deletePost(postId: String) {
+        viewModelScope.launch {
+            repository.deletePost(postId)
+        }
+    }
+
+    fun incrementRepost(postId: String) {
+        viewModelScope.launch {
+            repository.incrementRepost(postId)
+        }
+    }
+
     fun getCommentsForPost(postId: String): Flow<List<CommentEntity>> =
         repository.getCommentsFlow(postId)
 
@@ -338,7 +351,8 @@ class ScoringViewModel(application: Application) : AndroidViewModel(application)
         nonStriker: UserEntity,
         bowler: UserEntity,
         battingSquad: List<UserEntity>,
-        bowlingSquad: List<UserEntity>
+        bowlingSquad: List<UserEntity>,
+        maxOversPerBowler: Int = 4
     ) {
         viewModelScope.launch {
             val result = repository.createMatch(
@@ -352,11 +366,13 @@ class ScoringViewModel(application: Application) : AndroidViewModel(application)
             )
 
             val playerNames = (battingSquad + bowlingSquad).associate { it.userId to it.fullName }
+            val calculatedMaxWickets = (battingSquad.size - 1).coerceAtLeast(1)
 
             val scoringEngine = ScoringEngine(
                 matchId = result.matchId,
                 inningsNumber = 1,
                 totalOversAllotted = totalOvers,
+                maxWickets = calculatedMaxWickets,
                 playerNames = playerNames
             )
             scoringEngine.startInnings(
@@ -386,6 +402,7 @@ class ScoringViewModel(application: Application) : AndroidViewModel(application)
                 battingTeamName = battingTeamName,
                 bowlingTeamName = bowlingTeamName,
                 totalOvers = totalOvers,
+                maxOversPerBowler = maxOversPerBowler,
                 scoreState = scoringEngine.state,
                 striker = striker,
                 nonStriker = nonStriker,

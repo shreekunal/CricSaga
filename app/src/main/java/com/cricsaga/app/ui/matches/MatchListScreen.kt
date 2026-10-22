@@ -9,6 +9,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.SportsCricket
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -28,7 +29,8 @@ import com.cricsaga.app.ui.theme.*
 fun MatchListScreen(
     matches: List<MatchEntity>,
     onStartNewMatchClick: () -> Unit,
-    onMatchClick: (matchId: String) -> Unit
+    onMatchClick: (matchId: String) -> Unit,
+    onManageTeamsClick: () -> Unit = {}
 ) {
     val hapticManager = com.cricsaga.app.ui.utils.LocalHapticManager.current
 
@@ -43,6 +45,38 @@ fun MatchListScreen(
                         color = TextPrimary,
                         fontSize = 20.sp
                     )
+                },
+                actions = {
+                    Surface(
+                        modifier = Modifier
+                            .padding(end = 12.dp)
+                            .clickable {
+                                hapticManager?.tapUiClick()
+                                onManageTeamsClick()
+                            },
+                        shape = RoundedCornerShape(16.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Groups,
+                                contentDescription = "Teams",
+                                modifier = Modifier.size(15.dp),
+                                tint = CrimsonPrimaryDark
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "Teams",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = CharcoalBackgroundDark)
             )

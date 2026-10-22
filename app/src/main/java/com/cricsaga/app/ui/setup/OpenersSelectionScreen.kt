@@ -67,20 +67,24 @@ fun OpenersSelectionScreen(
             ) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text("OPENING STRIKER ($battingTeamName)", color = CrimsonPrimaryDark, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        items(battingSquad.filter { it.userId != nonStrikerId }) { p ->
-                            FilterChip(
-                                selected = strikerId == p.userId,
-                                onClick = {
-                                    hapticManager?.tapUiClick()
-                                    strikerId = p.userId
-                                },
-                                label = { Text(p.fullName) },
-                                colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = CrimsonPrimaryDark,
-                                    selectedLabelColor = Color.White
+                    if (battingSquad.isEmpty()) {
+                        Text("No squad members found for $battingTeamName.", color = TextTertiary, fontSize = 12.sp)
+                    } else {
+                        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            items(battingSquad.filter { it.userId != nonStrikerId }) { p ->
+                                FilterChip(
+                                    selected = strikerId == p.userId,
+                                    onClick = {
+                                        hapticManager?.tapUiClick()
+                                        strikerId = p.userId
+                                    },
+                                    label = { Text(p.fullName) },
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        selectedContainerColor = CrimsonPrimaryDark,
+                                        selectedLabelColor = Color.White
+                                    )
                                 )
-                            )
+                            }
                         }
                     }
                 }
@@ -94,20 +98,24 @@ fun OpenersSelectionScreen(
             ) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text("OPENING NON-STRIKER ($battingTeamName)", color = BoundaryAmber, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        items(battingSquad.filter { it.userId != strikerId }) { p ->
-                            FilterChip(
-                                selected = nonStrikerId == p.userId,
-                                onClick = {
-                                    hapticManager?.tapUiClick()
-                                    nonStrikerId = p.userId
-                                },
-                                label = { Text(p.fullName) },
-                                colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = BoundaryAmber,
-                                    selectedLabelColor = Color.Black
+                    if (battingSquad.size < 2) {
+                        Text("At least 2 squad members needed to select non-striker.", color = TextTertiary, fontSize = 12.sp)
+                    } else {
+                        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            items(battingSquad.filter { it.userId != strikerId }) { p ->
+                                FilterChip(
+                                    selected = nonStrikerId == p.userId,
+                                    onClick = {
+                                        hapticManager?.tapUiClick()
+                                        nonStrikerId = p.userId
+                                    },
+                                    label = { Text(p.fullName) },
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        selectedContainerColor = BoundaryAmber,
+                                        selectedLabelColor = Color.Black
+                                    )
                                 )
-                            )
+                            }
                         }
                     }
                 }
@@ -121,20 +129,24 @@ fun OpenersSelectionScreen(
             ) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text("OPENING BOWLER ($bowlingTeamName)", color = BoundaryGreen, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        items(bowlingSquad) { b ->
-                            FilterChip(
-                                selected = openingBowlerId == b.userId,
-                                onClick = {
-                                    hapticManager?.tapUiClick()
-                                    openingBowlerId = b.userId
-                                },
-                                label = { Text(b.fullName) },
-                                colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = BoundaryGreen,
-                                    selectedLabelColor = Color.Black
+                    if (bowlingSquad.isEmpty()) {
+                        Text("No squad members found for $bowlingTeamName.", color = TextTertiary, fontSize = 12.sp)
+                    } else {
+                        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            items(bowlingSquad) { b ->
+                                FilterChip(
+                                    selected = openingBowlerId == b.userId,
+                                    onClick = {
+                                        hapticManager?.tapUiClick()
+                                        openingBowlerId = b.userId
+                                    },
+                                    label = { Text(b.fullName) },
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        selectedContainerColor = BoundaryGreen,
+                                        selectedLabelColor = Color.Black
+                                    )
                                 )
-                            )
+                            }
                         }
                     }
                 }

@@ -36,4 +36,7 @@ interface PostDao {
 
     @Query("UPDATE posts SET commentCount = commentCount + 1 WHERE postId = :postId")
     suspend fun incrementCommentCount(postId: String)
+
+    @Query("UPDATE posts SET repostCount = repostCount + 1 WHERE postId = :postId")
+    suspend fun incrementRepostCount(postId: String)
 }

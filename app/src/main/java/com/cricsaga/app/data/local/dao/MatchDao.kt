@@ -35,6 +35,9 @@ interface MatchDao {
 
     @Query("SELECT * FROM matches ORDER BY createdAt DESC")
     fun getAllMatches(): Flow<List<MatchEntity>>
+
+    @Query("SELECT * FROM matches ORDER BY createdAt DESC")
+    suspend fun getAllMatchesList(): List<MatchEntity>
 }
 
 @Dao

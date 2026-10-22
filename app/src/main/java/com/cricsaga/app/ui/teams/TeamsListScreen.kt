@@ -7,6 +7,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material3.*
@@ -28,7 +29,8 @@ fun TeamsListScreen(
     teams: List<TeamEntity>,
     onTeamClick: (TeamEntity) -> Unit = {},
     onCreateTeam: (name: String, code: String, city: String) -> Unit,
-    onAddPlayer: (teamId: String, name: String, role: PlayingRole) -> Unit
+    onAddPlayer: (teamId: String, name: String, role: PlayingRole) -> Unit,
+    onBackClick: () -> Unit = {}
 ) {
     var showCreateTeamDialog by remember { mutableStateOf(false) }
     var selectedTeamForAddPlayer by remember { mutableStateOf<TeamEntity?>(null) }
@@ -39,6 +41,14 @@ fun TeamsListScreen(
         topBar = {
             TopAppBar(
                 title = { Text("Teams & Squads", fontWeight = FontWeight.Bold, color = TextPrimary, fontSize = 20.sp) },
+                navigationIcon = {
+                    IconButton(onClick = {
+                        hapticManager?.tapUiClick()
+                        onBackClick()
+                    }) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = TextPrimary)
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = CharcoalBackgroundDark)
             )
         },

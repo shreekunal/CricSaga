@@ -18,10 +18,14 @@ import com.cricsaga.app.ui.theme.*
 fun BowlerSelectionDialog(
     lastBowlerId: String,
     bowlingSquad: List<UserEntity>,
+    maxOversPerBowler: Int = 4,
+    bowlerOversMap: Map<String, Int> = emptyMap(),
     onBowlerSelected: (UserEntity) -> Unit
 ) {
-    val eligibleBowlers = bowlingSquad.filter { it.userId != lastBowlerId }
-    var selectedBowler by remember { mutableStateOf(eligibleBowlers.firstOrNull()) }
+    val eligibleBowlers = bowlingSquad.filter {
+        it.userId != lastBowlerId && (bowlerOversMap[it.userId] ?: 0) < maxOversPerBowler
+    }
+    var selectedBowler by remember { mutableStateOf(eligibleBowlers.firstOrNull() ?: bowlingSquad.firstOrNull { it.userId != lastBowlerId }) }
     val hapticManager = com.cricsaga.app.ui.utils.LocalHapticManager.current
 
     AlertDialog(
@@ -45,15 +49,25 @@ fun BowlerSelectionDialog(
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
-                    text = "Note: A bowler cannot bowl two consecutive overs.",
+                    text = "A bowler cannot bowl consecutive overs. Max quota: $maxOversPerBowler overs per bowler.",
                     color = MutedGrey,
                     fontSize = 12.sp
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 LazyColumn(modifier = Modifier.heightIn(max = 240.dp)) {
                     items(bowlingSquad) { bowler ->
+                        val oversBowled = bowlerOversMap[bowler.userId] ?: 0
+                        val isQuotaFull = oversBowled >= maxOversPerBowler
                         val isPreviousBowler = bowler.userId == lastBowlerId
+                        val isEnabled = !isPreviousBowler && !isQuotaFull
                         val isSelected = selectedBowler?.userId == bowler.userId
+
+                        val statusSuffix = when {
+                            isPreviousBowler -> " (Just Bowled)"
+                            isQuotaFull -> " (Quota Full: $oversBowled/$maxOversPerBowler ov)"
+                            oversBowled > 0 -> " ($oversBowled/$maxOversPerBowler ov)"
+                            else -> " (0/$maxOversPerBowler ov)"
+                        }
 
                         Row(
                             modifier = Modifier
@@ -63,15 +77,15 @@ fun BowlerSelectionDialog(
                         ) {
                             FilterChip(
                                 selected = isSelected,
-                                enabled = !isPreviousBowler,
+                                enabled = isEnabled,
                                 onClick = {
                                     hapticManager?.tapUiClick()
                                     selectedBowler = bowler
                                 },
                                 label = {
                                     Text(
-                                        text = bowler.fullName + if (isPreviousBowler) " (Just Bowled)" else "",
-                                        color = if (isPreviousBowler) Color.Gray else TextPrimary
+                                        text = bowler.fullName + statusSuffix,
+                                        color = if (!isEnabled) Color.Gray else TextPrimary
                                     )
                                 },
                                 colors = FilterChipDefaults.filterChipColors(

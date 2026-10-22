@@ -35,7 +35,8 @@ fun MatchSetupScreen(
         overs: Int,
         ballType: BallType,
         tossWinnerId: String,
-        tossDecision: TossDecision
+        tossDecision: TossDecision,
+        maxOversPerBowler: Int
     ) -> Unit
 ) {
     var teamA by remember { mutableStateOf(teams.getOrNull(0)?.teamId ?: "") }
@@ -320,7 +321,7 @@ fun MatchSetupScreen(
                     val teamAName = teams.find { it.teamId == teamA }?.teamName ?: "Team A"
                     val teamBName = teams.find { it.teamId == teamB }?.teamName ?: "Team B"
                     val title = "$teamAName vs $teamBName"
-                    onProceedToOpeners(title, teamA, teamB, totalOvers, selectedBallType, tossWinnerId, tossDecision)
+                    onProceedToOpeners(title, teamA, teamB, totalOvers, selectedBallType, tossWinnerId, tossDecision, maxOversPerBowler)
                 },
                 enabled = teamA.isNotEmpty() && teamB.isNotEmpty() && teamA != teamB,
                 colors = ButtonDefaults.buttonColors(containerColor = CrimsonPrimaryDark),

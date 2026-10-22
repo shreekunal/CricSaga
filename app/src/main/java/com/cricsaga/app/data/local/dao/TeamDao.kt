@@ -53,4 +53,7 @@ interface TeamDao {
 
     @Query("UPDATE teams SET captainId = :captainId WHERE teamId = :teamId")
     suspend fun updateTeamCaptain(teamId: String, captainId: String)
+
+    @Query("DELETE FROM teams WHERE teamId = :teamId")
+    suspend fun deleteTeam(teamId: String)
 }

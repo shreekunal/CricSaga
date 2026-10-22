@@ -321,12 +321,46 @@ fun HomeScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = "Live Score",
-                            fontSize = 17.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onBackground
-                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Surface(
+                                modifier = Modifier.clickable {
+                                    hapticManager?.tapUiClick()
+                                    onManageTeamsClick()
+                                },
+                                shape = RoundedCornerShape(16.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant,
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Groups,
+                                        contentDescription = "Teams",
+                                        modifier = Modifier.size(15.dp),
+                                        tint = CrimsonPrimaryDark
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = "Teams",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+                            }
+
+                            Text(
+                                text = "Live Score",
+                                fontSize = 17.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onBackground
+                            )
+                        }
 
                         Surface(
                             modifier = Modifier.clickable {
@@ -348,7 +382,7 @@ fun HomeScreen(
                                 )
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text(
-                                    text = "Match",
+                                    text = "+ Match",
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = Color.White

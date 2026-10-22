@@ -275,6 +275,20 @@ class MatchRepository(private val database: CricSagaDatabase) {
         teamDao.getTeamById(teamId)
     }
 
+    suspend fun deleteTeam(teamId: String) = withContext(Dispatchers.IO) {
+        teamDao.deleteTeam(teamId)
+    }
+
+    suspend fun getTeamStats(teamId: String): TeamStatsSummary = withContext(Dispatchers.IO) {
+        val matches = matchDao.getAllMatchesList()
+        val completed = matches.filter { (it.teamAId == teamId || it.teamBId == teamId) && it.matchStatus == MatchStatus.COMPLETED }
+        val played = completed.size
+        val won = completed.count { it.winnerTeamId == teamId }
+        val lost = completed.count { it.winnerTeamId != null && it.winnerTeamId != teamId }
+        val winPct = if (played > 0) String.format(java.util.Locale.US, "%.1f%%", (won.toDouble() / played) * 100.0) else "0.0%"
+        TeamStatsSummary(played = played, won = won, lost = lost, winPct = winPct)
+    }
+
     fun getTeamMembers(teamId: String): Flow<List<UserEntity>> = teamDao.getTeamMembers(teamId)
 
     suspend fun getTeamMembersList(teamId: String): List<UserEntity> = withContext(Dispatchers.IO) {
@@ -331,6 +345,14 @@ class MatchRepository(private val database: CricSagaDatabase) {
         val newLiked = !post.isLikedByMe
         val newCount = if (newLiked) post.likeCount + 1 else (post.likeCount - 1).coerceAtLeast(0)
         postDao.updatePost(post.copy(isLikedByMe = newLiked, likeCount = newCount))
+    }
+
+    suspend fun deletePost(postId: String) = withContext(Dispatchers.IO) {
+        postDao.deletePost(postId)
+    }
+
+    suspend fun incrementRepost(postId: String) = withContext(Dispatchers.IO) {
+        postDao.incrementRepostCount(postId)
     }
 
     fun getCommentsFlow(postId: String): Flow<List<CommentEntity>> =
@@ -576,6 +598,31 @@ class MatchRepository(private val database: CricSagaDatabase) {
         val teamId = UUID.randomUUID().toString()
         val team = TeamEntity(teamId = teamId, teamName = name, shortCode = shortCode, city = city)
         teamDao.insertTeam(team)
+
+        val defaultRoster = listOf(
+            Triple("Batter 1", PlayingRole.TOP_ORDER_BATTER, "07"),
+            Triple("Batter 2", PlayingRole.TOP_ORDER_BATTER, "18"),
+            Triple("Batter 3", PlayingRole.MIDDLE_ORDER_BATTER, "45"),
+            Triple("All-Rounder", PlayingRole.ALL_ROUNDER, "33"),
+            Triple("Keeper", PlayingRole.WICKET_KEEPER_BATTER, "01"),
+            Triple("Bowler 1", PlayingRole.FAST_BOWLER, "93"),
+            Triple("Bowler 2", PlayingRole.SPIN_BOWLER, "99"),
+            Triple("Bowler 3", PlayingRole.MEDIUM_PACER, "24")
+        )
+        defaultRoster.forEach { (roleName, role, jersey) ->
+            val userId = UUID.randomUUID().toString()
+            val user = UserEntity(
+                userId = userId,
+                phoneNumber = "90000000" + (10..99).random(),
+                fullName = "$name $roleName",
+                playingRole = role,
+                jerseyNumber = jersey,
+                city = city.ifBlank { "Mumbai" }
+            )
+            userDao.insertUser(user)
+            teamDao.insertTeamMember(TeamMemberEntity(teamId = teamId, userId = userId))
+        }
+
         teamId
     }
 
@@ -1163,5 +1210,12 @@ data class SeededMatchData(
     val nonStriker: UserEntity,
     val bowler: UserEntity,
     val incomingBatsman: UserEntity
+)
+
+data class TeamStatsSummary(
+    val played: Int,
+    val won: Int,
+    val lost: Int,
+    val winPct: String
 )
 
