@@ -1,7 +1,7 @@
 {
-  "latest_version_code": 2,
-  "latest_version_name": "1.0.1",
+  "latest_version_code": 3,
+  "latest_version_name": "1.0.2",
   "apk_url": "https://wyycmghdkcgdmoaaleki.supabase.co/storage/v1/object/public/app-updates/app-release.apk",
-  "changelog": "• Modernized Settings suite (athlete preview, theme switcher, match formats, cache manager)\n• Vertical Pro Membership tiers\n• Automated Over-The-Air (OTA) updater",
+  "changelog": "• Unified Team & Player Management with Gmail as Single Source of Truth\n• Pre-match empty squad validation\n• Clean team creation with 0 mock players\n• Instant captain selection & real-time badge sync",
   "is_force_update": false
 }

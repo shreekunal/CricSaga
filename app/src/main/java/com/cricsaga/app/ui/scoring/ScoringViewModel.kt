@@ -12,7 +12,6 @@ import com.cricsaga.app.data.local.entity.PostEntity
 import com.cricsaga.app.data.local.entity.TeamEntity
 import com.cricsaga.app.data.local.entity.UserEntity
 import com.cricsaga.app.data.repository.MatchRepository
-import com.cricsaga.app.data.repository.SeededMatchData
 import com.cricsaga.app.domain.engine.MatchResultCalculator
 import com.cricsaga.app.domain.engine.ScoringEngine
 import com.cricsaga.app.domain.model.*
@@ -63,7 +62,6 @@ class ScoringViewModel(application: Application) : AndroidViewModel(application)
 
     val repository: MatchRepository
     private var engine: ScoringEngine? = null
-    private var activeMatchData: SeededMatchData? = null
 
     val allMatches: StateFlow<List<MatchEntity>>
 
