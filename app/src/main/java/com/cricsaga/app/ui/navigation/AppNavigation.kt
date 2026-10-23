@@ -964,24 +964,29 @@ fun AppNavigation(
 
             // Flow: App Settings & Preferences
             composable(Screen.Settings.route) {
-                var currentUserEmail by remember { mutableStateOf(authManager.getCurrentUserEmail()) }
-                LaunchedEffect(Unit) {
-                    if (currentUserEmail.isNullOrBlank()) {
-                        val currentUid = authManager.getCurrentUserId()
-                        if (currentUid.isNotBlank()) {
-                            val user = scoringViewModel.repository.getUserById(currentUid)
-                            if (user?.email != null) {
-                                currentUserEmail = user.email
-                            }
-                        }
+                var currentUser by remember { mutableStateOf<UserEntity?>(null) }
+                val currentUid = authManager.getCurrentUserId()
+                LaunchedEffect(currentUid) {
+                    if (currentUid.isNotBlank()) {
+                        currentUser = scoringViewModel.repository.getUserById(currentUid)
                     }
                 }
+                val currentUserEmail = currentUser?.email ?: authManager.getCurrentUserEmail()
                 val isUserAdmin = authManager.isAdmin(currentUserEmail)
 
                 SettingsScreen(
+                    currentUser = currentUser,
                     themeManager = themeManager,
                     hapticManager = hapticManager,
                     isAdmin = isUserAdmin,
+                    onProfileClick = {
+                        hapticManager.tapUiClick()
+                        navController.navigate(Screen.Profile.route)
+                    },
+                    onProClick = {
+                        hapticManager.tapUiClick()
+                        navController.navigate(Screen.Redeem.route)
+                    },
                     onBackClick = {
                         hapticManager.tapUiClick()
                         navController.popBackStack()
