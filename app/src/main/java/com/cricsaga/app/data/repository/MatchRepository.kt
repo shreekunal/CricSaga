@@ -33,6 +33,8 @@ class MatchRepository(private val database: CricSagaDatabase) {
 
     fun getAllMatches(): Flow<List<MatchEntity>> = matchDao.getAllMatches()
 
+    fun getMatchesForUser(userId: String): Flow<List<MatchEntity>> = matchDao.getMatchesForUser(userId)
+
     fun getTopBatters(cityFilter: String? = null): Flow<List<PlayerRankingItem>> =
         combine(
             playerStatsDao.getAllPlayerStats(),
@@ -271,6 +273,7 @@ class MatchRepository(private val database: CricSagaDatabase) {
     }
 
     fun getAllTeams(): Flow<List<TeamEntity>> = teamDao.getAllTeams()
+    fun getTeamsForUser(userId: String): Flow<List<TeamEntity>> = teamDao.getTeamsForUser(userId)
 
     suspend fun getTeam(teamId: String): TeamEntity? = withContext(Dispatchers.IO) {
         teamDao.getTeamById(teamId)
@@ -847,6 +850,22 @@ class MatchRepository(private val database: CricSagaDatabase) {
         userDao.updateUser(user)
     }
 
+    suspend fun updateUserProStatus(userId: String, isPro: Boolean) = withContext(Dispatchers.IO) {
+        userDao.updateUserProStatus(userId, isPro)
+    }
+
+    suspend fun updateUserPassword(userId: String, newPassword: String) = withContext(Dispatchers.IO) {
+        userDao.updateUserPassword(userId, newPassword)
+    }
+
+    suspend fun deleteUserById(userId: String) = withContext(Dispatchers.IO) {
+        userDao.deleteUserById(userId)
+    }
+
+    suspend fun getUserCount(): Int = withContext(Dispatchers.IO) {
+        userDao.getUserCount()
+    }
+
     suspend fun getUserById(userId: String): UserEntity? = withContext(Dispatchers.IO) {
         userDao.getUserById(userId)
     }
@@ -857,11 +876,19 @@ class MatchRepository(private val database: CricSagaDatabase) {
         userDao.getUserByPhone(phoneNumber)
     }
 
+    suspend fun getUserByEmail(email: String): UserEntity? = withContext(Dispatchers.IO) {
+        userDao.getUserByEmail(email)
+    }
+
+    suspend fun getUserByGoogleId(googleId: String): UserEntity? = withContext(Dispatchers.IO) {
+        userDao.getUserByGoogleId(googleId)
+    }
+
     suspend fun authenticateUser(phoneNumber: String, password: String): UserEntity? = withContext(Dispatchers.IO) {
         val cleanPhone = phoneNumber.filter { it.isDigit() }.takeLast(10)
         val user = userDao.getUserByPhone(cleanPhone) ?: userDao.getUserByPhone(phoneNumber)
         if (user != null) {
-            if (user.password.isBlank() || user.password == password || password == "123456") {
+            if (user.password.isNotBlank() && user.password == password) {
                 return@withContext user
             }
         }

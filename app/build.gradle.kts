@@ -80,6 +80,9 @@ dependencies {
     // Networking (Supabase REST & Realtime WebSocket)
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
 
+    // Google Sign-In (Official Play Services Auth)
+    implementation("com.google.android.gms:play-services-auth:21.2.0")
+
     // Testing
     testImplementation(libs.junit)
 

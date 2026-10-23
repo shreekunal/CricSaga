@@ -9,6 +9,10 @@ import android.os.Build
 import android.util.Base64
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import okhttp3.OkHttpClient
+import okhttp3.Request
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
@@ -180,6 +184,59 @@ object ImageUtils {
         return try {
             BitmapFactory.decodeFile(file.absolutePath)
         } catch (e: Exception) {
+            null
+        }
+    }
+
+    /**
+     * Downloads an avatar from a remote URL (such as a Google Account photo) and caches it
+     * locally into internal storage as WebP. Returns the local absolute path.
+     */
+    suspend fun downloadAndCacheProfileImage(
+        context: Context,
+        imageUrl: String?,
+        userId: String
+    ): String? = withContext(Dispatchers.IO) {
+        if (imageUrl.isNullOrBlank()) return@withContext null
+        try {
+            val avatarDir = File(context.filesDir, "avatars").apply {
+                if (!exists()) mkdirs()
+            }
+            val destinationFile = File(avatarDir, "avatar_${userId}.webp")
+
+            val request = Request.Builder().url(imageUrl).build()
+            val client = OkHttpClient()
+            val response = client.newCall(request).execute()
+            if (!response.isSuccessful) return@withContext null
+
+            val bytes = response.body?.bytes() ?: return@withContext null
+            val originalBitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: return@withContext null
+
+            val maxDimension = 300
+            val width = originalBitmap.width
+            val height = originalBitmap.height
+            val scaledBitmap = if (width > maxDimension || height > maxDimension) {
+                val scale = maxDimension.toFloat() / max(width, height)
+                val matrix = Matrix().apply { postScale(scale, scale) }
+                Bitmap.createBitmap(originalBitmap, 0, 0, width, height, matrix, true)
+            } else {
+                originalBitmap
+            }
+
+            val format = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                Bitmap.CompressFormat.WEBP_LOSSY
+            } else {
+                @Suppress("DEPRECATION")
+                Bitmap.CompressFormat.WEBP
+            }
+
+            FileOutputStream(destinationFile).use { out ->
+                scaledBitmap.compress(format, 80, out)
+            }
+
+            destinationFile.absolutePath
+        } catch (e: Exception) {
+            e.printStackTrace()
             null
         }
     }

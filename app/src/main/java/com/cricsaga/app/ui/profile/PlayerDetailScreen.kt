@@ -444,14 +444,14 @@ fun PlayerDetailScreen(
                                             icon = Icons.Default.Bolt,
                                             title = "STRIKER",
                                             subtitle = "SR $batSr",
-                                            isUnlocked = (batSr.toDoubleOrNull() ?: 0.0) >= 120.0,
+                                            isUnlocked = (batSr.toDoubleOrNull() ?: 0.0) >= 120.0 && totalRuns >= 50,
                                             modifier = Modifier.weight(1f)
                                         )
                                         HonourBadgeCard(
                                             icon = Icons.Default.Shield,
                                             title = "SAFE HANDS",
-                                            subtitle = "15 Catches",
-                                            isUnlocked = true,
+                                            subtitle = "0 Catches",
+                                            isUnlocked = false,
                                             modifier = Modifier.weight(1f)
                                         )
                                     }
@@ -467,11 +467,11 @@ fun PlayerDetailScreen(
                             ) {
                                 Column(modifier = Modifier.padding(14.dp)) {
                                     TableStatRow("Strike Rate", batSr)
-                                    TableStatRow("Highest Score", "$highestScore*")
-                                    TableStatRow("Bowling Economy", bowlEcon)
-                                    TableStatRow("Best Bowling", "3/16 (4.0 ov)")
+                                    TableStatRow("Highest Score", if (highestScore > 0) "$highestScore*" else "-")
+                                    TableStatRow("Bowling Economy", if (totalBallsBowled > 0) bowlEcon else "-")
+                                    TableStatRow("Best Bowling", "-")
                                     TableStatRow("Fifties / Hundreds", "$totalFifties / $totalHundreds")
-                                    TableStatRow("Catches / Run Outs", "12 / 3")
+                                    TableStatRow("Catches / Run Outs", "0 / 0")
                                 }
                             }
                         }
@@ -505,10 +505,10 @@ fun PlayerDetailScreen(
                                     }
                                     Spacer(modifier = Modifier.height(10.dp))
                                     TableStatRow("Innings Batted", "$totalInnings")
-                                    TableStatRow("Not Outs (NO)", "3")
+                                    TableStatRow("Not Outs (NO)", "0")
                                     TableStatRow("Total Runs", "$totalRuns")
                                     TableStatRow("Balls Faced", "$totalBalls")
-                                    TableStatRow("Highest Score", "$highestScore*")
+                                    TableStatRow("Highest Score", if (highestScore > 0) "$highestScore*" else "-")
                                     TableStatRow("Batting Average", batAvg)
                                     TableStatRow("Strike Rate", batSr)
                                     TableStatRow("Fifties (50s)", "$totalFifties")
@@ -538,9 +538,9 @@ fun PlayerDetailScreen(
                                     TableStatRow("Maiden Overs", "$totalMaidens")
                                     TableStatRow("Runs Conceded", "$totalRunsConceded")
                                     TableStatRow("Wickets Taken", "$totalWickets")
-                                    TableStatRow("Best Bowling", "3/16 (4.0 ov)")
+                                    TableStatRow("Best Bowling", "-")
                                     TableStatRow("Bowling Average", bowlAvg)
-                                    TableStatRow("Economy Rate", bowlEcon)
+                                    TableStatRow("Economy Rate", if (totalBallsBowled > 0) bowlEcon else "-")
                                 }
                             }
 
@@ -561,9 +561,9 @@ fun PlayerDetailScreen(
                                         Icon(Icons.Default.Shield, contentDescription = null, tint = TextSecondary, modifier = Modifier.size(16.dp))
                                     }
                                     Spacer(modifier = Modifier.height(10.dp))
-                                    TableStatRow("Catches", "12")
-                                    TableStatRow("Direct Run Outs", "3")
-                                    TableStatRow("Assisted Run Outs", "2")
+                                    TableStatRow("Catches", "0")
+                                    TableStatRow("Direct Run Outs", "0")
+                                    TableStatRow("Assisted Run Outs", "0")
                                     TableStatRow("Stumpings", "0")
                                 }
                             }
@@ -697,15 +697,15 @@ fun PlayerDetailScreen(
                                         HonourBadgeCard(
                                             icon = Icons.Default.EmojiEvents,
                                             title = "CENTURY CLUB",
-                                            subtitle = if (totalHundreds > 0) "$totalHundreds Centuries" else "1 Unlocked (102*)",
-                                            isUnlocked = true,
+                                            subtitle = if (totalHundreds > 0) "$totalHundreds Centuries" else "0 Centuries",
+                                            isUnlocked = totalHundreds > 0,
                                             modifier = Modifier.weight(1f)
                                         )
                                         HonourBadgeCard(
                                             icon = Icons.Default.GpsFixed,
                                             title = "5-WICKET HAUL",
-                                            subtitle = if (totalWickets >= 5) "5/24 (Best)" else "3/16 (Personal Best)",
-                                            isUnlocked = true,
+                                            subtitle = if (totalWickets >= 5) "5+ Wkts" else "$totalWickets/5 Wkts",
+                                            isUnlocked = totalWickets >= 5,
                                             modifier = Modifier.weight(1f)
                                         )
                                     }
@@ -715,14 +715,14 @@ fun PlayerDetailScreen(
                                             icon = Icons.Default.Bolt,
                                             title = "STRIKE ACCELERATOR",
                                             subtitle = "SR $batSr",
-                                            isUnlocked = true,
+                                            isUnlocked = (batSr.toDoubleOrNull() ?: 0.0) >= 120.0 && totalRuns >= 50,
                                             modifier = Modifier.weight(1f)
                                         )
                                         HonourBadgeCard(
                                             icon = Icons.Default.Shield,
                                             title = "SAFE HANDS",
-                                            subtitle = "15 Catches",
-                                            isUnlocked = true,
+                                            subtitle = "0 Catches",
+                                            isUnlocked = false,
                                             modifier = Modifier.weight(1f)
                                         )
                                     }
@@ -739,11 +739,17 @@ fun PlayerDetailScreen(
                                 Column(modifier = Modifier.padding(14.dp)) {
                                     Text("STANDOUT INNINGS", style = SectionLabel, color = BoundaryAmber)
                                     Spacer(modifier = Modifier.height(10.dp))
-                                    DetailInningsRow("78* (38) vs Apex Kings", "T20 Championship • SR 205.2", "MATCH WINNER", BoundaryAmber)
-                                    HorizontalDivider(color = DividerDark, thickness = 0.5.dp, modifier = Modifier.padding(vertical = 8.dp))
-                                    DetailInningsRow("4/19 (4.0) vs Tigers", "Grassroots League • Econ 4.75", "BEST SPELL", ForestSixPrimary)
-                                    HorizontalDivider(color = DividerDark, thickness = 0.5.dp, modifier = Modifier.padding(vertical = 8.dp))
-                                    DetailInningsRow("42 (19) vs Bangalore Blasters", "Super 8 Knockout • 5 Fours, 2 Sixes", "EXPLOSIVE", CrimsonPrimaryDark)
+                                    Box(
+                                        modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = "No standout knocks or spells recorded yet.\nMilestone performances from scored matches will appear here automatically.",
+                                            style = BodyCaption,
+                                            color = TextSecondary,
+                                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                                        )
+                                    }
                                 }
                             }
                         }

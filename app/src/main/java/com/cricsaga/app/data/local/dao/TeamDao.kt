@@ -33,6 +33,14 @@ interface TeamDao {
     fun getAllTeams(): Flow<List<TeamEntity>>
 
     @Query("""
+        SELECT DISTINCT t.* FROM teams t
+        LEFT JOIN team_members tm ON t.teamId = tm.teamId
+        WHERE tm.userId = :userId OR t.captainId = :userId
+        ORDER BY t.teamName ASC
+    """)
+    fun getTeamsForUser(userId: String): Flow<List<TeamEntity>>
+
+    @Query("""
         SELECT u.* FROM users u
         INNER JOIN team_members tm ON u.userId = tm.userId
         WHERE tm.teamId = :teamId

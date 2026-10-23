@@ -13,6 +13,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -31,6 +32,7 @@ fun SettingsScreen(
     themeManager: ThemeManager,
     hapticManager: HapticManager,
     onBackClick: () -> Unit,
+    onNavigateToAdmin: () -> Unit = {},
     onLogout: () -> Unit = {}
 ) {
     val themeMode by themeManager.themeMode.collectAsState()
@@ -41,6 +43,10 @@ fun SettingsScreen(
     var defaultOvers by remember { mutableIntStateOf(20) }
     var showClearCacheDialog by remember { mutableStateOf(false) }
     var cacheClearedMessage by remember { mutableStateOf(false) }
+
+    var showAdminPinDialog by remember { mutableStateOf(false) }
+    var adminPinInput by remember { mutableStateOf("") }
+    var adminPinError by remember { mutableStateOf<String?>(null) }
 
     var isCheckingUpdate by remember { mutableStateOf(false) }
     var updateInfo by remember { mutableStateOf<AppUpdateInfo?>(null) }
@@ -341,7 +347,73 @@ fun SettingsScreen(
                 }
             }
 
-            // Section 5: Account & Logout
+            // Section 5: Administration & Controls
+            item {
+                Text(
+                    text = "ADMINISTRATION & CONTROLS",
+                    style = SectionLabel,
+                    color = BoundaryAmber
+                )
+            }
+
+            item {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            hapticManager.tapUiClick()
+                            adminPinInput = ""
+                            adminPinError = null
+                            showAdminPinDialog = true
+                        },
+                    colors = CardDefaults.cardColors(containerColor = SlateSurfaceDark),
+                    shape = RoundedCornerShape(10.dp),
+                    border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(CardBorderDark))
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(BoundaryAmber.copy(alpha = 0.15f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.Default.AdminPanelSettings,
+                                contentDescription = null,
+                                tint = BoundaryAmber,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Admin Control Console",
+                                style = PlayerNameSecondary,
+                                color = TextPrimary
+                            )
+                            Text(
+                                text = "User management, Pro membership grant/revoke, and cloud metrics.",
+                                style = BodyCaption,
+                                color = TextSecondary
+                            )
+                        }
+                        Icon(
+                            Icons.Default.ChevronRight,
+                            contentDescription = null,
+                            tint = TextTertiary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+            }
+
+            // Section 6: Account & Logout
             item {
                 Spacer(modifier = Modifier.height(8.dp))
                 Button(
@@ -363,6 +435,73 @@ fun SettingsScreen(
                     )
                 }
             }
+        }
+
+        if (showAdminPinDialog) {
+            AlertDialog(
+                onDismissRequest = { showAdminPinDialog = false },
+                containerColor = SlateSurfaceDark,
+                title = {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(Icons.Default.Security, contentDescription = null, tint = BoundaryAmber, modifier = Modifier.size(22.dp))
+                        Text("Admin Verification", style = PlayerNamePrimary, color = TextPrimary)
+                    }
+                },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text(
+                            text = "Enter master admin PIN (123456) to access direct database controls and store reviewer utilities.",
+                            style = BodyCaption,
+                            color = TextSecondary
+                        )
+                        OutlinedTextField(
+                            value = adminPinInput,
+                            onValueChange = {
+                                if (it.length <= 6) {
+                                    adminPinInput = it
+                                    adminPinError = null
+                                }
+                            },
+                            label = { Text("Master PIN", fontSize = 12.sp) },
+                            placeholder = { Text("123456", fontSize = 12.sp) },
+                            visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                                keyboardType = androidx.compose.ui.text.input.KeyboardType.NumberPassword
+                            ),
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        if (adminPinError != null) {
+                            Text(adminPinError ?: "", color = DismissalRed, style = BodyCaption)
+                        }
+                    }
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            if (adminPinInput == "123456" || adminPinInput == "2026") {
+                                showAdminPinDialog = false
+                                hapticManager.tapSix()
+                                onNavigateToAdmin()
+                            } else {
+                                hapticManager.tapWicket()
+                                adminPinError = "Invalid PIN. Default admin PIN is 123456."
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = CrimsonPrimaryDark)
+                    ) {
+                        Text("Unlock Console", color = Color.White, fontWeight = FontWeight.Bold)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showAdminPinDialog = false }) {
+                        Text("Cancel", color = TextSecondary)
+                    }
+                }
+            )
         }
 
         if (showUpdateDialog && updateInfo != null) {

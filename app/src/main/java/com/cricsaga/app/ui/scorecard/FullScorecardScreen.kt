@@ -4,16 +4,17 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.PictureAsPdf
-import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -135,7 +136,7 @@ fun FullScorecardScreen(
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
                 when (selectedTab) {
-                    0 -> ScorecardTab(battingTeamName, bowlingTeamName, scoreState)
+                    0 -> ScorecardTab(battingTeamName, bowlingTeamName, scoreState, innings1Score)
                     1 -> ManhattanChart(
                         battingTeamName = battingTeamName,
                         deliveries = currentInningsDeliveries,
@@ -157,12 +158,66 @@ fun FullScorecardScreen(
     }
 }
 
+data class MatchBadgeAward(
+    val title: String,
+    val playerDetail: String,
+    val icon: androidx.compose.ui.graphics.vector.ImageVector,
+    val color: Color
+)
+
 @Composable
 fun ScorecardTab(
     battingTeamName: String,
     bowlingTeamName: String,
-    scoreState: InningsScoreState
+    scoreState: InningsScoreState,
+    firstInningsState: InningsScoreState? = null
 ) {
+    val amberColor = BoundaryAmber
+    val greenColor = ForestSixPrimary
+    val crimsonColor = CrimsonPrimaryDark
+    val blueColor = Color(0xFF38BDF8)
+    val goldColor = AmberFourPrimary
+
+    val matchBadges = remember(scoreState, firstInningsState, amberColor, greenColor, crimsonColor, blueColor, goldColor) {
+        val badges = mutableListOf<MatchBadgeAward>()
+        val allBatsmen = (firstInningsState?.batsmen?.values?.toList().orEmpty()) + scoreState.batsmen.values.toList()
+        val allBowlers = (firstInningsState?.bowlers?.values?.toList().orEmpty()) + scoreState.bowlers.values.toList()
+
+        // 1. Century Club (100+ runs)
+        allBatsmen.filter { it.runs >= 100 }.forEach {
+            badges.add(MatchBadgeAward("CENTURY CLUB", "${it.playerName} • ${it.runs} (${it.ballsFaced}b)", Icons.Default.SportsCricket, goldColor))
+        }
+        // 2. Half Century (50-99 runs)
+        allBatsmen.filter { it.runs in 50..99 }.forEach {
+            badges.add(MatchBadgeAward("HALF CENTURY", "${it.playerName} • ${it.runs} (${it.ballsFaced}b)", Icons.Default.Star, greenColor))
+        }
+        // 3. Super Sixer (3+ sixes)
+        allBatsmen.filter { it.sixes >= 3 }.forEach {
+            badges.add(MatchBadgeAward("SUPER SIXER", "${it.playerName} • ${it.sixes} Sixes", Icons.Default.RocketLaunch, greenColor))
+        }
+        // 4. Boundary King (5+ fours)
+        allBatsmen.filter { it.fours >= 5 }.forEach {
+            badges.add(MatchBadgeAward("BOUNDARY KING", "${it.playerName} • ${it.fours} Fours", Icons.Default.LocalFireDepartment, amberColor))
+        }
+        // 5. Strike Accelerator (SR >= 150.0, runs >= 20)
+        allBatsmen.filter { it.runs >= 20 && it.strikeRate >= 150.0 }.forEach {
+            badges.add(MatchBadgeAward("STRIKE ACCELERATOR", "${it.playerName} • SR ${String.format(java.util.Locale.US, "%.1f", it.strikeRate)}", Icons.Default.Bolt, amberColor))
+        }
+        // 6. 5-Wicket Haul (5+ wkts)
+        allBowlers.filter { it.wickets >= 5 }.forEach {
+            badges.add(MatchBadgeAward("5-WICKET HAUL", "${it.bowlerName} • ${it.wickets}/${it.runsConceded}", Icons.Default.GpsFixed, crimsonColor))
+        }
+        // 7. 3-Wicket Spell (3-4 wkts)
+        allBowlers.filter { it.wickets in 3..4 }.forEach {
+            badges.add(MatchBadgeAward("3-WICKET SPELL", "${it.bowlerName} • ${it.wickets}/${it.runsConceded}", Icons.Default.SportsBaseball, blueColor))
+        }
+        // 8. Economy Maestro (legalBalls >= 12, econ <= 5.0)
+        allBowlers.filter { it.legalBalls >= 12 && it.economyRate <= 5.0 }.forEach {
+            badges.add(MatchBadgeAward("ECONOMY MAESTRO", "${it.bowlerName} • Econ ${String.format(java.util.Locale.US, "%.1f", it.economyRate)}", Icons.Default.Shield, greenColor))
+        }
+        badges
+    }
+
     // Total Banner
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -188,6 +243,79 @@ fun ScorecardTab(
                 color = MutedGrey,
                 fontSize = 13.sp
             )
+        }
+    }
+
+    // Match Badges & Honours Shelf
+    if (matchBadges.isNotEmpty()) {
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = SlateSurfaceDark),
+            shape = RoundedCornerShape(12.dp),
+            border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(BoundaryAmber.copy(alpha = 0.4f)))
+        ) {
+            Column(modifier = Modifier.padding(14.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.MilitaryTech, contentDescription = null, tint = BoundaryAmber, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("MATCH BADGES & HONOURS", color = BoundaryAmber, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    }
+                    Surface(
+                        color = BoundaryAmber.copy(alpha = 0.15f),
+                        shape = RoundedCornerShape(4.dp)
+                    ) {
+                        Text(
+                            text = "${matchBadges.size} Badges",
+                            color = BoundaryAmber,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(10.dp))
+                matchBadges.forEach { badge ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(32.dp)
+                                .clip(CircleShape)
+                                .background(badge.color.copy(alpha = 0.15f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(badge.icon, contentDescription = null, tint = badge.color, modifier = Modifier.size(16.dp))
+                        }
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(badge.title, color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                            Text(badge.playerDetail, color = TextSecondary, fontSize = 10.sp)
+                        }
+                        Surface(
+                            color = badge.color.copy(alpha = 0.15f),
+                            shape = RoundedCornerShape(4.dp),
+                            border = androidx.compose.foundation.BorderStroke(0.5.dp, badge.color.copy(alpha = 0.4f))
+                        ) {
+                            Text(
+                                text = "AWARDED",
+                                color = badge.color,
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
+                }
+            }
         }
     }
 

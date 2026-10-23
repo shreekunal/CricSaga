@@ -27,8 +27,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cricsaga.app.data.local.ProManager
 import com.cricsaga.app.data.local.entity.PlayerStatsEntity
+import com.cricsaga.app.data.local.entity.MatchEntity
 import com.cricsaga.app.data.local.entity.TeamEntity
 import com.cricsaga.app.data.local.entity.UserEntity
+import com.cricsaga.app.domain.model.MatchStatus
 import com.cricsaga.app.domain.model.PlayingRole
 import com.cricsaga.app.ui.profile.dialog.EditProfileDialog
 import com.cricsaga.app.ui.theme.*
@@ -49,11 +51,14 @@ fun PlayerProfileScreen(
     proManager: ProManager,
     currentUser: UserEntity? = null,
     playerStats: PlayerStatsEntity? = null,
+    userMatches: List<MatchEntity> = emptyList(),
     teams: List<TeamEntity> = emptyList(),
     posts: List<com.cricsaga.app.data.local.entity.PostEntity> = emptyList(),
     followersCount: Int = 0,
     followingCount: Int = 0,
     onRedeemCodeClick: () -> Unit,
+    onMatchClick: (String) -> Unit = {},
+    onStartMatchClick: () -> Unit = {},
     onUpdateProfile: (UserEntity) -> Unit = {},
     onTeamClick: (String) -> Unit = {},
     onCreateOrJoinTeamClick: () -> Unit = {},
@@ -65,10 +70,10 @@ fun PlayerProfileScreen(
     val context = LocalContext.current
     var showEditProfileDialog by remember { mutableStateOf(false) }
     var selectedTab by remember { mutableIntStateOf(0) }
-    val tabs = listOf("Overview", "Stats", "Teams", "Highlights", "Posts")
+    val tabs = listOf("Overview", "Matches", "Stats", "Teams", "Highlights", "Posts")
     val subscriptionState by proManager.subscriptionState.collectAsState()
 
-    val playerName = currentUser?.fullName?.ifBlank { "Rohit Sharma" } ?: "Rohit Sharma"
+    val playerName = currentUser?.fullName?.ifBlank { "Player" } ?: "Player"
     val initials = playerName.split(" ")
         .mapNotNull { it.firstOrNull()?.toString() }
         .take(2)
@@ -103,6 +108,115 @@ fun PlayerProfileScreen(
     val batSr = if (totalBalls > 0) String.format(java.util.Locale.US, "%.1f", (totalRuns.toDouble() / totalBalls.toDouble()) * 100.0) else "0.0"
     val bowlEcon = if (totalBallsBowled > 0) String.format(java.util.Locale.US, "%.2f", (totalRunsConceded.toDouble() / (totalBallsBowled.toDouble() / 6.0))) else "0.0"
     val bowlAvg = if (totalWickets > 0) String.format(java.util.Locale.US, "%.2f", totalRunsConceded.toDouble() / totalWickets.toDouble()) else "0.0"
+
+    val centuryCount = playerStats?.hundreds ?: 0
+    val fiftyCount = playerStats?.fifties ?: 0
+    val potmCount = userMatches.count { it.playerOfTheMatchId == currentUser?.userId }
+    val totalWicketsCount = playerStats?.wicketsTaken ?: 0
+    val fiveWicketsCount = if (totalWicketsCount >= 5) totalWicketsCount / 5 else 0
+    val threeWicketsCount = if (totalWicketsCount >= 3) totalWicketsCount / 3 else 0
+    val sixesCount = playerStats?.sixes ?: 0
+    val superSixerCount = if (sixesCount >= 3) sixesCount / 3 else 0
+    val foursCount = playerStats?.fours ?: 0
+    val boundaryKingCount = if (foursCount >= 5) foursCount / 5 else 0
+    val strikeAcceleratorCount = if ((batSr.toDoubleOrNull() ?: 0.0) >= 150.0 && totalRuns >= 20) 1 else 0
+    val economyMaestroCount = if (totalBallsBowled >= 12 && (bowlEcon.toDoubleOrNull() ?: 99.0) <= 5.0) 1 else 0
+    val safeHandsCount = playerStats?.catches ?: 0
+
+    val amberColor = BoundaryAmber
+    val greenColor = ForestSixPrimary
+    val crimsonColor = CrimsonPrimaryDark
+    val blueColor = Color(0xFF38BDF8)
+    val goldColor = AmberFourPrimary
+
+    val allBadges = remember(
+        centuryCount, fiftyCount, potmCount, fiveWicketsCount, threeWicketsCount,
+        superSixerCount, boundaryKingCount, strikeAcceleratorCount, economyMaestroCount, safeHandsCount,
+        amberColor, greenColor, crimsonColor, blueColor, goldColor
+    ) {
+        listOf(
+            MatchBadgeItem(
+                title = "PLAYER OF THE MATCH",
+                category = "MATCH MVP",
+                description = "Awarded MVP honors for best overall performance in a match.",
+                count = potmCount,
+                icon = Icons.Default.EmojiEvents,
+                accentColor = amberColor
+            ),
+            MatchBadgeItem(
+                title = "CENTURY CLUB",
+                category = "BATTING MILESTONE",
+                description = "Score 100 or more runs in a single match innings.",
+                count = centuryCount,
+                icon = Icons.Default.SportsCricket,
+                accentColor = goldColor
+            ),
+            MatchBadgeItem(
+                title = "HALF CENTURY",
+                category = "BATTING MILESTONE",
+                description = "Score 50 to 99 runs in a single match innings.",
+                count = fiftyCount,
+                icon = Icons.Default.Star,
+                accentColor = greenColor
+            ),
+            MatchBadgeItem(
+                title = "5-WICKET HAUL",
+                category = "BOWLING FEAT",
+                description = "Take 5 or more wickets in a single match spell.",
+                count = fiveWicketsCount,
+                icon = Icons.Default.GpsFixed,
+                accentColor = crimsonColor
+            ),
+            MatchBadgeItem(
+                title = "3-WICKET SPELL",
+                category = "BOWLING STRIKE",
+                description = "Take 3 or more wickets in a single match spell.",
+                count = threeWicketsCount,
+                icon = Icons.Default.SportsBaseball,
+                accentColor = blueColor
+            ),
+            MatchBadgeItem(
+                title = "SUPER SIXER",
+                category = "POWER HITTING",
+                description = "Smash 3 or more sixes in a single match innings.",
+                count = superSixerCount,
+                icon = Icons.Default.RocketLaunch,
+                accentColor = greenColor
+            ),
+            MatchBadgeItem(
+                title = "BOUNDARY KING",
+                category = "BALL STRIKING",
+                description = "Hit 5 or more fours in a single match innings.",
+                count = boundaryKingCount,
+                icon = Icons.Default.LocalFireDepartment,
+                accentColor = amberColor
+            ),
+            MatchBadgeItem(
+                title = "STRIKE ACCELERATOR",
+                category = "HIGH TEMPO",
+                description = "Strike Rate of 150+ with 20+ runs scored in a match.",
+                count = strikeAcceleratorCount,
+                icon = Icons.Default.Bolt,
+                accentColor = amberColor
+            ),
+            MatchBadgeItem(
+                title = "ECONOMY MAESTRO",
+                category = "DISCIPLINED SPELL",
+                description = "Concede ≤5.00 rpo bowling at least 2 complete overs in a match.",
+                count = economyMaestroCount,
+                icon = Icons.Default.Shield,
+                accentColor = greenColor
+            ),
+            MatchBadgeItem(
+                title = "SAFE HANDS",
+                category = "FIELDING BRILLIANCE",
+                description = "Take catches or dismissals in the outfield across matches.",
+                count = safeHandsCount,
+                icon = Icons.Default.Shield,
+                accentColor = blueColor
+            )
+        )
+    }
 
     // Archetype resolution
     val archetype = when {
@@ -335,7 +449,7 @@ fun PlayerProfileScreen(
                                 contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
                             ) {
                                 Text(
-                                    text = if (subscriptionState.isActive) "View Perks" else "Redeem Code",
+                                    text = "View Perks",
                                     style = BodyCaption,
                                     color = TextPrimary
                                 )
@@ -446,7 +560,7 @@ fun PlayerProfileScreen(
                                         HonourBadgeCard(
                                             icon = Icons.Default.EmojiEvents,
                                             title = "CENTURY",
-                                            subtitle = if (totalHundreds > 0) "$totalHundreds Scored" else "In Progress",
+                                            subtitle = if (totalHundreds > 0) "$totalHundreds Scored" else "0 Centuries",
                                             isUnlocked = totalHundreds > 0,
                                             modifier = Modifier.weight(1f)
                                         )
@@ -469,14 +583,14 @@ fun PlayerProfileScreen(
                                             icon = Icons.Default.Bolt,
                                             title = "STRIKER",
                                             subtitle = "SR $batSr",
-                                            isUnlocked = (batSr.toDoubleOrNull() ?: 0.0) >= 140.0,
+                                            isUnlocked = (batSr.toDoubleOrNull() ?: 0.0) >= 140.0 && totalRuns >= 50,
                                             modifier = Modifier.weight(1f)
                                         )
                                         HonourBadgeCard(
                                             icon = Icons.Default.Shield,
                                             title = "SAFE HANDS",
-                                            subtitle = "15 Catches",
-                                            isUnlocked = true,
+                                            subtitle = "0 Catches",
+                                            isUnlocked = false,
                                             modifier = Modifier.weight(1f)
                                         )
                                     }
@@ -492,11 +606,11 @@ fun PlayerProfileScreen(
                             ) {
                                 Column(modifier = Modifier.padding(14.dp)) {
                                     TableStatRow("Strike Rate", batSr)
-                                    TableStatRow("Highest Score", "$highestScore*")
-                                    TableStatRow("Bowling Economy", bowlEcon)
-                                    TableStatRow("Best Bowling", "3/16 (4.0 ov)")
+                                    TableStatRow("Highest Score", if (highestScore > 0) "$highestScore*" else "-")
+                                    TableStatRow("Bowling Economy", if (totalBallsBowled > 0) bowlEcon else "-")
+                                    TableStatRow("Best Bowling", "-")
                                     TableStatRow("Fifties / Hundreds", "$totalFifties / $totalHundreds")
-                                    TableStatRow("Catches / Run Outs", "12 / 3")
+                                    TableStatRow("Catches / Run Outs", "0 / 0")
                                 }
                             }
                         }
@@ -504,6 +618,205 @@ fun PlayerProfileScreen(
                 }
 
                 1 -> {
+                    // Matches Tab (Past Matches Scored & Played)
+                    if (userMatches.isEmpty()) {
+                        item {
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
+                                colors = CardDefaults.cardColors(containerColor = SlateSurfaceDark),
+                                shape = RoundedCornerShape(10.dp),
+                                border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(CardBorderDark))
+                            ) {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(24.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.SportsCricket,
+                                        contentDescription = null,
+                                        tint = TextSecondary,
+                                        modifier = Modifier.size(40.dp)
+                                    )
+                                    Spacer(modifier = Modifier.height(10.dp))
+                                    Text(
+                                        text = "No Matches Recorded Yet",
+                                        style = PlayerNameSecondary,
+                                        color = TextPrimary
+                                    )
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        text = "Matches you score or participate in will appear here in your career timeline with complete ball-by-ball scorecards, awards, and match badges.",
+                                        style = BodyCaption,
+                                        color = TextSecondary,
+                                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                                    )
+                                    Spacer(modifier = Modifier.height(14.dp))
+                                    Button(
+                                        onClick = {
+                                            hapticManager?.tapUiClick()
+                                            onStartMatchClick()
+                                        },
+                                        colors = ButtonDefaults.buttonColors(containerColor = CrimsonPrimaryDark),
+                                        shape = RoundedCornerShape(8.dp)
+                                    ) {
+                                        Icon(Icons.Default.Add, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("Start New Match", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 12.sp)
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        item {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "CAREER MATCHES (${userMatches.size})",
+                                    style = SectionLabel,
+                                    color = BoundaryAmber
+                                )
+                                Text(
+                                    text = "Tap match for scorecard & badges",
+                                    style = MicroTag,
+                                    color = TextTertiary
+                                )
+                            }
+                        }
+
+                        items(userMatches, key = { it.matchId }) { match ->
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 6.dp)
+                                    .clickable {
+                                        hapticManager?.tapUiClick()
+                                        onMatchClick(match.matchId)
+                                    },
+                                colors = CardDefaults.cardColors(containerColor = SlateSurfaceDark),
+                                shape = RoundedCornerShape(10.dp),
+                                border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(CardBorderDark))
+                            ) {
+                                Column(modifier = Modifier.padding(14.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = match.matchTitle,
+                                            style = PlayerNameSecondary,
+                                            color = TextPrimary
+                                        )
+                                        Surface(
+                                            color = if (match.matchStatus == MatchStatus.LIVE) CrimsonPrimaryDark.copy(alpha = 0.15f) else ElevatedSurfaceDark,
+                                            shape = RoundedCornerShape(4.dp)
+                                        ) {
+                                            Text(
+                                                text = match.matchStatus.name,
+                                                color = if (match.matchStatus == MatchStatus.LIVE) CrimsonPrimaryDark else TextSecondary,
+                                                style = MicroTag,
+                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                            )
+                                        }
+                                    }
+
+                                    Spacer(modifier = Modifier.height(4.dp))
+
+                                    val dateStr = remember(match.createdAt) {
+                                        java.text.SimpleDateFormat("dd MMM yyyy, hh:mm a", java.util.Locale.getDefault()).format(java.util.Date(match.createdAt))
+                                    }
+                                    Text(
+                                        text = "$dateStr • ${match.totalOvers} Overs • ${match.ballType.name.replace('_', ' ').lowercase().replaceFirstChar { it.uppercase() }}",
+                                        style = BodyCaption,
+                                        color = TextSecondary
+                                    )
+
+                                    if (!match.resultSummary.isNullOrBlank()) {
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Text(
+                                            text = match.resultSummary,
+                                            style = BodyCaption,
+                                            color = BoundaryAmber,
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                    }
+
+                                    val isPotm = match.playerOfTheMatchId == currentUser?.userId
+                                    if (isPotm) {
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        Surface(
+                                            color = BoundaryAmber.copy(alpha = 0.15f),
+                                            shape = RoundedCornerShape(4.dp),
+                                            border = androidx.compose.foundation.BorderStroke(0.5.dp, BoundaryAmber.copy(alpha = 0.4f))
+                                        ) {
+                                            Row(
+                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                            ) {
+                                                Icon(Icons.Default.EmojiEvents, contentDescription = null, tint = BoundaryAmber, modifier = Modifier.size(12.dp))
+                                                Text("PLAYER OF THE MATCH", color = BoundaryAmber, style = MicroTag, fontWeight = FontWeight.Bold)
+                                            }
+                                        }
+                                    }
+
+                                    Spacer(modifier = Modifier.height(10.dp))
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = if (match.matchStatus == MatchStatus.LIVE) "Resume Live Scoring →" else "View Scorecard & Badges →",
+                                            style = MicroTag,
+                                            color = CrimsonPrimaryDark,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        Icon(
+                                            imageVector = Icons.Default.ChevronRight,
+                                            contentDescription = null,
+                                            tint = CrimsonPrimaryDark,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        item {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                            ) {
+                                OutlinedButton(
+                                    onClick = {
+                                        hapticManager?.tapUiClick()
+                                        onStartMatchClick()
+                                    },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(8.dp),
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, CrimsonPrimaryDark)
+                                ) {
+                                    Icon(Icons.Default.Add, contentDescription = null, tint = CrimsonPrimaryDark, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Start Another Match", color = CrimsonPrimaryDark, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                }
+                            }
+                        }
+                    }
+                }
+
+                2 -> {
                     // Unified Stats Tab (Batting, Bowling, and Fielding)
                     item {
                         Column(
@@ -530,10 +843,10 @@ fun PlayerProfileScreen(
                                     }
                                     Spacer(modifier = Modifier.height(10.dp))
                                     TableStatRow("Innings Batted", "$totalInnings")
-                                    TableStatRow("Not Outs (NO)", "3")
+                                    TableStatRow("Not Outs (NO)", "0")
                                     TableStatRow("Total Runs", "$totalRuns")
                                     TableStatRow("Balls Faced", "$totalBalls")
-                                    TableStatRow("Highest Score", "$highestScore*")
+                                    TableStatRow("Highest Score", if (highestScore > 0) "$highestScore*" else "-")
                                     TableStatRow("Batting Average", batAvg)
                                     TableStatRow("Strike Rate", batSr)
                                     TableStatRow("Fifties (50s)", "$totalFifties")
@@ -563,9 +876,9 @@ fun PlayerProfileScreen(
                                     TableStatRow("Maiden Overs", "$totalMaidens")
                                     TableStatRow("Runs Conceded", "$totalRunsConceded")
                                     TableStatRow("Wickets Taken", "$totalWickets")
-                                    TableStatRow("Best Bowling", "3/16 (4.0 ov)")
+                                    TableStatRow("Best Bowling", "-")
                                     TableStatRow("Bowling Average", bowlAvg)
-                                    TableStatRow("Economy Rate", bowlEcon)
+                                    TableStatRow("Economy Rate", if (totalBallsBowled > 0) bowlEcon else "-")
                                 }
                             }
 
@@ -586,9 +899,9 @@ fun PlayerProfileScreen(
                                         Icon(Icons.Default.Shield, contentDescription = null, tint = TextSecondary, modifier = Modifier.size(16.dp))
                                     }
                                     Spacer(modifier = Modifier.height(10.dp))
-                                    TableStatRow("Catches", "12")
-                                    TableStatRow("Direct Run Outs", "3")
-                                    TableStatRow("Assisted Run Outs", "2")
+                                    TableStatRow("Catches", "$safeHandsCount")
+                                    TableStatRow("Direct Run Outs", "0")
+                                    TableStatRow("Assisted Run Outs", "0")
                                     TableStatRow("Stumpings", "0")
                                 }
                             }
@@ -596,7 +909,7 @@ fun PlayerProfileScreen(
                     }
                 }
 
-                2 -> {
+                3 -> {
                     // Teams Tab (Player's Clubs, Squads & Roles)
                     if (teams.isEmpty()) {
                         item {
@@ -714,8 +1027,8 @@ fun PlayerProfileScreen(
                     }
                 }
 
-                3 -> {
-                    // Highlights Tab (Milestones & Standout Match Performances)
+                4 -> {
+                    // Highlights Tab: Trophy Cabinet with ALL badges and their earned counts
                     item {
                         Column(
                             modifier = Modifier
@@ -723,57 +1036,61 @@ fun PlayerProfileScreen(
                                 .padding(16.dp),
                             verticalArrangement = Arrangement.spacedBy(14.dp)
                         ) {
-                            // Major Milestones Grid
+                            // Trophy Cabinet Summary Card
+                            val totalBadgesEarned = allBadges.sumOf { it.count }
                             Card(
                                 modifier = Modifier.fillMaxWidth(),
                                 colors = CardDefaults.cardColors(containerColor = SlateSurfaceDark),
-                                shape = RoundedCornerShape(10.dp),
+                                shape = RoundedCornerShape(12.dp),
                                 border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(CardBorderDark))
                             ) {
-                                Column(modifier = Modifier.padding(14.dp)) {
+                                Column(modifier = Modifier.padding(16.dp)) {
                                     Row(
                                         modifier = Modifier.fillMaxWidth(),
                                         horizontalArrangement = Arrangement.SpaceBetween,
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Text("CAREER HIGHLIGHTS & HONOURS", style = SectionLabel, color = BoundaryAmber)
-                                        Icon(Icons.Default.MilitaryTech, contentDescription = null, tint = BoundaryAmber, modifier = Modifier.size(18.dp))
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Icon(
+                                                imageVector = Icons.Default.MilitaryTech,
+                                                contentDescription = null,
+                                                tint = BoundaryAmber,
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text(
+                                                text = "TROPHY CABINET & MATCH BADGES",
+                                                style = SectionLabel,
+                                                color = BoundaryAmber
+                                            )
+                                        }
+
+                                        Surface(
+                                            color = if (totalBadgesEarned > 0) BoundaryAmber.copy(alpha = 0.15f) else ElevatedSurfaceDark,
+                                            shape = RoundedCornerShape(12.dp)
+                                        ) {
+                                            Text(
+                                                text = "$totalBadgesEarned Earned",
+                                                color = if (totalBadgesEarned > 0) BoundaryAmber else TextSecondary,
+                                                style = MicroTag,
+                                                fontWeight = FontWeight.Bold,
+                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                            )
+                                        }
                                     }
-                                    Spacer(modifier = Modifier.height(12.dp))
-                                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                        HonourBadgeCard(
-                                            icon = Icons.Default.EmojiEvents,
-                                            title = "CENTURY CLUB",
-                                            subtitle = if (totalHundreds > 0) "$totalHundreds Centuries" else "1 Unlocked (102*)",
-                                            isUnlocked = true,
-                                            modifier = Modifier.weight(1f)
-                                        )
-                                        HonourBadgeCard(
-                                            icon = Icons.Default.GpsFixed,
-                                            title = "5-WICKET HAUL",
-                                            subtitle = if (totalWickets >= 5) "5/24 (Best)" else "3/16 (Personal Best)",
-                                            isUnlocked = true,
-                                            modifier = Modifier.weight(1f)
-                                        )
-                                    }
+
                                     Spacer(modifier = Modifier.height(8.dp))
-                                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                        HonourBadgeCard(
-                                            icon = Icons.Default.Bolt,
-                                            title = "STRIKE ACCELERATOR",
-                                            subtitle = "SR $batSr",
-                                            isUnlocked = true,
-                                            modifier = Modifier.weight(1f)
-                                        )
-                                        HonourBadgeCard(
-                                            icon = Icons.Default.Shield,
-                                            title = "MATCH WINNER",
-                                            subtitle = "4x Player of Match",
-                                            isUnlocked = true,
-                                            modifier = Modifier.weight(1f)
-                                        )
-                                    }
+                                    Text(
+                                        text = "Badges are earned per match across your career. Open any past match in your Matches tab to inspect individual scorecards and match awards.",
+                                        style = BodyCaption,
+                                        color = TextSecondary
+                                    )
                                 }
+                            }
+
+                            // All 10 Countable Badges with Multiplier Chips
+                            allBadges.forEach { badge ->
+                                CountableBadgeCard(badge = badge)
                             }
 
                             // Standout Knocks & Spells Shelf
@@ -786,33 +1103,28 @@ fun PlayerProfileScreen(
                                 Column(modifier = Modifier.padding(14.dp)) {
                                     Text("STANDOUT INNINGS & NOTABLE SPELLS", style = SectionLabel, color = TextSecondary)
                                     Spacer(modifier = Modifier.height(10.dp))
-                                    HighlightInningsRow(
-                                        title = "102* (48) vs Delhi Challengers",
-                                        meta = "Super Over Thriller • Match MVP • S/R 212.5",
-                                        badge = "MATCH WINNING KNOCK",
-                                        badgeColor = BoundaryAmber
-                                    )
-                                    HorizontalDivider(color = DividerDark, thickness = 0.5.dp, modifier = Modifier.padding(vertical = 8.dp))
-                                    HighlightInningsRow(
-                                        title = "3/16 (4.0 ov) vs Royal Club Pune",
-                                        meta = "Death Overs Economy: 4.00 • 2 Bowled",
-                                        badge = "CLUTCH SPELL",
-                                        badgeColor = ForestSixPrimary
-                                    )
-                                    HorizontalDivider(color = DividerDark, thickness = 0.5.dp, modifier = Modifier.padding(vertical = 8.dp))
-                                    HighlightInningsRow(
-                                        title = "56 (29) vs Bandra Blasters",
-                                        meta = "Chasing 175 • 4 Fours, 4 Sixes",
-                                        badge = "FIFTY",
-                                        badgeColor = CrimsonPrimaryDark
-                                    )
+                                    Box(
+                                        modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = if (totalMatches > 0) {
+                                                "Career Best: ${if (highestScore > 0) "$highestScore* runs" else "No innings yet"} • ${if (totalWickets > 0) "$totalWickets wickets taken" else "0 wickets"}"
+                                            } else {
+                                                "No standout knocks or spells recorded yet.\nMilestone performances from scored matches will appear here automatically."
+                                            },
+                                            style = BodyCaption,
+                                            color = TextSecondary,
+                                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                                        )
+                                    }
                                 }
                             }
                         }
                     }
                 }
 
-                4 -> {
+                5 -> {
                     // Posts Tab
                     if (posts.isEmpty()) {
                         item {
@@ -963,6 +1275,123 @@ private fun HighlightInningsRow(
                 color = badgeColor,
                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
             )
+        }
+    }
+}
+
+data class MatchBadgeItem(
+    val title: String,
+    val category: String,
+    val description: String,
+    val count: Int,
+    val icon: ImageVector,
+    val accentColor: Color
+)
+
+@Composable
+fun CountableBadgeCard(
+    badge: MatchBadgeItem,
+    modifier: Modifier = Modifier
+) {
+    val isUnlocked = badge.count > 0
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = SlateSurfaceDark),
+        shape = RoundedCornerShape(10.dp),
+        border = CardDefaults.outlinedCardBorder().copy(
+            brush = androidx.compose.ui.graphics.SolidColor(
+                if (isUnlocked) badge.accentColor.copy(alpha = 0.5f) else CardBorderDark
+            )
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(46.dp)
+                    .clip(CircleShape)
+                    .background(
+                        if (isUnlocked) badge.accentColor.copy(alpha = 0.15f) else ElevatedSurfaceDark
+                    )
+                    .border(
+                        width = 1.dp,
+                        color = if (isUnlocked) badge.accentColor.copy(alpha = 0.6f) else CardBorderDark,
+                        shape = CircleShape
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = badge.icon,
+                    contentDescription = null,
+                    tint = if (isUnlocked) badge.accentColor else TextTertiary,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.width(14.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text(
+                        text = badge.title,
+                        style = SectionLabel,
+                        color = if (isUnlocked) TextPrimary else TextSecondary
+                    )
+                    Surface(
+                        color = if (isUnlocked) badge.accentColor.copy(alpha = 0.12f) else ElevatedSurfaceDark,
+                        shape = RoundedCornerShape(3.dp)
+                    ) {
+                        Text(
+                            text = badge.category,
+                            style = MicroTag,
+                            color = if (isUnlocked) badge.accentColor else TextTertiary,
+                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
+                            fontSize = 9.sp
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(3.dp))
+
+                Text(
+                    text = badge.description,
+                    style = BodyCaption,
+                    color = TextSecondary,
+                    fontSize = 11.sp
+                )
+            }
+
+            Spacer(modifier = Modifier.width(10.dp))
+
+            // Multiplier / Count Badge Pill
+            Surface(
+                color = if (isUnlocked) badge.accentColor.copy(alpha = 0.2f) else ElevatedSurfaceDark,
+                shape = RoundedCornerShape(8.dp),
+                border = androidx.compose.foundation.BorderStroke(
+                    1.dp,
+                    if (isUnlocked) badge.accentColor else CardBorderDark
+                )
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    Text(
+                        text = "x${badge.count}",
+                        fontWeight = FontWeight.Black,
+                        fontSize = 14.sp,
+                        color = if (isUnlocked) badge.accentColor else TextTertiary
+                    )
+                }
+            }
         }
     }
 }

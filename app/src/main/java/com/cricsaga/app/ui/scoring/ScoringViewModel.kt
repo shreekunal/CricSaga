@@ -66,6 +66,8 @@ class ScoringViewModel(application: Application) : AndroidViewModel(application)
     private var activeMatchData: SeededMatchData? = null
 
     val allMatches: StateFlow<List<MatchEntity>>
+
+    fun getMatchesForUser(userId: String): Flow<List<MatchEntity>> = repository.getMatchesForUser(userId)
     val allTeams: StateFlow<List<TeamEntity>>
     val topPerformers: StateFlow<List<GrassrootsHeroItem>>
     val lookingForPosts: StateFlow<List<LookingForEntity>>
@@ -169,12 +171,6 @@ class ScoringViewModel(application: Application) : AndroidViewModel(application)
             SharingStarted.WhileSubscribed(5000),
             listOf("All Regions")
         )
-
-        viewModelScope.launch {
-            repository.seedInitialLookingForPostsIfEmpty()
-        }
-
-        loadActiveMatch()
     }
 
     fun setSelectedRankingCity(city: String) {
@@ -277,65 +273,6 @@ class ScoringViewModel(application: Application) : AndroidViewModel(application)
     ) {
         viewModelScope.launch {
             repository.createLookingForPost(type, title, teamOrOrganizer, timing, location, note, contactPhone)
-        }
-    }
-
-    private fun loadActiveMatch() {
-        viewModelScope.launch {
-            val data = repository.seedInitialDataIfEmpty()
-            activeMatchData = data
-
-            val playerNames = mapOf(
-                data.striker.userId to data.striker.fullName,
-                data.nonStriker.userId to data.nonStriker.fullName,
-                data.bowler.userId to data.bowler.fullName,
-                data.incomingBatsman.userId to data.incomingBatsman.fullName
-            )
-
-            val scoringEngine = ScoringEngine(
-                matchId = data.matchId,
-                inningsNumber = 1,
-                totalOversAllotted = 20,
-                playerNames = playerNames
-            )
-            scoringEngine.startInnings(
-                strikerId = data.striker.userId,
-                nonStrikerId = data.nonStriker.userId,
-                openingBowlerId = data.bowler.userId
-            )
-            engine = scoringEngine
-
-            val battingSquad = listOf(data.striker, data.nonStriker, data.incomingBatsman)
-            val bowlingSquad = listOf(
-                data.bowler,
-                UserEntity("user_hardik", "9876543214", "Hardik Pandya", playingRole = PlayingRole.ALL_ROUNDER),
-                UserEntity("user_shami", "9876543215", "Mohammed Shami", playingRole = PlayingRole.BOWLER)
-            )
-
-            val bench = battingSquad.filter { it.userId != data.striker.userId && it.userId != data.nonStriker.userId }
-
-            _uiState.value = ScoringUiState(
-                isLoading = false,
-                matchId = data.matchId,
-                inningsId = data.inningsId,
-                inningsNumber = 1,
-                matchTitle = "Warriors vs Tigers",
-                teamAId = "team_warriors",
-                teamBId = "team_tigers",
-                battingTeamId = "team_warriors",
-                bowlingTeamId = "team_tigers",
-                battingTeamName = data.teamAName,
-                bowlingTeamName = data.teamBName,
-                totalOvers = 20,
-                scoreState = scoringEngine.state,
-                striker = data.striker,
-                nonStriker = data.nonStriker,
-                bowler = data.bowler,
-                battingSquad = battingSquad,
-                bowlingSquad = bowlingSquad,
-                battingBench = bench,
-                lastActionMessage = "Match loaded: ${data.striker.fullName} on strike"
-            )
         }
     }
 

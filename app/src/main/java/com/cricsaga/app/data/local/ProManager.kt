@@ -54,9 +54,7 @@ class ProManager(context: Context) {
     val isProFlow: StateFlow<Boolean> = MutableStateFlow(isProActive())
 
     init {
-        CoroutineScope(Dispatchers.IO).launch {
-            seedDefaultCodesIfEmpty()
-        }
+        // Initialized with admin-managed Pro status
     }
 
     private fun loadSubscriptionState(): ProSubscriptionState {
@@ -84,6 +82,30 @@ class ProManager(context: Context) {
     fun isProActive(): Boolean {
         val state = loadSubscriptionState()
         return state.isActive
+    }
+
+    fun syncUserProStatus(isPro: Boolean) {
+        if (isPro) {
+            val now = System.currentTimeMillis()
+            prefs.edit()
+                .putBoolean("is_pro_active", true)
+                .putString("pro_plan", ProPlan.LIFETIME.name)
+                .putString("redeemed_code", "ADMIN_VERIFIED")
+                .putLong("pro_activated_at", now)
+                .putLong("pro_expires_at", Long.MAX_VALUE)
+                .apply()
+
+            _subscriptionState.value = ProSubscriptionState(
+                isActive = true,
+                plan = ProPlan.LIFETIME,
+                redeemedCode = "ADMIN_VERIFIED",
+                activatedAt = now,
+                expiresAt = Long.MAX_VALUE
+            )
+            (isProFlow as MutableStateFlow).value = true
+        } else {
+            deactivatePro()
+        }
     }
 
     fun activatePlan(plan: ProPlan) {
@@ -229,5 +251,24 @@ class ProManager(context: Context) {
             plan,
             "Success! CricSaga Pro (${plan.title}) is now ACTIVE on your account!"
         )
+    }
+
+    fun getAllRedeemCodes(): kotlinx.coroutines.flow.Flow<List<RedeemCodeEntity>> = redeemCodeDao.getAllCodes()
+
+    suspend fun getAllRedeemCodesList(): List<RedeemCodeEntity> = withContext(Dispatchers.IO) {
+        redeemCodeDao.getAllCodesList()
+    }
+
+    suspend fun createCustomRedeemCode(code: String, plan: ProPlan, durationDays: Int = 30) = withContext(Dispatchers.IO) {
+        val entity = RedeemCodeEntity(
+            code = code.trim().uppercase(),
+            plan = plan,
+            durationDays = durationDays
+        )
+        redeemCodeDao.insertCode(entity)
+    }
+
+    suspend fun deleteRedeemCode(code: String) = withContext(Dispatchers.IO) {
+        redeemCodeDao.deleteCode(code)
     }
 }

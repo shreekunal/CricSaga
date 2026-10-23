@@ -65,7 +65,7 @@ data class LiveRadarItem(
 fun HomeScreen(
     isPro: Boolean,
     currentUserId: String,
-    currentUserName: String = "Rohit Sharma",
+    currentUserName: String = "Player",
     currentUserAvatarUrl: String? = null,
     matches: List<MatchEntity>,
     posts: List<PostEntity>,

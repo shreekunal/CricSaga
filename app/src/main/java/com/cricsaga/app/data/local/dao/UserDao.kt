@@ -27,9 +27,27 @@ interface UserDao {
     @Query("SELECT * FROM users WHERE phoneNumber = :phoneNumber LIMIT 1")
     suspend fun getUserByPhone(phoneNumber: String): UserEntity?
 
+    @Query("SELECT * FROM users WHERE email = :email LIMIT 1")
+    suspend fun getUserByEmail(email: String): UserEntity?
+
+    @Query("SELECT * FROM users WHERE googleId = :googleId LIMIT 1")
+    suspend fun getUserByGoogleId(googleId: String): UserEntity?
+
     @Query("SELECT * FROM users ORDER BY fullName ASC")
     fun getAllUsers(): Flow<List<UserEntity>>
 
     @Query("UPDATE users SET city = :city WHERE userId = :userId")
     suspend fun updateUserCity(userId: String, city: String)
+
+    @Query("UPDATE users SET isPro = :isPro WHERE userId = :userId")
+    suspend fun updateUserProStatus(userId: String, isPro: Boolean)
+
+    @Query("UPDATE users SET password = :password WHERE userId = :userId")
+    suspend fun updateUserPassword(userId: String, password: String)
+
+    @Query("DELETE FROM users WHERE userId = :userId")
+    suspend fun deleteUserById(userId: String)
+
+    @Query("SELECT COUNT(*) FROM users")
+    suspend fun getUserCount(): Int
 }

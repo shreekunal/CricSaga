@@ -2,7 +2,6 @@ package com.cricsaga.app.ui.redeem
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -10,22 +9,19 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.AdminPanelSettings
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.filled.WorkspacePremium
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cricsaga.app.data.local.ProManager
-import com.cricsaga.app.data.local.ProPlan
 import com.cricsaga.app.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -35,8 +31,6 @@ fun RedeemCodeScreen(
     onBackClick: () -> Unit = {}
 ) {
     val subscriptionState by proManager.subscriptionState.collectAsState()
-    var selectedPlan by remember { mutableStateOf(ProPlan.ONE_YEAR) }
-    var actionMessage by remember { mutableStateOf<String?>(null) }
     val scrollState = rememberScrollState()
     val hapticManager = com.cricsaga.app.ui.utils.LocalHapticManager.current
 
@@ -46,7 +40,7 @@ fun RedeemCodeScreen(
             TopAppBar(
                 title = {
                     Text(
-                        text = "Pro Membership",
+                        text = "Pro Membership & Perks",
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onBackground,
                         fontSize = 18.sp
@@ -83,160 +77,84 @@ fun RedeemCodeScreen(
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
-                color = if (subscriptionState.isActive) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surface,
+                color = if (subscriptionState.isActive) SlateSurfaceDark else MaterialTheme.colorScheme.surface,
                 border = BorderStroke(
                     1.dp,
-                    if (subscriptionState.isActive) BoundaryAmber else MaterialTheme.colorScheme.outlineVariant
+                    if (subscriptionState.isActive) BoundaryAmber.copy(alpha = 0.6f) else MaterialTheme.colorScheme.outlineVariant
                 )
             ) {
                 Column(
-                    modifier = Modifier.padding(20.dp),
+                    modifier = Modifier.padding(22.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(54.dp)
+                            .size(58.dp)
                             .clip(CircleShape)
-                            .background(if (subscriptionState.isActive) BoundaryAmber.copy(alpha = 0.15f) else CrimsonPrimaryDark.copy(alpha = 0.15f)),
+                            .background(
+                                if (subscriptionState.isActive) BoundaryAmber.copy(alpha = 0.15f)
+                                else CrimsonPrimaryDark.copy(alpha = 0.12f)
+                            ),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            imageVector = if (subscriptionState.isActive) Icons.Default.WorkspacePremium else Icons.Default.Star,
+                            imageVector = if (subscriptionState.isActive) Icons.Default.WorkspacePremium else Icons.Default.SportsCricket,
                             contentDescription = null,
                             tint = if (subscriptionState.isActive) BoundaryAmber else CrimsonPrimaryDark,
-                            modifier = Modifier.size(30.dp)
+                            modifier = Modifier.size(32.dp)
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
 
                     Text(
-                        text = if (subscriptionState.isActive) "CRICSAGA PRO ACTIVE" else "ELEVATE YOUR CRICKET",
+                        text = if (subscriptionState.isActive) "CRICSAGA PRO VERIFIED" else "GRASSROOTS ATHLETE TIER",
                         fontWeight = FontWeight.Black,
-                        fontSize = 17.sp,
+                        fontSize = 18.sp,
                         letterSpacing = 0.5.sp,
                         color = if (subscriptionState.isActive) BoundaryAmber else MaterialTheme.colorScheme.onSurface
                     )
 
-                    Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(modifier = Modifier.height(6.dp))
 
                     Text(
                         text = if (subscriptionState.isActive) {
-                            "Plan: ${subscriptionState.plan?.title ?: "Pro"} • Valid: ${subscriptionState.formattedExpiry}"
+                            "Verified Pro Athlete Access • Unlimited match analytics, official PDF exports, and golden broadcast badge enabled on your profile."
                         } else {
-                            "Unlock full match analytics, official PDF scorecards, and verified golden player badges."
+                            "Standard Community Athlete • Complete digital ball-by-ball scoring, squad rosters, and local match records are always free."
                         },
                         fontSize = 12.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center,
-                        lineHeight = 17.sp
+                        lineHeight = 18.sp
                     )
 
                     if (subscriptionState.isActive) {
                         Spacer(modifier = Modifier.height(12.dp))
-                        OutlinedButton(
-                            onClick = {
-                                hapticManager?.tapUiClick()
-                                proManager.deactivatePro()
-                                actionMessage = "Membership deactivated for testing."
-                            },
-                            shape = RoundedCornerShape(8.dp),
-                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+                        Surface(
+                            shape = RoundedCornerShape(20.dp),
+                            color = BoundaryAmber.copy(alpha = 0.15f),
+                            border = BorderStroke(0.5.dp, BoundaryAmber.copy(alpha = 0.5f))
                         ) {
-                            Text("Switch to Free Tier", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Icon(Icons.Default.Verified, contentDescription = null, tint = BoundaryAmber, modifier = Modifier.size(14.dp))
+                                Text(
+                                    text = "ADMIN VERIFIED",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = BoundaryAmber
+                                )
+                            }
                         }
                     }
                 }
             }
 
-            // Section 2: Three Pricing Plans
-            Text(
-                text = "SELECT MEMBERSHIP PLAN",
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 1.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                MembershipPlanCard(
-                    plan = ProPlan.ONE_MONTH,
-                    isSelected = selectedPlan == ProPlan.ONE_MONTH,
-                    tag = null,
-                    modifier = Modifier.weight(1f),
-                    onSelect = {
-                        hapticManager?.tapUiClick()
-                        selectedPlan = ProPlan.ONE_MONTH
-                    }
-                )
-
-                MembershipPlanCard(
-                    plan = ProPlan.ONE_YEAR,
-                    isSelected = selectedPlan == ProPlan.ONE_YEAR,
-                    tag = "SAVE 83%",
-                    modifier = Modifier.weight(1.1f),
-                    onSelect = {
-                        hapticManager?.tapUiClick()
-                        selectedPlan = ProPlan.ONE_YEAR
-                    }
-                )
-
-                MembershipPlanCard(
-                    plan = ProPlan.LIFETIME,
-                    isSelected = selectedPlan == ProPlan.LIFETIME,
-                    tag = "VIP",
-                    modifier = Modifier.weight(1f),
-                    onSelect = {
-                        hapticManager?.tapUiClick()
-                        selectedPlan = ProPlan.LIFETIME
-                    }
-                )
-            }
-
-            // Section 3: Action Button
-            Button(
-                onClick = {
-                    hapticManager?.tapBoundaryFour()
-                    proManager.activatePlan(selectedPlan)
-                    actionMessage = "Congratulations! ${selectedPlan.title} (${selectedPlan.price}) is now ACTIVE on your profile."
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(50.dp),
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = CrimsonPrimaryDark)
-            ) {
-                Text(
-                    text = "UPGRADE TO ${selectedPlan.title.uppercase()} • ${selectedPlan.price}",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 13.sp,
-                    color = Color.White
-                )
-            }
-
-            actionMessage?.let { msg ->
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = BoundaryGreen.copy(alpha = 0.12f),
-                    border = BorderStroke(1.dp, BoundaryGreen.copy(alpha = 0.4f)),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text(
-                        text = msg,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = BoundaryGreen,
-                        modifier = Modifier.padding(12.dp),
-                        textAlign = TextAlign.Center
-                    )
-                }
-            }
-
-            // Section 4: What You Get (Features Quad)
+            // Section 2: What's Included in Pro
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(14.dp),
@@ -244,27 +162,51 @@ fun RedeemCodeScreen(
                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
             ) {
                 Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    modifier = Modifier.padding(18.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
                     Text(
-                        text = "ALL PLANS INCLUDE",
-                        fontSize = 11.sp,
+                        text = "CRICSAGA PRO CAPABILITIES",
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
                         letterSpacing = 1.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = BoundaryAmber
                     )
 
-                    FeatureRow("100% Ad-Free Live Scoring on Ground")
-                    FeatureRow("Unlimited Official PDF Scorecard Downloads")
-                    FeatureRow("Worm Graphs & Manhattan Run-Rate Charts")
-                    FeatureRow("Verified Golden Athlete Profile Badge")
-                    FeatureRow("Unlimited Squad & Player Roster Creations")
-                    FeatureRow("Priority Grassroots Leaderboard Rankings")
+                    ProPerkRow(
+                        icon = Icons.Default.Block,
+                        title = "100% Ad-Free Ground Scoring",
+                        subtitle = "Clean, uninterrupted ball-by-ball scoring during intense matches."
+                    )
+                    ProPerkRow(
+                        icon = Icons.Default.PictureAsPdf,
+                        title = "Official Match PDF Scorecards",
+                        subtitle = "Generate and share print-ready A4 scorecards for leagues and tournaments."
+                    )
+                    ProPerkRow(
+                        icon = Icons.Default.ShowChart,
+                        title = "Manhattan & Worm Analytics",
+                        subtitle = "Broadcast-style run-rate wagon graphs and fall-of-wickets comparisons."
+                    )
+                    ProPerkRow(
+                        icon = Icons.Default.Verified,
+                        title = "Verified Athlete Golden Badge",
+                        subtitle = "Prominent verification mark on your player profile and match lineups."
+                    )
+                    ProPerkRow(
+                        icon = Icons.Default.Groups,
+                        title = "Unlimited Squads & Tournaments",
+                        subtitle = "Create and manage multiple club rosters across local turf circuits."
+                    )
+                    ProPerkRow(
+                        icon = Icons.Default.Leaderboard,
+                        title = "Priority Leaderboard Inclusion",
+                        subtitle = "Top batter, bowler, and MVP standings across regional cricket rankings."
+                    )
                 }
             }
 
-            // Section 5: Admin Dashboard Notice Card
+            // Section 3: Admin-Managed Policy Notice
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
@@ -278,20 +220,20 @@ fun RedeemCodeScreen(
                     Icon(
                         imageVector = Icons.Default.AdminPanelSettings,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(24.dp)
+                        tint = BoundaryAmber,
+                        modifier = Modifier.size(28.dp)
                     )
                     Spacer(modifier = Modifier.width(12.dp))
                     Column {
                         Text(
-                            text = "Admin Dashboard Integration",
+                            text = "Admin-Managed Pro Access",
                             fontWeight = FontWeight.Bold,
                             fontSize = 12.sp,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
-                            text = "Tournament organizers and authorized admins can promote any registered cricketer to Pro directly from the CricSaga Admin Dashboard.",
+                            text = "CricSaga Pro access is assigned directly by tournament coordinators and authorized CricSaga administrators. There are no paid in-app upgrades or recurring subscriptions.",
                             fontSize = 11.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             lineHeight = 15.sp
@@ -306,90 +248,43 @@ fun RedeemCodeScreen(
 }
 
 @Composable
-private fun MembershipPlanCard(
-    plan: ProPlan,
-    isSelected: Boolean,
-    tag: String?,
-    modifier: Modifier = Modifier,
-    onSelect: () -> Unit
+private fun ProPerkRow(
+    icon: ImageVector,
+    title: String,
+    subtitle: String
 ) {
-    val borderColor = if (isSelected) CrimsonPrimaryDark else MaterialTheme.colorScheme.outlineVariant
-    val containerColor = if (isSelected) CrimsonPrimaryDark.copy(alpha = 0.08f) else MaterialTheme.colorScheme.surface
-
-    Surface(
-        modifier = modifier.clickable(onClick = onSelect),
-        shape = RoundedCornerShape(12.dp),
-        color = containerColor,
-        border = BorderStroke(if (isSelected) 2.dp else 1.dp, borderColor)
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.Top
     ) {
-        Column(
-            modifier = Modifier.padding(12.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+        Box(
+            modifier = Modifier
+                .size(32.dp)
+                .clip(CircleShape)
+                .background(BoundaryAmber.copy(alpha = 0.12f)),
+            contentAlignment = Alignment.Center
         ) {
-            tag?.let {
-                Surface(
-                    color = if (plan.isBestValue) CrimsonPrimaryDark else BoundaryAmber,
-                    shape = RoundedCornerShape(4.dp)
-                ) {
-                    Text(
-                        text = it,
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.Black,
-                        color = Color.White,
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                    )
-                }
-                Spacer(modifier = Modifier.height(6.dp))
-            } ?: run {
-                Spacer(modifier = Modifier.height(17.dp))
-            }
-
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = BoundaryAmber,
+                modifier = Modifier.size(16.dp)
+            )
+        }
+        Spacer(modifier = Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = plan.title,
-                fontWeight = FontWeight.Bold,
+                text = title,
+                fontWeight = FontWeight.SemiBold,
                 fontSize = 13.sp,
                 color = MaterialTheme.colorScheme.onSurface
             )
-
-            Spacer(modifier = Modifier.height(4.dp))
-
             Text(
-                text = plan.price,
-                fontWeight = FontWeight.Black,
-                fontSize = 20.sp,
-                color = if (isSelected) CrimsonPrimaryDark else MaterialTheme.colorScheme.onSurface
-            )
-
-            Spacer(modifier = Modifier.height(2.dp))
-
-            Text(
-                text = plan.durationText,
-                fontSize = 10.sp,
+                text = subtitle,
+                fontSize = 11.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center
+                lineHeight = 15.sp
             )
         }
-    }
-}
-
-@Composable
-private fun FeatureRow(label: String) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Icon(
-            imageVector = Icons.Default.CheckCircle,
-            contentDescription = null,
-            tint = BoundaryGreen,
-            modifier = Modifier.size(16.dp)
-        )
-        Spacer(modifier = Modifier.width(10.dp))
-        Text(
-            text = label,
-            fontSize = 12.sp,
-            color = MaterialTheme.colorScheme.onSurface,
-            fontWeight = FontWeight.Medium
-        )
     }
 }

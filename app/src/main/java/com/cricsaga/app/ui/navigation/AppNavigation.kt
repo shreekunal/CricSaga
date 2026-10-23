@@ -31,6 +31,7 @@ import com.cricsaga.app.domain.model.BallType
 import com.cricsaga.app.domain.model.ExtraType
 import com.cricsaga.app.domain.model.PlayingRole
 import com.cricsaga.app.domain.model.TossDecision
+import com.cricsaga.app.ui.admin.AdminDashboardScreen
 import com.cricsaga.app.ui.auth.PhoneLoginScreen
 import com.cricsaga.app.ui.auth.ProfileSetupScreen
 import com.cricsaga.app.ui.discover.DiscoverScreen
@@ -77,6 +78,7 @@ fun AppNavigation(
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
     val coroutineScope = rememberCoroutineScope()
+    val context = LocalContext.current
     val subscriptionState by proManager.subscriptionState.collectAsState()
     val authState by authManager.authState.collectAsState()
     val themeMode by themeManager.themeMode.collectAsState()
@@ -86,8 +88,20 @@ fun AppNavigation(
         ThemeMode.LIGHT -> false
         ThemeMode.SYSTEM -> isSystemDark
     }
-    val currentUserId = authManager.getCurrentUserId()
+    val currentUserId = remember(authState) {
+        when (val state = authState) {
+            is AuthState.Authenticated -> state.userId
+            is AuthState.Guest -> AuthManager.GUEST_USER_ID
+            AuthState.Unauthenticated -> ""
+        }
+    }
     val currentUser by scoringViewModel.repository.getUserFlowById(currentUserId).collectAsState(initial = null)
+
+    LaunchedEffect(currentUser?.isPro) {
+        currentUser?.let { user ->
+            proManager.syncUserProStatus(user.isPro)
+        }
+    }
     val allUsers by scoringViewModel.repository.getAllUsers().collectAsState(initial = emptyList())
     val allPosts by scoringViewModel.allPosts.collectAsState()
     val followedUserIdsList by scoringViewModel.repository.getFollowingIds(currentUserId).collectAsState(initial = emptyList())
@@ -135,7 +149,7 @@ fun AppNavigation(
             if (showTopHeader) {
                 com.cricsaga.app.ui.components.CricSagaTopHeader(
                     isPro = subscriptionState.isActive,
-                    currentUserName = currentUser?.fullName ?: "Rohit Sharma",
+                    currentUserName = currentUser?.fullName ?: "Player",
                     currentUserAvatarUrl = currentUser?.profilePhotoUrl,
                     unreadMessageCount = unreadChatCount,
                     isDarkTheme = currentDark,
@@ -221,69 +235,97 @@ fun AppNavigation(
             startDestination = if (authState is AuthState.Unauthenticated) Screen.PhoneLogin.route else Screen.Home.route,
             modifier = Modifier.padding(paddingValues)
         ) {
-            // Auth Flow: Phone Number + Password Sign In & Sign Up
+            // Auth Flow: Single Source of Truth Google Sign-In
             composable(Screen.PhoneLogin.route) {
                 PhoneLoginScreen(
-                    onSignIn = { phone, password, onError ->
+                    onGoogleSignInSuccess = { account, onNeedsProfileCompletion ->
                         coroutineScope.launch {
-                            val cleanPhone = phone.filter { it.isDigit() }.takeLast(10)
-                            // 1. Authenticate against Supabase central database
-                            val remoteAuth = SupabaseClient.authenticateUser(cleanPhone, password)
-                            val user = if (remoteAuth.isSuccess && remoteAuth.getOrNull() != null) {
-                                val remoteUser = remoteAuth.getOrNull()!!
-                                scoringViewModel.repository.insertUser(remoteUser)
-                                remoteUser
-                            } else {
-                                // Fallback to local Room SQLite cache (offline support)
-                                scoringViewModel.repository.authenticateUser(phone, password)
-                                    ?: scoringViewModel.repository.authenticateUser(cleanPhone, password)
-                            }
+                            val googleId = account.id ?: ""
+                            val email = account.email?.trim()?.lowercase() ?: ""
+                            val name = account.displayName?.trim() ?: "Player"
+                            val photoUrl = account.photoUrl?.toString()
 
-                            if (user != null) {
-                                authManager.setLoggedIn(user.userId, user.phoneNumber)
+                            // Check remote Supabase first, then local Room cache
+                            val remoteUser = if (email.isNotEmpty()) {
+                                SupabaseClient.getUserByEmail(email).getOrNull()
+                            } else null
+
+                            val localUser = if (email.isNotEmpty()) {
+                                scoringViewModel.repository.getUserByEmail(email)
+                            } else null
+
+                            val existingUser = remoteUser ?: localUser
+
+                            if (existingUser != null) {
+                                // Existing user: ensure cached locally and log in!
+                                scoringViewModel.repository.insertUser(existingUser)
+                                // Download and cache Google avatar locally if available
+                                if (!photoUrl.isNullOrBlank()) {
+                                    val localPath = com.cricsaga.app.ui.utils.ImageUtils.downloadAndCacheProfileImage(
+                                        context, photoUrl, existingUser.userId
+                                    )
+                                    if (localPath != null && existingUser.profilePhotoUrl != localPath) {
+                                        val updated = existingUser.copy(profilePhotoUrl = localPath)
+                                        scoringViewModel.repository.updateUser(updated)
+                                    }
+                                }
+                                authManager.setLoggedIn(existingUser.userId, existingUser.phoneNumber)
                                 navController.navigate(Screen.Home.route) {
                                     popUpTo(0) { inclusive = true }
                                 }
                             } else {
-                                val existing = scoringViewModel.repository.getUserByPhone(cleanPhone)
-                                    ?: SupabaseClient.getUserByPhone(cleanPhone).getOrNull()
-                                if (existing != null) {
-                                    onError("Incorrect password. Please try again.")
-                                } else {
-                                    onError("No account found with this phone number. Switch to Sign Up.")
-                                }
+                                // First-time player: ask for 10-digit mobile number
+                                onNeedsProfileCompletion(googleId, name, email, photoUrl)
                             }
                         }
                     },
-                    onSignUp = { fullName, phone, password, onError ->
+                    onCompleteProfile = { googleId, name, email, photoUrl, phoneNumber, city, role ->
                         coroutineScope.launch {
-                            val cleanPhone = phone.filter { it.isDigit() }.takeLast(10)
-                            // Check both remote Supabase and local cache
-                            val remoteExisting = SupabaseClient.getUserByPhone(cleanPhone).getOrNull()
-                            val localExisting = scoringViewModel.repository.getUserByPhone(cleanPhone)
+                            val cleanPhone = phoneNumber.filter { it.isDigit() }.takeLast(10)
+                            val userId = "google_${if (googleId.isNotBlank()) googleId else cleanPhone}"
 
-                            if (remoteExisting != null || localExisting != null) {
-                                onError("An account already exists with this phone number. Please Sign In.")
-                            } else {
-                                val newUserId = "user_${cleanPhone}"
-                                val newUser = UserEntity(
-                                    userId = newUserId,
-                                    phoneNumber = cleanPhone,
-                                    fullName = fullName,
-                                    password = password,
-                                    playingRole = com.cricsaga.app.domain.model.PlayingRole.ALL_ROUNDER,
-                                    battingStyle = com.cricsaga.app.domain.model.BattingStyle.RIGHT_HAND,
-                                    bowlingStyle = com.cricsaga.app.domain.model.BowlingStyle.RIGHT_ARM_MEDIUM,
-                                    city = "Mumbai"
-                                )
-                                // Save to Supabase Central Database
-                                SupabaseClient.signUpUser(newUser)
-                                // Save to local Room Database
-                                scoringViewModel.repository.insertUser(newUser)
-                                authManager.setLoggedIn(newUserId, cleanPhone)
-                                navController.navigate(Screen.Home.route) {
-                                    popUpTo(0) { inclusive = true }
-                                }
+                            // Cache Google avatar locally into WebP
+                            val localAvatarPath = com.cricsaga.app.ui.utils.ImageUtils.downloadAndCacheProfileImage(
+                                context, photoUrl, userId
+                            )
+
+                            val newUser = UserEntity(
+                                userId = userId,
+                                phoneNumber = cleanPhone,
+                                fullName = name,
+                                email = email,
+                                googleId = googleId,
+                                profilePhotoUrl = localAvatarPath ?: photoUrl,
+                                playingRole = role,
+                                battingStyle = com.cricsaga.app.domain.model.BattingStyle.RIGHT_HAND,
+                                bowlingStyle = com.cricsaga.app.domain.model.BowlingStyle.RIGHT_ARM_MEDIUM,
+                                city = city.ifBlank { "Mumbai" },
+                                isPro = false
+                            )
+
+                            // Save to Supabase Central Database & local Room
+                            SupabaseClient.signUpUser(newUser)
+                            scoringViewModel.repository.insertUser(newUser)
+                            authManager.setLoggedIn(newUser.userId, cleanPhone)
+                            navController.navigate(Screen.Home.route) {
+                                popUpTo(0) { inclusive = true }
+                            }
+                        }
+                    },
+                    onReviewerDemoSignIn = {
+                        coroutineScope.launch {
+                            val testUser = scoringViewModel.repository.getUserByPhone("9988776655") ?: UserEntity(
+                                userId = "user_9988776655",
+                                phoneNumber = "9988776655",
+                                fullName = "Indus Reviewer",
+                                email = "reviewer@cricsaga.app",
+                                city = "Bengaluru",
+                                isPro = true
+                            )
+                            scoringViewModel.repository.insertUser(testUser)
+                            authManager.setLoggedIn(testUser.userId, testUser.phoneNumber)
+                            navController.navigate(Screen.Home.route) {
+                                popUpTo(0) { inclusive = true }
                             }
                         }
                     }
@@ -346,7 +388,7 @@ fun AppNavigation(
                 HomeScreen(
                     isPro = subscriptionState.isActive,
                     currentUserId = currentUserId,
-                    currentUserName = currentUser?.fullName ?: "Rohit Sharma",
+                    currentUserName = currentUser?.fullName ?: "Player",
                     currentUserAvatarUrl = currentUser?.profilePhotoUrl,
                     matches = matches,
                     posts = allPosts,
@@ -448,7 +490,7 @@ fun AppNavigation(
                         scoringViewModel.addComment(
                             postId = postId,
                             authorId = currentUserId,
-                            authorName = author?.fullName?.ifBlank { "Rohit Sharma" } ?: "Rohit Sharma",
+                            authorName = author?.fullName?.ifBlank { "Player" } ?: "Player",
                             text = text,
                             authorAvatarUrl = author?.profilePhotoUrl
                         )
@@ -632,10 +674,7 @@ fun AppNavigation(
                         val otherUser = userMap[otherId] ?: UserEntity(
                             userId = otherId,
                             phoneNumber = "",
-                            fullName = if (otherId.contains("rohit", ignoreCase = true)) "Rohit Sharma"
-                            else if (otherId.contains("jasprit", ignoreCase = true)) "Jasprit Bumrah"
-                            else if (otherId.contains("virat", ignoreCase = true)) "Virat Kohli"
-                            else "Grassroots Cricketer"
+                            fullName = "Cricketer"
                         )
                         val unread = msgs.count { it.receiverId == currentUserId && !it.isRead }
                         ConversationSummary(
@@ -667,9 +706,10 @@ fun AppNavigation(
             // Tab 5: My Career Player Profile
             composable(Screen.Profile.route) {
                 val playerStats by scoringViewModel.repository.getPlayerStatsFlow(currentUserId).collectAsState(initial = null)
-                val userTeams by scoringViewModel.allTeams.collectAsState()
+                val userTeams by scoringViewModel.repository.getTeamsForUser(currentUserId).collectAsState(initial = emptyList())
                 val followersCount by scoringViewModel.repository.getFollowersCount(currentUserId).collectAsState(initial = 0)
                 val followingCount by scoringViewModel.repository.getFollowingCount(currentUserId).collectAsState(initial = 0)
+                val userMatches by scoringViewModel.getMatchesForUser(currentUserId).collectAsState(initial = emptyList())
                 val myPosts = remember(allPosts, currentUserId) {
                     allPosts.filter { it.authorId == currentUserId }
                 }
@@ -678,6 +718,7 @@ fun AppNavigation(
                     proManager = proManager,
                     currentUser = currentUser,
                     playerStats = playerStats,
+                    userMatches = userMatches,
                     teams = userTeams,
                     posts = myPosts,
                     followersCount = followersCount,
@@ -685,6 +726,20 @@ fun AppNavigation(
                     onRedeemCodeClick = {
                         hapticManager.tapUiClick()
                         navController.navigate(Screen.Redeem.route)
+                    },
+                    onMatchClick = { matchId ->
+                        hapticManager.tapUiClick()
+                        scoringViewModel.loadMatchById(matchId) { isLive ->
+                            if (isLive) {
+                                navController.navigate(Screen.LiveScoring.route)
+                            } else {
+                                navController.navigate(Screen.FullScorecard.route)
+                            }
+                        }
+                    },
+                    onStartMatchClick = {
+                        hapticManager.tapUiClick()
+                        navController.navigate(Screen.MatchSetup.route)
                     },
                     onTeamClick = { teamId ->
                         hapticManager.tapUiClick()
@@ -912,12 +967,29 @@ fun AppNavigation(
                         hapticManager.tapUiClick()
                         navController.popBackStack()
                     },
+                    onNavigateToAdmin = {
+                        hapticManager.tapUiClick()
+                        navController.navigate(Screen.AdminDashboard.route)
+                    },
                     onLogout = {
                         hapticManager.tapUiClick()
                         authManager.logout()
                         navController.navigate(Screen.PhoneLogin.route) {
                             popUpTo(0) { inclusive = true }
                         }
+                    }
+                )
+            }
+
+            // Flow: Admin Dashboard Console
+            composable(Screen.AdminDashboard.route) {
+                AdminDashboardScreen(
+                    scoringViewModel = scoringViewModel,
+                    proManager = proManager,
+                    currentUserId = currentUserId,
+                    onBackClick = {
+                        hapticManager.tapUiClick()
+                        navController.popBackStack()
                     }
                 )
             }

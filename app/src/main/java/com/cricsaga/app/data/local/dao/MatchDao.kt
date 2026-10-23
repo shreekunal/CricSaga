@@ -38,6 +38,20 @@ interface MatchDao {
 
     @Query("SELECT * FROM matches ORDER BY createdAt DESC")
     suspend fun getAllMatchesList(): List<MatchEntity>
+
+    @Query("""
+        SELECT DISTINCT m.* FROM matches m
+        WHERE m.teamAId IN (SELECT teamId FROM team_members WHERE userId = :userId)
+           OR m.teamBId IN (SELECT teamId FROM team_members WHERE userId = :userId)
+           OR m.playerOfTheMatchId = :userId
+           OR m.matchId IN (
+               SELECT i.matchId FROM innings i
+               JOIN deliveries d ON d.inningsId = i.inningsId
+               WHERE d.strikerId = :userId OR d.bowlerId = :userId OR d.nonStrikerId = :userId
+           )
+        ORDER BY m.createdAt DESC
+    """)
+    fun getMatchesForUser(userId: String): Flow<List<MatchEntity>>
 }
 
 @Dao

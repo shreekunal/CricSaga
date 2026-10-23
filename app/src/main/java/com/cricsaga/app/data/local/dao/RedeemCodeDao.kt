@@ -21,6 +21,12 @@ interface RedeemCodeDao {
     @Query("SELECT * FROM redeem_codes ORDER BY createdAt DESC")
     fun getAllCodes(): Flow<List<RedeemCodeEntity>>
 
+    @Query("SELECT * FROM redeem_codes ORDER BY createdAt DESC")
+    suspend fun getAllCodesList(): List<RedeemCodeEntity>
+
+    @Query("DELETE FROM redeem_codes WHERE UPPER(code) = UPPER(:code)")
+    suspend fun deleteCode(code: String)
+
     @Query("UPDATE redeem_codes SET isRedeemed = 1, redeemedByUserId = :userId, redeemedAt = :timestamp WHERE UPPER(code) = UPPER(:code) AND isRedeemed = 0")
     suspend fun markCodeRedeemed(code: String, userId: String, timestamp: Long): Int
 

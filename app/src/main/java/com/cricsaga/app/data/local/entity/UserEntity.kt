@@ -13,11 +13,14 @@ data class UserEntity(
     val phoneNumber: String,
     val fullName: String,
     val password: String = "123456",
+    val email: String? = null,
+    val googleId: String? = null,
     val profilePhotoUrl: String? = null,
     val playingRole: PlayingRole = PlayingRole.ALL_ROUNDER,
     val battingStyle: BattingStyle = BattingStyle.RIGHT_HAND,
     val bowlingStyle: BowlingStyle = BowlingStyle.RIGHT_ARM_MEDIUM,
     val city: String = "",
     val jerseyNumber: String = "18",
+    val isPro: Boolean = false,
     val createdAt: Long = System.currentTimeMillis()
 )

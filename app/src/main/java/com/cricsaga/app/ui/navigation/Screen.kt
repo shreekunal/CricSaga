@@ -2,6 +2,7 @@ package com.cricsaga.app.ui.navigation
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Chat
+import androidx.compose.material.icons.filled.AdminPanelSettings
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Groups
@@ -31,9 +32,10 @@ sealed class Screen(val route: String, val title: String, val icon: ImageVector?
     object TeamDetail : Screen("team_detail", "Team Hub")
     object PlayerDetail : Screen("player_detail", "Player Profile")
     object Settings : Screen("settings", "Settings", Icons.Default.Settings)
-    object Redeem : Screen("redeem", "Redeem Pro", Icons.Default.Star)
+    object Redeem : Screen("redeem", "Pro Perks", Icons.Default.Star)
     object MatchSetup : Screen("match_setup", "Match Setup")
     object OpenersSelection : Screen("openers_selection", "Select Openers")
     object LiveScoring : Screen("live_scoring", "Live Scoring")
     object FullScorecard : Screen("full_scorecard", "Scorecard")
+    object AdminDashboard : Screen("admin_dashboard", "Admin Console", Icons.Default.AdminPanelSettings)
 }

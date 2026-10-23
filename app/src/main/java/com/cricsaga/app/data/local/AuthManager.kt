@@ -75,7 +75,7 @@ class AuthManager(context: Context) {
         return when (val state = _authState.value) {
             is AuthState.Authenticated -> state.userId
             is AuthState.Guest -> GUEST_USER_ID
-            AuthState.Unauthenticated -> DEFAULT_SEEDED_USER_ID
+            AuthState.Unauthenticated -> ""
         }
     }
 
@@ -86,6 +86,6 @@ class AuthManager(context: Context) {
         private const val KEY_PHONE = "key_phone"
 
         const val GUEST_USER_ID = "user_guest_scorer"
-        const val DEFAULT_SEEDED_USER_ID = "user_rohit"
+        const val DEFAULT_SEEDED_USER_ID = ""
     }
 }

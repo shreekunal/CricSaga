@@ -75,6 +75,55 @@ object SupabaseClient {
         }
     }
 
+    suspend fun getUserByEmail(email: String): Result<UserEntity?> = withContext(Dispatchers.IO) {
+        try {
+            val cleanEmail = email.trim().lowercase()
+            val request = newRequestBuilder("users?email=eq.$cleanEmail&select=*").get().build()
+            val response = httpClient.newCall(request).execute()
+
+            if (!response.isSuccessful) {
+                return@withContext Result.failure(Exception("HTTP error ${response.code} fetching user by email"))
+            }
+
+            val body = response.body?.string() ?: "[]"
+            val array = JSONArray(body)
+            if (array.length() == 0) {
+                return@withContext Result.success(null)
+            }
+
+            val obj = array.getJSONObject(0)
+            val user = parseUser(obj)
+            Result.success(user)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error fetching user by email", e)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun getUserByGoogleId(googleId: String): Result<UserEntity?> = withContext(Dispatchers.IO) {
+        try {
+            val request = newRequestBuilder("users?google_id=eq.$googleId&select=*").get().build()
+            val response = httpClient.newCall(request).execute()
+
+            if (!response.isSuccessful) {
+                return@withContext Result.failure(Exception("HTTP error ${response.code} fetching user by googleId"))
+            }
+
+            val body = response.body?.string() ?: "[]"
+            val array = JSONArray(body)
+            if (array.length() == 0) {
+                return@withContext Result.success(null)
+            }
+
+            val obj = array.getJSONObject(0)
+            val user = parseUser(obj)
+            Result.success(user)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error fetching user by googleId", e)
+            Result.failure(e)
+        }
+    }
+
     suspend fun signUpUser(user: UserEntity): Result<UserEntity> = withContext(Dispatchers.IO) {
         try {
             val json = JSONObject().apply {
@@ -82,13 +131,15 @@ object SupabaseClient {
                 put("phone_number", user.phoneNumber.filter { it.isDigit() }.takeLast(10))
                 put("full_name", user.fullName)
                 put("password_hash", user.password)
+                if (!user.email.isNullOrBlank()) put("email", user.email)
+                if (!user.googleId.isNullOrBlank()) put("google_id", user.googleId)
                 put("profile_photo_url", user.profilePhotoUrl ?: JSONObject.NULL)
                 put("playing_role", user.playingRole.name)
                 put("batting_style", user.battingStyle.name)
                 put("bowling_style", user.bowlingStyle.name)
                 put("city", user.city)
                 put("jersey_number", user.jerseyNumber)
-                put("is_pro", false)
+                put("is_pro", user.isPro)
                 put("created_at", user.createdAt)
             }
 
@@ -121,13 +172,104 @@ object SupabaseClient {
                 return@withContext Result.success(null) // User not found
             }
 
-            if (user.password == password || password == "123456") {
+            if (user.password == password) {
                 Result.success(user)
             } else {
                 Result.success(null) // Password mismatch
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error authenticating user", e)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun getAllUsers(): Result<List<UserEntity>> = withContext(Dispatchers.IO) {
+        try {
+            val request = newRequestBuilder("users?select=*&order=created_at.desc").get().build()
+            val response = httpClient.newCall(request).execute()
+
+            if (!response.isSuccessful) {
+                return@withContext Result.failure(Exception("HTTP error ${response.code} fetching all users"))
+            }
+
+            val body = response.body?.string() ?: "[]"
+            val array = JSONArray(body)
+            val list = mutableListOf<UserEntity>()
+            for (i in 0 until array.length()) {
+                list.add(parseUser(array.getJSONObject(i)))
+            }
+            Result.success(list)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error fetching all users", e)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun deleteUser(userId: String): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val request = newRequestBuilder("users?user_id=eq.$userId").delete().build()
+            val response = httpClient.newCall(request).execute()
+            if (response.isSuccessful || response.code == 404) {
+                Result.success(Unit)
+            } else {
+                Result.failure(Exception("Failed to delete user: HTTP ${response.code}"))
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error deleting user from Supabase", e)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun updateUserPassword(userId: String, newPassword: String): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val json = JSONObject().apply {
+                put("password_hash", newPassword)
+            }
+            val body = json.toString().toRequestBody(JSON_MEDIA_TYPE)
+            val request = newRequestBuilder("users?user_id=eq.$userId").patch(body).build()
+            val response = httpClient.newCall(request).execute()
+            if (response.isSuccessful) {
+                Result.success(Unit)
+            } else {
+                Result.failure(Exception("Failed to update password: HTTP ${response.code}"))
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error updating password in Supabase", e)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun updateUserProStatus(userId: String, isPro: Boolean): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val json = JSONObject().apply {
+                put("is_pro", isPro)
+            }
+            val body = json.toString().toRequestBody(JSON_MEDIA_TYPE)
+            val request = newRequestBuilder("users?user_id=eq.$userId").patch(body).build()
+            val response = httpClient.newCall(request).execute()
+            if (response.isSuccessful) {
+                Result.success(Unit)
+            } else {
+                Result.failure(Exception("Failed to update pro status: HTTP ${response.code}"))
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error updating pro status in Supabase", e)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun checkCloudPing(): Result<Long> = withContext(Dispatchers.IO) {
+        try {
+            val start = System.currentTimeMillis()
+            val request = newRequestBuilder("users?select=count").head().build()
+            val response = httpClient.newCall(request).execute()
+            val latency = System.currentTimeMillis() - start
+            if (response.isSuccessful || response.code == 200 || response.code == 206) {
+                Result.success(latency)
+            } else {
+                Result.success(latency)
+            }
+        } catch (e: Exception) {
             Result.failure(e)
         }
     }
@@ -334,12 +476,15 @@ object SupabaseClient {
             phoneNumber = obj.optString("phone_number"),
             fullName = obj.optString("full_name"),
             password = obj.optString("password_hash", "123456"),
+            email = obj.optString("email").takeIf { it.isNotEmpty() && it != "null" },
+            googleId = obj.optString("google_id").takeIf { it.isNotEmpty() && it != "null" },
             profilePhotoUrl = obj.optString("profile_photo_url").takeIf { it.isNotEmpty() && it != "null" },
             playingRole = runCatching { PlayingRole.valueOf(obj.optString("playing_role")) }.getOrDefault(PlayingRole.ALL_ROUNDER),
             battingStyle = runCatching { BattingStyle.valueOf(obj.optString("batting_style")) }.getOrDefault(BattingStyle.RIGHT_HAND),
             bowlingStyle = runCatching { BowlingStyle.valueOf(obj.optString("bowling_style")) }.getOrDefault(BowlingStyle.RIGHT_ARM_MEDIUM),
             city = obj.optString("city", "Mumbai"),
             jerseyNumber = obj.optString("jersey_number", "18"),
+            isPro = obj.optBoolean("is_pro", false),
             createdAt = obj.optLong("created_at", System.currentTimeMillis())
         )
     }
