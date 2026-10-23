@@ -601,42 +601,89 @@ class MatchRepository(private val database: CricSagaDatabase) {
         }
     }
 
-    suspend fun createTeam(name: String, shortCode: String, city: String): String = withContext(Dispatchers.IO) {
+    suspend fun createTeam(name: String, shortCode: String, city: String, captainId: String? = null): String = withContext(Dispatchers.IO) {
         val teamId = UUID.randomUUID().toString()
-        val team = TeamEntity(teamId = teamId, teamName = name, shortCode = shortCode, city = city)
+        val team = TeamEntity(teamId = teamId, teamName = name, shortCode = shortCode, city = city, captainId = captainId)
         teamDao.insertTeam(team)
         try {
             SupabaseClient.createTeam(team)
         } catch (_: Exception) {}
 
-        val defaultRoster = listOf(
-            Triple("Batter 1", PlayingRole.BATSMAN, "07"),
-            Triple("Batter 2", PlayingRole.BATSMAN, "18"),
-            Triple("Batter 3", PlayingRole.BATSMAN, "45"),
-            Triple("All-Rounder", PlayingRole.ALL_ROUNDER, "33"),
-            Triple("Keeper", PlayingRole.WICKET_KEEPER, "01"),
-            Triple("Bowler 1", PlayingRole.BOWLER, "93"),
-            Triple("Bowler 2", PlayingRole.BOWLER, "99"),
-            Triple("Bowler 3", PlayingRole.BOWLER, "24")
-        )
-        defaultRoster.forEach { (roleName, role, jersey) ->
-            val randomSuffix = (10000000..99999999).random().toString()
-            val phone = "98$randomSuffix"
-            val userId = "user_$phone"
-            val user = UserEntity(
-                userId = userId,
-                phoneNumber = phone,
-                fullName = "$name $roleName",
-                password = "123456",
-                playingRole = role,
-                jerseyNumber = jersey,
-                city = city.ifBlank { "Mumbai" }
-            )
-            userDao.insertUser(user)
-            teamDao.insertTeamMember(TeamMemberEntity(teamId = teamId, userId = userId))
+        if (!captainId.isNullOrBlank()) {
+            teamDao.insertTeamMember(TeamMemberEntity(teamId = teamId, userId = captainId))
+            try {
+                SupabaseClient.addTeamMember(teamId, captainId)
+            } catch (_: Exception) {}
         }
 
         teamId
+    }
+
+    suspend fun addExistingUserToTeam(teamId: String, userId: String) = withContext(Dispatchers.IO) {
+        teamDao.insertTeamMember(TeamMemberEntity(teamId = teamId, userId = userId))
+        try {
+            SupabaseClient.addTeamMember(teamId, userId)
+        } catch (_: Exception) {}
+
+        val team = teamDao.getTeamById(teamId)
+        if (team != null && team.captainId.isNullOrBlank()) {
+            teamDao.updateTeamCaptain(teamId, userId)
+            try {
+                SupabaseClient.updateTeamCaptain(teamId, userId)
+            } catch (_: Exception) {}
+        }
+    }
+
+    suspend fun createAndAddPlayerToTeam(
+        teamId: String,
+        fullName: String,
+        email: String,
+        role: PlayingRole = PlayingRole.ALL_ROUNDER,
+        jerseyNumber: String = "18",
+        battingStyle: BattingStyle = BattingStyle.RIGHT_HAND,
+        bowlingStyle: BowlingStyle = BowlingStyle.RIGHT_ARM_MEDIUM
+    ): String = withContext(Dispatchers.IO) {
+        val cleanEmail = email.trim().lowercase()
+        var existingUser: UserEntity? = if (cleanEmail.isNotEmpty()) {
+            userDao.getUserByEmail(cleanEmail) ?: SupabaseClient.getUserByEmail(cleanEmail).getOrNull()
+        } else null
+
+        val finalUserId = if (existingUser != null) {
+            userDao.insertUser(existingUser)
+            existingUser.userId
+        } else {
+            val newUserId = "user_${UUID.randomUUID().toString().replace("-", "").take(12)}"
+            val newUser = UserEntity(
+                userId = newUserId,
+                phoneNumber = "", // Phone number collected upon their first Google login
+                fullName = fullName.trim(),
+                email = cleanEmail.ifEmpty { null },
+                playingRole = role,
+                battingStyle = battingStyle,
+                bowlingStyle = bowlingStyle,
+                jerseyNumber = jerseyNumber.ifBlank { "18" }
+            )
+            userDao.insertUser(newUser)
+            try {
+                SupabaseClient.signUpUser(newUser)
+            } catch (_: Exception) {}
+            newUserId
+        }
+
+        teamDao.insertTeamMember(TeamMemberEntity(teamId = teamId, userId = finalUserId))
+        try {
+            SupabaseClient.addTeamMember(teamId, finalUserId)
+        } catch (_: Exception) {}
+
+        val team = teamDao.getTeamById(teamId)
+        if (team != null && team.captainId.isNullOrBlank()) {
+            teamDao.updateTeamCaptain(teamId, finalUserId)
+            try {
+                SupabaseClient.updateTeamCaptain(teamId, finalUserId)
+            } catch (_: Exception) {}
+        }
+
+        finalUserId
     }
 
     suspend fun addPlayerToTeam(
@@ -671,9 +718,15 @@ class MatchRepository(private val database: CricSagaDatabase) {
                 city = city.ifBlank { "Mumbai" }
             )
             userDao.insertUser(user)
+            try {
+                SupabaseClient.signUpUser(user)
+            } catch (_: Exception) {}
             newUserId
         }
         teamDao.insertTeamMember(TeamMemberEntity(teamId = teamId, userId = userId))
+        try {
+            SupabaseClient.addTeamMember(teamId, userId)
+        } catch (_: Exception) {}
         userId
     }
 
@@ -683,6 +736,9 @@ class MatchRepository(private val database: CricSagaDatabase) {
 
     suspend fun setTeamCaptain(teamId: String, captainId: String) = withContext(Dispatchers.IO) {
         teamDao.updateTeamCaptain(teamId, captainId)
+        try {
+            SupabaseClient.updateTeamCaptain(teamId, captainId)
+        } catch (_: Exception) {}
     }
 
     suspend fun createMatch(

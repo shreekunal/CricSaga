@@ -126,9 +126,12 @@ object SupabaseClient {
 
     suspend fun signUpUser(user: UserEntity): Result<UserEntity> = withContext(Dispatchers.IO) {
         try {
+            val cleanPhone = user.phoneNumber.filter { it.isDigit() }.takeLast(10)
+            val phoneVal = if (cleanPhone.isNotEmpty()) cleanPhone else "pending_${user.userId.replace("-", "").take(10)}"
+
             val json = JSONObject().apply {
                 put("user_id", user.userId)
-                put("phone_number", user.phoneNumber.filter { it.isDigit() }.takeLast(10))
+                put("phone_number", phoneVal)
                 put("full_name", user.fullName)
                 put("password_hash", user.password)
                 if (!user.email.isNullOrBlank()) put("email", user.email)
@@ -254,6 +257,37 @@ object SupabaseClient {
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error updating pro status in Supabase", e)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun updateUser(user: UserEntity): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val json = JSONObject().apply {
+                val cleanPhone = user.phoneNumber.filter { it.isDigit() }.takeLast(10)
+                if (cleanPhone.isNotEmpty()) {
+                    put("phone_number", cleanPhone)
+                }
+                put("full_name", user.fullName)
+                if (!user.email.isNullOrBlank()) put("email", user.email)
+                if (!user.googleId.isNullOrBlank()) put("google_id", user.googleId)
+                if (!user.profilePhotoUrl.isNullOrBlank()) put("profile_photo_url", user.profilePhotoUrl)
+                put("playing_role", user.playingRole.name)
+                put("batting_style", user.battingStyle.name)
+                put("bowling_style", user.bowlingStyle.name)
+                put("city", user.city)
+                put("jersey_number", user.jerseyNumber)
+            }
+            val body = json.toString().toRequestBody(JSON_MEDIA_TYPE)
+            val request = newRequestBuilder("users?user_id=eq.${user.userId}").patch(body).build()
+            val response = httpClient.newCall(request).execute()
+            if (response.isSuccessful) {
+                Result.success(Unit)
+            } else {
+                Result.failure(Exception("Failed to update user: HTTP ${response.code}"))
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error updating user in Supabase", e)
             Result.failure(e)
         }
     }
@@ -403,6 +437,35 @@ object SupabaseClient {
         }
     }
 
+    suspend fun addTeamMember(teamId: String, userId: String): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val json = JSONObject().apply {
+                put("team_id", teamId)
+                put("user_id", userId)
+            }
+            val body = json.toString().toRequestBody(JSON_MEDIA_TYPE)
+            val req = newRequestBuilder("team_members").post(body).build()
+            httpClient.newCall(req).execute().close()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun updateTeamCaptain(teamId: String, captainId: String): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val json = JSONObject().apply {
+                put("captain_id", captainId)
+            }
+            val body = json.toString().toRequestBody(JSON_MEDIA_TYPE)
+            val req = newRequestBuilder("teams?team_id=eq.$teamId").patch(body).build()
+            httpClient.newCall(req).execute().close()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     suspend fun createPost(post: PostEntity): Result<Unit> = withContext(Dispatchers.IO) {
         try {
             val json = JSONObject().apply {
@@ -472,9 +535,11 @@ object SupabaseClient {
     }
 
     private fun parseUser(obj: JSONObject): UserEntity {
+        val rawPhone = obj.optString("phone_number")
+        val cleanPhone = if (rawPhone.startsWith("pending_")) "" else rawPhone
         return UserEntity(
             userId = obj.optString("user_id"),
-            phoneNumber = obj.optString("phone_number"),
+            phoneNumber = cleanPhone,
             fullName = obj.optString("full_name"),
             password = obj.optString("password_hash", "123456"),
             email = obj.optString("email").takeIf { it.isNotEmpty() && it != "null" },

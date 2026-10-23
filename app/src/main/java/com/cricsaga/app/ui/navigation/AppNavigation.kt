@@ -260,21 +260,27 @@ fun AppNavigation(
                         val existingUser = remoteUser ?: localUser
 
                         if (existingUser != null) {
-                            // Existing user: ensure cached locally and log in!
-                            scoringViewModel.repository.insertUser(existingUser)
-                            // Download and cache Google avatar locally if available
-                            if (!photoUrl.isNullOrBlank()) {
-                                val localPath = com.cricsaga.app.ui.utils.ImageUtils.downloadAndCacheProfileImage(
-                                    context, photoUrl, existingUser.userId
-                                )
-                                if (localPath != null && existingUser.profilePhotoUrl != localPath) {
-                                    val updated = existingUser.copy(profilePhotoUrl = localPath)
-                                    scoringViewModel.repository.updateUser(updated)
+                            if (existingUser.phoneNumber.isBlank()) {
+                                // Athlete was pre-registered by email by a team captain!
+                                // Prompt them for their mobile number to complete profile
+                                onNeedsProfileCompletion(googleId, existingUser.fullName.ifBlank { name }, email, photoUrl)
+                            } else {
+                                // Existing user: ensure cached locally and log in!
+                                scoringViewModel.repository.insertUser(existingUser)
+                                // Download and cache Google avatar locally if available
+                                if (!photoUrl.isNullOrBlank()) {
+                                    val localPath = com.cricsaga.app.ui.utils.ImageUtils.downloadAndCacheProfileImage(
+                                        context, photoUrl, existingUser.userId
+                                    )
+                                    if (localPath != null && existingUser.profilePhotoUrl != localPath) {
+                                        val updated = existingUser.copy(profilePhotoUrl = localPath)
+                                        scoringViewModel.repository.updateUser(updated)
+                                    }
                                 }
-                            }
-                            authManager.setLoggedIn(existingUser.userId, existingUser.phoneNumber, existingUser.email ?: email)
-                            navController.navigate(Screen.Home.route) {
-                                popUpTo(0) { inclusive = true }
+                                authManager.setLoggedIn(existingUser.userId, existingUser.phoneNumber, existingUser.email ?: email)
+                                navController.navigate(Screen.Home.route) {
+                                    popUpTo(0) { inclusive = true }
+                                }
                             }
                         } else {
                             // First-time player: ask for 10-digit mobile number
@@ -283,31 +289,40 @@ fun AppNavigation(
                     },
                     onCompleteProfile = { googleId, name, email, photoUrl, phoneNumber, city, role ->
                         val cleanPhone = phoneNumber.filter { it.isDigit() }.takeLast(10)
-                        val userId = "google_${if (googleId.isNotBlank()) googleId else cleanPhone}"
+
+                        // Check if user was pre-registered by email
+                        val existingUser = if (email.isNotBlank()) {
+                            scoringViewModel.repository.getUserByEmail(email.lowercase().trim())
+                                ?: SupabaseClient.getUserByEmail(email.lowercase().trim()).getOrNull()
+                        } else null
+
+                        val finalUserId = existingUser?.userId ?: "google_${if (googleId.isNotBlank()) googleId else cleanPhone}"
 
                         // Cache Google avatar locally into WebP
                         val localAvatarPath = com.cricsaga.app.ui.utils.ImageUtils.downloadAndCacheProfileImage(
-                            context, photoUrl, userId
+                            context, photoUrl, finalUserId
                         )
 
-                        val newUser = UserEntity(
-                            userId = userId,
+                        val finalUser = (existingUser ?: UserEntity(userId = finalUserId, phoneNumber = cleanPhone, fullName = name)).copy(
+                            userId = finalUserId,
                             phoneNumber = cleanPhone,
-                            fullName = name,
-                            email = email,
-                            googleId = googleId,
-                            profilePhotoUrl = localAvatarPath ?: photoUrl,
-                            playingRole = role,
-                            battingStyle = com.cricsaga.app.domain.model.BattingStyle.RIGHT_HAND,
-                            bowlingStyle = com.cricsaga.app.domain.model.BowlingStyle.RIGHT_ARM_MEDIUM,
-                            city = city.ifBlank { "Mumbai" },
-                            isPro = false
+                            fullName = if (!existingUser?.fullName.isNullOrBlank()) existingUser!!.fullName else name,
+                            email = email.ifBlank { existingUser?.email },
+                            googleId = googleId.ifBlank { existingUser?.googleId },
+                            profilePhotoUrl = localAvatarPath ?: photoUrl ?: existingUser?.profilePhotoUrl,
+                            playingRole = if (existingUser != null && existingUser.playingRole != PlayingRole.ALL_ROUNDER) existingUser.playingRole else role,
+                            city = city.ifBlank { existingUser?.city?.ifBlank { "Mumbai" } ?: "Mumbai" }
                         )
 
                         // Save to Supabase Central Database & local Room
-                        SupabaseClient.signUpUser(newUser)
-                        scoringViewModel.repository.insertUser(newUser)
-                        authManager.setLoggedIn(newUser.userId, cleanPhone, email)
+                        if (existingUser != null) {
+                            SupabaseClient.updateUser(finalUser)
+                            scoringViewModel.repository.updateUser(finalUser)
+                        } else {
+                            SupabaseClient.signUpUser(finalUser)
+                            scoringViewModel.repository.insertUser(finalUser)
+                        }
+                        authManager.setLoggedIn(finalUser.userId, cleanPhone, email)
                         navController.navigate(Screen.Home.route) {
                             popUpTo(0) { inclusive = true }
                         }
@@ -780,8 +795,10 @@ fun AppNavigation(
             // Flow: Teams & Players Squad Manager
             composable(Screen.Teams.route) {
                 val teams by scoringViewModel.allTeams.collectAsState()
+                val allUsers by scoringViewModel.repository.getAllUsers().collectAsState(initial = emptyList())
                 TeamsListScreen(
                     teams = teams,
+                    allUsers = allUsers,
                     onTeamClick = { team ->
                         hapticManager.tapUiClick()
                         selectedTeamForDetail = team
@@ -790,6 +807,22 @@ fun AppNavigation(
                     onCreateTeam = { name, code, city ->
                         coroutineScope.launch {
                             scoringViewModel.repository.createTeam(name, code, city)
+                        }
+                    },
+                    onAddExistingPlayer = { teamId, userId ->
+                        coroutineScope.launch {
+                            scoringViewModel.repository.addExistingUserToTeam(teamId, userId)
+                        }
+                    },
+                    onCreateAndAddNewPlayer = { teamId, name, email, role, jersey ->
+                        coroutineScope.launch {
+                            scoringViewModel.repository.createAndAddPlayerToTeam(
+                                teamId = teamId,
+                                fullName = name,
+                                email = email,
+                                role = role,
+                                jerseyNumber = jersey
+                            )
                         }
                     },
                     onAddPlayer = { teamId, name, role ->
@@ -806,8 +839,11 @@ fun AppNavigation(
 
             // Flow: Team Squad Detail
             composable(Screen.TeamDetail.route) {
-                selectedTeamForDetail?.let { team ->
+                selectedTeamForDetail?.let { initialTeam ->
+                    val allTeams by scoringViewModel.allTeams.collectAsState()
+                    val team = allTeams.find { it.teamId == initialTeam.teamId } ?: initialTeam
                     val squad by scoringViewModel.repository.getTeamMembers(team.teamId).collectAsState(initial = emptyList())
+                    val allUsers by scoringViewModel.repository.getAllUsers().collectAsState(initial = emptyList())
                     var teamStats by remember(team.teamId) { mutableStateOf<com.cricsaga.app.data.repository.TeamStatsSummary?>(null) }
                     LaunchedEffect(team.teamId) {
                         teamStats = scoringViewModel.repository.getTeamStats(team.teamId)
@@ -815,7 +851,24 @@ fun AppNavigation(
                     TeamDetailScreen(
                         team = team,
                         squad = squad,
+                        allUsers = allUsers,
                         teamStats = teamStats,
+                        onAddExistingPlayer = { userId ->
+                            coroutineScope.launch {
+                                scoringViewModel.repository.addExistingUserToTeam(team.teamId, userId)
+                            }
+                        },
+                        onCreateAndAddNewPlayer = { name, email, role, jersey ->
+                            coroutineScope.launch {
+                                scoringViewModel.repository.createAndAddPlayerToTeam(
+                                    teamId = team.teamId,
+                                    fullName = name,
+                                    email = email,
+                                    role = role,
+                                    jerseyNumber = jersey
+                                )
+                            }
+                        },
                         onAddPlayer = { name, jersey, role ->
                             coroutineScope.launch {
                                 scoringViewModel.repository.addPlayerToTeam(
@@ -1026,8 +1079,10 @@ fun AppNavigation(
             // Flow: Match Setup Form
             composable(Screen.MatchSetup.route) {
                 val teams by scoringViewModel.allTeams.collectAsState()
+                val allUsers by scoringViewModel.repository.getAllUsers().collectAsState(initial = emptyList())
                 MatchSetupScreen(
                     teams = teams,
+                    allUsers = allUsers,
                     onBackClick = {
                         hapticManager.tapUiClick()
                         navController.popBackStack()
@@ -1036,6 +1091,24 @@ fun AppNavigation(
                         coroutineScope.launch {
                             val newTeamId = scoringViewModel.repository.createTeam(name, code, city)
                             onCreated(newTeamId)
+                        }
+                    },
+                    onAddExistingPlayer = { teamId, userId, onAdded ->
+                        coroutineScope.launch {
+                            scoringViewModel.repository.addExistingUserToTeam(teamId, userId)
+                            onAdded()
+                        }
+                    },
+                    onCreateAndAddPlayer = { teamId, name, email, role, jersey, onAdded ->
+                        coroutineScope.launch {
+                            scoringViewModel.repository.createAndAddPlayerToTeam(
+                                teamId = teamId,
+                                fullName = name,
+                                email = email,
+                                role = role,
+                                jerseyNumber = jersey
+                            )
+                            onAdded()
                         }
                     },
                     onAddPlayerToTeam = { teamId, name, phone, role, password, onAdded ->

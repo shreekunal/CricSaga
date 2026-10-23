@@ -14,7 +14,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Casino
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.SportsCricket
@@ -25,7 +24,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cricsaga.app.data.local.entity.TeamEntity
@@ -38,13 +36,17 @@ import com.cricsaga.app.domain.model.TossDecision
 import com.cricsaga.app.ui.theme.*
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
+import com.cricsaga.app.ui.teams.dialog.AddPlayerToTeamDialog
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MatchSetupScreen(
     teams: List<TeamEntity>,
+    allUsers: List<UserEntity> = emptyList(),
     onBackClick: () -> Unit,
     onCreateTeam: (name: String, code: String, city: String, onCreated: (teamId: String) -> Unit) -> Unit = { _, _, _, _ -> },
+    onAddExistingPlayer: (teamId: String, userId: String, onAdded: () -> Unit) -> Unit = { _, _, _ -> },
+    onCreateAndAddPlayer: (teamId: String, fullName: String, email: String, role: PlayingRole, jerseyNumber: String, onAdded: () -> Unit) -> Unit = { _, _, _, _, _, _ -> },
     onAddPlayerToTeam: (teamId: String, name: String, phone: String, role: PlayingRole, password: String, onAdded: () -> Unit) -> Unit = { _, _, _, _, _, _ -> },
     getTeamMembersFlow: (teamId: String) -> Flow<List<UserEntity>> = { flowOf(emptyList()) },
     onProceedToOpeners: (
@@ -70,6 +72,7 @@ fun MatchSetupScreen(
 
     var showAddTeamDialog by remember { mutableStateOf(false) }
     var teamIdForAddPlayer by remember { mutableStateOf<String?>(null) }
+    var emptyTeamAlertTarget by remember { mutableStateOf<TeamEntity?>(null) }
 
     val scrollState = rememberScrollState()
     val hapticManager = com.cricsaga.app.ui.utils.LocalHapticManager.current
@@ -631,11 +634,7 @@ fun MatchSetupScreen(
             }
 
             // Squad Minimum Notice
-            val canStart = teamA.isNotEmpty() &&
-                    teamB.isNotEmpty() &&
-                    teamA != teamB &&
-                    teamASquad.size >= 2 &&
-                    teamBSquad.size >= 2
+            val canAttemptStart = teamA.isNotEmpty() && teamB.isNotEmpty() && teamA != teamB
 
             if (teamA.isNotEmpty() && teamB.isNotEmpty() && (teamASquad.size < 2 || teamBSquad.size < 2)) {
                 Surface(
@@ -645,7 +644,7 @@ fun MatchSetupScreen(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(
-                        text = "Each team must have at least 2 players in its squad to begin a match. Use '+ Add Player' above to add squad members.",
+                        text = "Each team must have at least 2 players in its squad to begin a match. Tap below to add squad members.",
                         color = MaterialTheme.colorScheme.onSurface,
                         fontSize = 12.sp,
                         modifier = Modifier.padding(12.dp)
@@ -657,21 +656,30 @@ fun MatchSetupScreen(
             Button(
                 onClick = {
                     hapticManager?.tapUiClick()
-                    val teamAName = teams.find { it.teamId == teamA }?.teamName ?: "Team A"
-                    val teamBName = teams.find { it.teamId == teamB }?.teamName ?: "Team B"
-                    val title = "$teamAName vs $teamBName"
-                    onProceedToOpeners(
-                        title,
-                        teamA,
-                        teamB,
-                        totalOvers,
-                        selectedBallType,
-                        tossWinnerId,
-                        tossDecision,
-                        maxOversPerBowler
-                    )
+                    val selectedTeamA = teams.find { it.teamId == teamA }
+                    val selectedTeamB = teams.find { it.teamId == teamB }
+
+                    if (teamASquad.size < 2 && selectedTeamA != null) {
+                        emptyTeamAlertTarget = selectedTeamA
+                    } else if (teamBSquad.size < 2 && selectedTeamB != null) {
+                        emptyTeamAlertTarget = selectedTeamB
+                    } else {
+                        val teamAName = selectedTeamA?.teamName ?: "Team A"
+                        val teamBName = selectedTeamB?.teamName ?: "Team B"
+                        val title = "$teamAName vs $teamBName"
+                        onProceedToOpeners(
+                            title,
+                            teamA,
+                            teamB,
+                            totalOvers,
+                            selectedBallType,
+                            tossWinnerId,
+                            tossDecision,
+                            maxOversPerBowler
+                        )
+                    }
                 },
-                enabled = canStart,
+                enabled = canAttemptStart,
                 colors = ButtonDefaults.buttonColors(
                     containerColor = CrimsonPrimaryDark,
                     disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
@@ -686,12 +694,53 @@ fun MatchSetupScreen(
                     text = "SELECT OPENERS & START",
                     fontWeight = FontWeight.Bold,
                     fontSize = 15.sp,
-                    color = if (canStart) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
+                    color = if (canAttemptStart) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 
             Spacer(modifier = Modifier.height(16.dp))
         }
+    }
+
+    // Alert: Prompt user to add players if team is empty or has < 2 players
+    emptyTeamAlertTarget?.let { emptyTeam ->
+        val currentCount = if (emptyTeam.teamId == teamA) teamASquad.size else teamBSquad.size
+        AlertDialog(
+            onDismissRequest = { emptyTeamAlertTarget = null },
+            containerColor = SlateSurfaceDark,
+            title = {
+                Text(
+                    text = "Squad Incomplete",
+                    fontWeight = FontWeight.Bold,
+                    color = TextPrimary
+                )
+            },
+            text = {
+                Text(
+                    text = "${emptyTeam.teamName} currently has $currentCount players. At least 2 players are required to start a match.\n\nWould you like to add squad members now?",
+                    color = TextSecondary,
+                    fontSize = 13.sp
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val targetId = emptyTeam.teamId
+                        emptyTeamAlertTarget = null
+                        teamIdForAddPlayer = targetId
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = CrimsonPrimaryDark),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text("ADD PLAYERS", fontWeight = FontWeight.Bold, color = Color.White)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { emptyTeamAlertTarget = null }) {
+                    Text("CANCEL", color = TextSecondary)
+                }
+            }
+        )
     }
 
     // Dialog: Create New Team on the go
@@ -712,14 +761,24 @@ fun MatchSetupScreen(
         )
     }
 
-    // Dialog: Add Player on the go to a Team
+    // Dialog: Add Player on the go to a Team using unified AddPlayerToTeamDialog
     teamIdForAddPlayer?.let { targetTeamId ->
         val targetTeam = teams.find { it.teamId == targetTeamId }
-        AddPlayerOnTheGoDialog(
+        val currentSquad = if (targetTeamId == teamA) teamASquad else teamBSquad
+        val currentSquadUserIds = currentSquad.map { it.userId }.toSet()
+
+        AddPlayerToTeamDialog(
             teamName = targetTeam?.teamName ?: "Team",
+            currentSquadUserIds = currentSquadUserIds,
+            allUsers = allUsers,
             onDismiss = { teamIdForAddPlayer = null },
-            onAddPlayer = { name, phone, role, password ->
-                onAddPlayerToTeam(targetTeamId, name, phone, role, password) {
+            onAddExistingUser = { userId ->
+                onAddExistingPlayer(targetTeamId, userId) {
+                    teamIdForAddPlayer = null
+                }
+            },
+            onCreateAndAddNewPlayer = { name, email, role, jersey ->
+                onCreateAndAddPlayer(targetTeamId, name, email, role, jersey) {
                     teamIdForAddPlayer = null
                 }
             }
@@ -926,190 +985,6 @@ private fun PlayerMiniChip(player: UserEntity) {
 }
 
 /**
- * Dialog to add a new player on the go.
- * Creates both a player roster entry and a full user login account.
- */
-@Composable
-private fun AddPlayerOnTheGoDialog(
-    teamName: String,
-    onDismiss: () -> Unit,
-    onAddPlayer: (name: String, phone: String, role: PlayingRole, password: String) -> Unit
-) {
-    var name by remember { mutableStateOf("") }
-    var phone by remember { mutableStateOf("") }
-    var role by remember { mutableStateOf(PlayingRole.ALL_ROUNDER) }
-    var password by remember { mutableStateOf("123456") }
-
-    fun generateRandomPhone() {
-        val randomDigits = (10000000..99999999).random().toString()
-        phone = "98$randomDigits"
-    }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = MaterialTheme.colorScheme.surface,
-        shape = RoundedCornerShape(16.dp),
-        title = {
-            Column {
-                Text(
-                    text = "Add Player to $teamName",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = "Creates player profile and login account",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        },
-        text = {
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    label = { Text("Player Full Name") },
-                    placeholder = { Text("e.g. Aarav Patel") },
-                    singleLine = true,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
-                        focusedBorderColor = CrimsonPrimaryDark,
-                        unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
-                        focusedLabelColor = CrimsonPrimaryDark,
-                        unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                        focusedContainerColor = MaterialTheme.colorScheme.surface,
-                        unfocusedContainerColor = MaterialTheme.colorScheme.surface
-                    ),
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(10.dp)
-                )
-
-                OutlinedTextField(
-                    value = phone,
-                    onValueChange = { if (it.length <= 10) phone = it.filter { ch -> ch.isDigit() } },
-                    label = { Text("10-Digit Mobile Number") },
-                    placeholder = { Text("e.g. 9876543210") },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
-                        focusedBorderColor = CrimsonPrimaryDark,
-                        unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
-                        focusedLabelColor = CrimsonPrimaryDark,
-                        unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                        focusedContainerColor = MaterialTheme.colorScheme.surface,
-                        unfocusedContainerColor = MaterialTheme.colorScheme.surface
-                    ),
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(10.dp)
-                )
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End
-                ) {
-                    TextButton(
-                        onClick = { generateRandomPhone() },
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Casino,
-                            contentDescription = null,
-                            tint = CrimsonPrimaryDark,
-                            modifier = Modifier.size(14.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = "Auto-Generate Number",
-                            color = CrimsonPrimaryDark,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    }
-                }
-
-                Text(
-                    text = "Playing Role:",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Medium
-                )
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    listOf(
-                        PlayingRole.BATSMAN to "Batter",
-                        PlayingRole.BOWLER to "Bowler",
-                        PlayingRole.ALL_ROUNDER to "All-Round",
-                        PlayingRole.WICKET_KEEPER to "Keeper"
-                    ).forEach { (r, label) ->
-                        val isSelected = role == r
-                        FilterChip(
-                            selected = isSelected,
-                            onClick = { role = r },
-                            label = { Text(label, fontSize = 11.sp) },
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = CrimsonPrimaryDark,
-                                selectedLabelColor = Color.White,
-                                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
-                                labelColor = MaterialTheme.colorScheme.onSurface
-                            ),
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-                }
-
-                Surface(
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
-                    shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(modifier = Modifier.padding(10.dp)) {
-                        Text(
-                            text = "Account Password:",
-                            fontSize = 11.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                        Text(
-                            text = "Default password is set to 123456 so the player can log in immediately from the login screen.",
-                            fontSize = 10.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = {
-                    if (name.isNotBlank()) {
-                        onAddPlayer(name.trim(), phone.trim(), role, password)
-                    }
-                },
-                enabled = name.isNotBlank(),
-                colors = ButtonDefaults.buttonColors(containerColor = CrimsonPrimaryDark),
-                shape = RoundedCornerShape(8.dp)
-            ) {
-                Text("ADD PLAYER", color = Color.White, fontWeight = FontWeight.Bold)
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("CANCEL", color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        }
-    )
-}
-
-/**
  * Dialog to create a brand new team on the go.
  */
 @Composable
@@ -1134,7 +1009,7 @@ private fun AddTeamOnTheGoDialog(
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
-                    text = "Creates team and auto-generates 8 starter accounts",
+                    text = "Create an official team roster",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

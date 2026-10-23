@@ -9,10 +9,12 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;
 -- 1. USERS TABLE
 CREATE TABLE IF NOT EXISTS users (
     user_id TEXT PRIMARY KEY,
-    phone_number TEXT UNIQUE NOT NULL,
+    phone_number TEXT UNIQUE,
     full_name TEXT NOT NULL,
-    password_hash TEXT NOT NULL,
-    profile_photo_url TEXT, -- Stores compressed WebP Base64 string (< 25 KB)
+    password_hash TEXT NOT NULL DEFAULT '123456',
+    email TEXT UNIQUE,
+    google_id TEXT,
+    profile_photo_url TEXT, -- Stores compressed WebP Base64 string (< 25 KB) or avatar URL
     playing_role TEXT DEFAULT 'ALL_ROUNDER',
     batting_style TEXT DEFAULT 'RIGHT_HAND',
     bowling_style TEXT DEFAULT 'RIGHT_ARM_MEDIUM',

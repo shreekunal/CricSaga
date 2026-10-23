@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.sp
 import com.cricsaga.app.data.local.entity.TeamEntity
 import com.cricsaga.app.data.local.entity.UserEntity
 import com.cricsaga.app.domain.model.PlayingRole
+import com.cricsaga.app.ui.teams.dialog.AddPlayerToTeamDialog
 import com.cricsaga.app.ui.theme.*
 import com.cricsaga.app.ui.utils.ImageUtils
 
@@ -36,8 +37,11 @@ import com.cricsaga.app.ui.utils.ImageUtils
 fun TeamDetailScreen(
     team: TeamEntity,
     squad: List<UserEntity>,
+    allUsers: List<UserEntity> = emptyList(),
     teamStats: com.cricsaga.app.data.repository.TeamStatsSummary? = null,
-    onAddPlayer: (name: String, jersey: String, role: PlayingRole) -> Unit,
+    onAddExistingPlayer: (userId: String) -> Unit = {},
+    onCreateAndAddNewPlayer: (fullName: String, email: String, role: PlayingRole, jerseyNumber: String) -> Unit = { _, _, _, _ -> },
+    onAddPlayer: (name: String, jersey: String, role: PlayingRole) -> Unit = { _, _, _ -> },
     onRemovePlayer: (UserEntity) -> Unit = {},
     onSetCaptain: (UserEntity) -> Unit = {},
     onDeleteTeam: () -> Unit = {},
@@ -328,116 +332,20 @@ fun TeamDetailScreen(
             }
         }
 
-        // Add Player Dialog
+        // Add Player Dialog using unified AddPlayerToTeamDialog
         if (showAddDialog) {
-            var newPlayerName by remember { mutableStateOf("") }
-            var newPlayerJersey by remember { mutableStateOf("") }
-            var newPlayerRole by remember { mutableStateOf(PlayingRole.BATSMAN) }
-
-            AlertDialog(
-                onDismissRequest = { showAddDialog = false },
-                containerColor = SlateSurfaceDark,
-                shape = RoundedCornerShape(12.dp),
-                title = {
-                    Text(
-                        text = "Add Player to ${team.teamName}",
-                        fontWeight = FontWeight.Bold,
-                        color = TextPrimary,
-                        fontSize = 16.sp
-                    )
+            AddPlayerToTeamDialog(
+                teamName = team.teamName,
+                currentSquadUserIds = squad.map { it.userId }.toSet(),
+                allUsers = allUsers,
+                onDismiss = { showAddDialog = false },
+                onAddExistingUser = { userId ->
+                    onAddExistingPlayer(userId)
+                    showAddDialog = false
                 },
-                text = {
-                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        OutlinedTextField(
-                            value = newPlayerName,
-                            onValueChange = { newPlayerName = it },
-                            label = { Text("Player Full Name *") },
-                            singleLine = true,
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = CrimsonPrimaryDark,
-                                unfocusedBorderColor = CardBorderDark,
-                                focusedTextColor = TextPrimary,
-                                unfocusedTextColor = TextPrimary
-                            ),
-                            modifier = Modifier.fillMaxWidth()
-                        )
-
-                        OutlinedTextField(
-                            value = newPlayerJersey,
-                            onValueChange = { if (it.length <= 3) newPlayerJersey = it },
-                            label = { Text("Jersey Number (e.g. 7, 18, 45)") },
-                            singleLine = true,
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = CrimsonPrimaryDark,
-                                unfocusedBorderColor = CardBorderDark,
-                                focusedTextColor = TextPrimary,
-                                unfocusedTextColor = TextPrimary
-                            ),
-                            modifier = Modifier.fillMaxWidth()
-                        )
-
-                        Text("Playing Role:", style = MicroTag, color = TextTertiary)
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            listOf(
-                                PlayingRole.BATSMAN to "BAT",
-                                PlayingRole.BOWLER to "BOWL",
-                                PlayingRole.ALL_ROUNDER to "ALL",
-                                PlayingRole.WICKET_KEEPER to "WK"
-                            ).forEach { (role, label) ->
-                                val isSelected = newPlayerRole == role
-                                Box(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .clip(RoundedCornerShape(6.dp))
-                                        .background(if (isSelected) CrimsonPrimaryDark else ElevatedSurfaceDark)
-                                        .border(1.dp, if (isSelected) CrimsonPrimaryDark else CardBorderDark, RoundedCornerShape(6.dp))
-                                        .clickable {
-                                            hapticManager?.tapUiClick()
-                                            newPlayerRole = role
-                                        }
-                                        .padding(vertical = 8.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        text = label,
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 11.sp,
-                                        color = if (isSelected) Color.White else TextSecondary
-                                    )
-                                }
-                            }
-                        }
-                    }
-                },
-                confirmButton = {
-                    Button(
-                        onClick = {
-                            if (newPlayerName.isNotBlank()) {
-                                hapticManager?.tapUiClick()
-                                onAddPlayer(
-                                    newPlayerName.trim(),
-                                    newPlayerJersey.trim().ifEmpty { "00" },
-                                    newPlayerRole
-                                )
-                                showAddDialog = false
-                            }
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = CrimsonPrimaryDark),
-                        shape = RoundedCornerShape(6.dp)
-                    ) {
-                        Text("ADD TO SQUAD", fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = {
-                        hapticManager?.tapUiClick()
-                        showAddDialog = false
-                    }) {
-                        Text("CANCEL", color = TextSecondary)
-                    }
+                onCreateAndAddNewPlayer = { name, email, role, jersey ->
+                    onCreateAndAddNewPlayer(name, email, role, jersey)
+                    showAddDialog = false
                 }
             )
         }

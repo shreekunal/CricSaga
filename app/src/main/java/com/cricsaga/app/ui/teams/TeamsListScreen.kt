@@ -21,15 +21,19 @@ import androidx.compose.ui.unit.sp
 import com.cricsaga.app.data.local.entity.TeamEntity
 import com.cricsaga.app.data.local.entity.UserEntity
 import com.cricsaga.app.domain.model.PlayingRole
+import com.cricsaga.app.ui.teams.dialog.AddPlayerToTeamDialog
 import com.cricsaga.app.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TeamsListScreen(
     teams: List<TeamEntity>,
+    allUsers: List<UserEntity> = emptyList(),
     onTeamClick: (TeamEntity) -> Unit = {},
     onCreateTeam: (name: String, code: String, city: String) -> Unit,
-    onAddPlayer: (teamId: String, name: String, role: PlayingRole) -> Unit,
+    onAddExistingPlayer: (teamId: String, userId: String) -> Unit = { _, _ -> },
+    onCreateAndAddNewPlayer: (teamId: String, fullName: String, email: String, role: PlayingRole, jerseyNumber: String) -> Unit = { _, _, _, _, _ -> },
+    onAddPlayer: (teamId: String, name: String, role: PlayingRole) -> Unit = { _, _, _ -> },
     onBackClick: () -> Unit = {}
 ) {
     var showCreateTeamDialog by remember { mutableStateOf(false) }
@@ -171,52 +175,20 @@ fun TeamsListScreen(
             )
         }
 
-        // Add Player Dialog
+        // Add Player Dialog using unified AddPlayerToTeamDialog
         selectedTeamForAddPlayer?.let { team ->
-            var playerName by remember { mutableStateOf("") }
-            var selectedRole by remember { mutableStateOf(PlayingRole.BATSMAN) }
-
-            AlertDialog(
-                onDismissRequest = { selectedTeamForAddPlayer = null },
-                containerColor = SlateSurfaceDark,
-                title = { Text("Add Player to ${team.teamName}", color = TextPrimary, fontWeight = FontWeight.Bold) },
-                text = {
-                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        OutlinedTextField(
-                            value = playerName,
-                            onValueChange = { playerName = it },
-                            label = { Text("Player Full Name") },
-                            singleLine = true
-                        )
-                        Text("Role:", color = MutedGrey, fontSize = 12.sp)
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            listOf(PlayingRole.BATSMAN, PlayingRole.BOWLER, PlayingRole.ALL_ROUNDER).forEach { role ->
-                                FilterChip(
-                                    selected = selectedRole == role,
-                                    onClick = { selectedRole = role },
-                                    label = { Text(role.name.replace("_", " ")) }
-                                )
-                            }
-                        }
-                    }
+            AddPlayerToTeamDialog(
+                teamName = team.teamName,
+                currentSquadUserIds = emptySet(),
+                allUsers = allUsers,
+                onDismiss = { selectedTeamForAddPlayer = null },
+                onAddExistingUser = { userId ->
+                    onAddExistingPlayer(team.teamId, userId)
+                    selectedTeamForAddPlayer = null
                 },
-                confirmButton = {
-                    Button(
-                        onClick = {
-                            if (playerName.isNotBlank()) {
-                                onAddPlayer(team.teamId, playerName, selectedRole)
-                                selectedTeamForAddPlayer = null
-                            }
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = BoundaryGreen)
-                    ) {
-                        Text("ADD PLAYER", color = Color.Black, fontWeight = FontWeight.Bold)
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = { selectedTeamForAddPlayer = null }) {
-                        Text("CANCEL", color = Color.Gray)
-                    }
+                onCreateAndAddNewPlayer = { name, email, role, jersey ->
+                    onCreateAndAddNewPlayer(team.teamId, name, email, role, jersey)
+                    selectedTeamForAddPlayer = null
                 }
             )
         }
