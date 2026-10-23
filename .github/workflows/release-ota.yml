@@ -149,5 +149,3 @@ jobs:
             - **Google Play / App Store Bundle:** `app-release.aab`
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
