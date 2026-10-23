@@ -57,6 +57,15 @@ fun PhoneLoginScreen(
     onReviewerDemoSignIn: () -> Unit
 ) {
     val context = LocalContext.current
+    val activity = remember(context) {
+        var ctx = context
+        while (ctx is android.content.ContextWrapper) {
+            if (ctx is Activity) return@remember ctx
+            ctx = ctx.baseContext
+        }
+        null
+    }
+
     val hapticManager = com.cricsaga.app.ui.utils.LocalHapticManager.current
     val scrollState = rememberScrollState()
 
@@ -82,14 +91,17 @@ fun PhoneLoginScreen(
             .requestProfile()
             .build()
     }
-    val googleSignInClient = remember(context) { GoogleSignIn.getClient(context, gso) }
+    val googleSignInClient = remember(context, activity) {
+        GoogleSignIn.getClient(activity ?: context, gso)
+    }
 
     val googleSignInLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
     ) { result ->
         isGoogleSigningIn = false
-        if (result.resultCode == Activity.RESULT_OK && result.data != null) {
-            val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
+        val data = result.data
+        if (data != null) {
+            val task = GoogleSignIn.getSignedInAccountFromIntent(data)
             try {
                 val account = task.getResult(ApiException::class.java)
                 if (account != null) {
@@ -105,11 +117,19 @@ fun PhoneLoginScreen(
                     authErrorMessage = "Could not retrieve Google account details. Please try again."
                 }
             } catch (e: ApiException) {
-                // Status 12501 indicates user canceled the picker; other codes are errors
-                if (e.statusCode != 12501) {
-                    authErrorMessage = "Google Sign-In failed (${e.statusCode}). Please verify your connection."
+                authErrorMessage = when (e.statusCode) {
+                    10 -> "Google Setup Required: App SHA-1 is not registered in Google Cloud Console (Error 10: DEVELOPER_ERROR)."
+                    12500 -> "Google Sign-In failed (Error 12500). Please check Google Play Services on your device."
+                    12501 -> null // User dismissed the picker dialog
+                    7 -> "Network error: Unable to reach Google servers. Please check your internet connection."
+                    else -> "Google Sign-In failed (${e.statusCode}): ${e.localizedMessage}"
                 }
+            } catch (e: Exception) {
+                authErrorMessage = "Sign in error: ${e.localizedMessage}"
             }
+        } else {
+            // Data was null; user cancelled without selecting
+            authErrorMessage = null
         }
     }
 
@@ -132,20 +152,13 @@ fun PhoneLoginScreen(
                 Spacer(modifier = Modifier.height(16.dp))
 
                 // Brand Emblem
-                Box(
+                Image(
+                    painter = painterResource(id = R.drawable.logo_round),
+                    contentDescription = "CricSaga",
                     modifier = Modifier
-                        .size(72.dp)
+                        .size(76.dp)
                         .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.surface)
-                        .border(1.5.dp, BoundaryAmber.copy(alpha = 0.6f), CircleShape),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Image(
-                        painter = painterResource(id = R.drawable.cricsaga_logo),
-                        contentDescription = "CricSaga",
-                        modifier = Modifier.size(50.dp)
-                    )
-                }
+                )
 
                 Spacer(modifier = Modifier.height(14.dp))
 
@@ -259,9 +272,11 @@ fun PhoneLoginScreen(
                                 hapticManager?.tapUiClick()
                                 authErrorMessage = null
                                 isGoogleSigningIn = true
-                                // Sign out of existing client session first so account picker always appears
-                                googleSignInClient.signOut().addOnCompleteListener {
+                                try {
                                     googleSignInLauncher.launch(googleSignInClient.signInIntent)
+                                } catch (e: Exception) {
+                                    isGoogleSigningIn = false
+                                    authErrorMessage = "Could not open Google sign-in: ${e.localizedMessage}"
                                 }
                             },
                             enabled = !isGoogleSigningIn,
