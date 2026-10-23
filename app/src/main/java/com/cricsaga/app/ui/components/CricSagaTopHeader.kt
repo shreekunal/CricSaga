@@ -118,7 +118,7 @@ fun CricSagaTopHeader(
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
-                            text = if (isPro) "PRO" else "PERKS",
+                            text = if (isPro) "PRO" else "PRO @99",
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
                             color = AmberFourPrimary

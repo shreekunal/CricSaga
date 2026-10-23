@@ -1,0 +1,153 @@
+name: Release OTA Update
+
+on:
+  push:
+    branches:
+      - master
+      - main
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      changelog:
+        description: 'What is new in this release (Changelog)'
+        required: true
+        default: 'Performance improvements and bug fixes.'
+      is_force_update:
+        description: 'Force update (block older versions)?'
+        type: boolean
+        default: false
+
+jobs:
+  build-and-deploy-ota:
+    name: Build APK and Deploy OTA to Supabase
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Restore Keystore & Configuration
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 --decode > app/cricsaga-release.jks
+          fi
+          echo "sdk.dir=$ANDROID_HOME" > local.properties
+          echo "KEYSTORE_PASSWORD=${KEYSTORE_PASSWORD:-cricsaga2026}" >> local.properties
+          echo "KEY_PASSWORD=${KEY_PASSWORD:-cricsaga2026}" >> local.properties
+
+      - name: Grant Execute Permission to Gradlew
+        run: chmod +x gradlew
+
+      - name: Build Release APK and App Bundle
+        run: ./gradlew assembleRelease bundleRelease --no-daemon
+
+      - name: Extract Version Info from Gradle
+        id: version_info
+        run: |
+          VERSION_CODE=$(grep -o 'versionCode = [0-9]*' app/build.gradle.kts | head -1 | awk '{print $3}')
+          VERSION_NAME=$(grep -o 'versionName = "[^"]*"' app/build.gradle.kts | head -1 | cut -d'"' -f2)
+          echo "version_code=$VERSION_CODE" >> $GITHUB_OUTPUT
+          echo "version_name=$VERSION_NAME" >> $GITHUB_OUTPUT
+          echo "Detected App Version: v$VERSION_NAME (Code: $VERSION_CODE)"
+
+      - name: Generate version.json Manifest
+        env:
+          VERSION_CODE: ${{ steps.version_info.outputs.version_code }}
+          VERSION_NAME: ${{ steps.version_info.outputs.version_name }}
+          INPUT_CHANGELOG: ${{ github.event.inputs.changelog }}
+          COMMIT_MSG: ${{ github.event.head_commit.message }}
+          INPUT_FORCE: ${{ github.event.inputs.is_force_update }}
+        run: |
+          RAW_CHANGELOG="${INPUT_CHANGELOG:-$COMMIT_MSG}"
+          # Clean up multi-line commit messages into a single clean changelog line
+          CHANGELOG=$(echo "${RAW_CHANGELOG:-Continuous improvements and updates.}" | head -n 1 | tr -d '"\r\n')
+          IS_FORCE="${INPUT_FORCE:-false}"
+          cat <<EOF > version.json
+          {
+            "latest_version_code": $VERSION_CODE,
+            "latest_version_name": "$VERSION_NAME",
+            "apk_url": "https://wyycmghdkcgdmoaaleki.supabase.co/storage/v1/object/public/app-updates/app-release.apk",
+            "changelog": "$CHANGELOG",
+            "is_force_update": $IS_FORCE
+          }
+          EOF
+          cat version.json
+
+      - name: Deploy app-release.apk to Supabase Storage
+        env:
+          SUPABASE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          if [ -z "$SUPABASE_KEY" ]; then
+            echo "ERROR: SUPABASE_SERVICE_ROLE_KEY secret is not set in GitHub repository settings!"
+            exit 1
+          fi
+
+          echo "Uploading app-release.apk to Supabase app-updates bucket..."
+          HTTP_STATUS=$(curl -s -o upload_apk.log -w "%{http_code}" -X POST \
+            "https://wyycmghdkcgdmoaaleki.supabase.co/storage/v1/object/app-updates/app-release.apk" \
+            -H "Authorization: Bearer $SUPABASE_KEY" \
+            -H "x-upsert: true" \
+            -H "Content-Type: application/vnd.android.package-archive" \
+            --data-binary "@app/build/outputs/apk/release/app-release.apk")
+
+          if [ "$HTTP_STATUS" -ne 200 ] && [ "$HTTP_STATUS" -ne 201 ]; then
+            echo "APK upload failed with status $HTTP_STATUS:"
+            cat upload_apk.log
+            exit 1
+          fi
+          echo "APK successfully deployed to Supabase!"
+
+      - name: Deploy version.json Manifest to Supabase Storage
+        env:
+          SUPABASE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          echo "Uploading version.json to Supabase app-updates bucket..."
+          HTTP_STATUS=$(curl -s -o upload_manifest.log -w "%{http_code}" -X POST \
+            "https://wyycmghdkcgdmoaaleki.supabase.co/storage/v1/object/app-updates/version.json" \
+            -H "Authorization: Bearer $SUPABASE_KEY" \
+            -H "x-upsert: true" \
+            -H "Content-Type: application/json" \
+            --data-binary "@version.json")
+
+          if [ "$HTTP_STATUS" -ne 200 ] && [ "$HTTP_STATUS" -ne 201 ]; then
+            echo "version.json upload failed with status $HTTP_STATUS:"
+            cat upload_manifest.log
+            exit 1
+          fi
+          echo "version.json successfully deployed to Supabase!"
+
+      - name: Publish GitHub Release (with APK & Bundle)
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main'
+        with:
+          files: |
+            app/build/outputs/apk/release/app-release.apk
+            app/build/outputs/bundle/release/app-release.aab
+            version.json
+          tag_name: v${{ steps.version_info.outputs.version_name }}
+          name: CricSaga v${{ steps.version_info.outputs.version_name }}
+          body: |
+            ## CricSaga v${{ steps.version_info.outputs.version_name }}
+            ${{ github.event.inputs.changelog || github.event.head_commit.message || 'Continuous release build.' }}
+
+            ### Downloads:
+            - **Signed APK (3.0 MB):** `app-release.apk`
+            - **Google Play / App Store Bundle:** `app-release.aab`
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

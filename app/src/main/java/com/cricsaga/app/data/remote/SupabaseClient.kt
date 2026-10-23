@@ -27,7 +27,7 @@ object SupabaseClient {
 
     private const val TAG = "SupabaseClient"
     private const val BASE_URL = "https://wyycmghdkcgdmoaaleki.supabase.co/rest/v1"
-    private const val API_KEY = "sb_secret_NbYbuHhvgmyKi9Vgt1A9PA_TfNI04-K"
+    private const val API_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind5eWNtZ2hka2NnZG1vYWFsZWtpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI2NTY2NDIsImV4cCI6MjEwODIzMjY0Mn0.USMZes3f9weO34N3p5A7LRtt8FPvAtd7UunzjIPa7q0"
 
     private val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
 
@@ -359,7 +359,7 @@ object SupabaseClient {
 
             val deliveryBody = deliveryJson.toString().toRequestBody(JSON_MEDIA_TYPE)
             val delReq = newRequestBuilder("deliveries").post(deliveryBody).build()
-            httpClient.newCall(delReq).execute()
+            httpClient.newCall(delReq).execute().close()
 
             // Update innings summary
             val inningsUpdateJson = JSONObject().apply {
@@ -371,7 +371,7 @@ object SupabaseClient {
             val innReq = newRequestBuilder("innings?innings_id=eq.${delivery.inningsId}")
                 .patch(innBody)
                 .build()
-            httpClient.newCall(innReq).execute()
+            httpClient.newCall(innReq).execute().close()
 
             Result.success(Unit)
         } catch (e: Exception) {
@@ -396,7 +396,7 @@ object SupabaseClient {
             }
             val body = json.toString().toRequestBody(JSON_MEDIA_TYPE)
             val req = newRequestBuilder("teams").post(body).build()
-            httpClient.newCall(req).execute()
+            httpClient.newCall(req).execute().close()
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
@@ -423,7 +423,7 @@ object SupabaseClient {
             }
             val body = json.toString().toRequestBody(JSON_MEDIA_TYPE)
             val req = newRequestBuilder("posts").post(body).build()
-            httpClient.newCall(req).execute()
+            httpClient.newCall(req).execute().close()
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
@@ -435,14 +435,14 @@ object SupabaseClient {
             val req = newRequestBuilder("matches?match_status=eq.LIVE&order=created_at.desc&limit=10")
                 .get()
                 .build()
-            val res = httpClient.newCall(req).execute()
-            if (!res.isSuccessful) return@withContext Result.success(emptyList())
+            httpClient.newCall(req).execute().use { res ->
+                if (!res.isSuccessful) return@withContext Result.success(emptyList())
 
-            val body = res.body?.string() ?: "[]"
-            val array = JSONArray(body)
-            val list = mutableListOf<MatchEntity>()
-            for (i in 0 until array.length()) {
-                val o = array.getJSONObject(i)
+                val body = res.body?.string() ?: "[]"
+                val array = JSONArray(body)
+                val list = mutableListOf<MatchEntity>()
+                for (i in 0 until array.length()) {
+                    val o = array.getJSONObject(i)
                 list.add(
                     MatchEntity(
                         matchId = o.optString("match_id"),
@@ -465,7 +465,8 @@ object SupabaseClient {
                 )
             }
             Result.success(list)
-        } catch (e: Exception) {
+        }
+    } catch (e: Exception) {
             Result.failure(e)
         }
     }

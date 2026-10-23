@@ -182,23 +182,7 @@ class ProManager(context: Context) {
         }
 
         // Query the dedicated redeem_codes table
-        var codeEntity = redeemCodeDao.getCode(cleanCode)
-
-        // If not in database yet, check if it's a valid pattern to auto-create and redeem once
-        if (codeEntity == null) {
-            val fallbackPlan = when {
-                cleanCode.startsWith("VIP-") || cleanCode.startsWith("LIFE-") -> ProPlan.LIFETIME
-                cleanCode.startsWith("SEASON-") || cleanCode.startsWith("1M-") -> ProPlan.ONE_MONTH
-                cleanCode.startsWith("ANNUAL-") || cleanCode.startsWith("PRO-") -> ProPlan.ONE_YEAR
-                else -> null
-            }
-            if (fallbackPlan != null) {
-                val days = if (fallbackPlan == ProPlan.LIFETIME) 36500 else if (fallbackPlan == ProPlan.ONE_YEAR) 365 else 90
-                val newCode = RedeemCodeEntity(cleanCode, fallbackPlan, days)
-                redeemCodeDao.insertCode(newCode)
-                codeEntity = newCode
-            }
-        }
+        val codeEntity = redeemCodeDao.getCode(cleanCode)
 
         if (codeEntity == null) {
             return@withContext RedeemResult(false, null, "Invalid redeem code. Please verify the code or contact support.")

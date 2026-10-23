@@ -32,6 +32,7 @@ fun SettingsScreen(
     themeManager: ThemeManager,
     hapticManager: HapticManager,
     onBackClick: () -> Unit,
+    isAdmin: Boolean = false,
     onNavigateToAdmin: () -> Unit = {},
     onLogout: () -> Unit = {}
 ) {
@@ -347,68 +348,70 @@ fun SettingsScreen(
                 }
             }
 
-            // Section 5: Administration & Controls
-            item {
-                Text(
-                    text = "ADMINISTRATION & CONTROLS",
-                    style = SectionLabel,
-                    color = BoundaryAmber
-                )
-            }
+            // Section 5: Administration & Controls (Visible only to authorized Admin email)
+            if (isAdmin) {
+                item {
+                    Text(
+                        text = "ADMINISTRATION & CONTROLS",
+                        style = SectionLabel,
+                        color = BoundaryAmber
+                    )
+                }
 
-            item {
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable {
-                            hapticManager.tapUiClick()
-                            adminPinInput = ""
-                            adminPinError = null
-                            showAdminPinDialog = true
-                        },
-                    colors = CardDefaults.cardColors(containerColor = SlateSurfaceDark),
-                    shape = RoundedCornerShape(10.dp),
-                    border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(CardBorderDark))
-                ) {
-                    Row(
+                item {
+                    Card(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(14.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                            .clickable {
+                                hapticManager.tapUiClick()
+                                adminPinInput = ""
+                                adminPinError = null
+                                showAdminPinDialog = true
+                            },
+                        colors = CardDefaults.cardColors(containerColor = SlateSurfaceDark),
+                        shape = RoundedCornerShape(10.dp),
+                        border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(CardBorderDark))
                     ) {
-                        Box(
+                        Row(
                             modifier = Modifier
-                                .size(40.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(BoundaryAmber.copy(alpha = 0.15f)),
-                            contentAlignment = Alignment.Center
+                                .fillMaxWidth()
+                                .padding(14.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(BoundaryAmber.copy(alpha = 0.15f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    Icons.Default.AdminPanelSettings,
+                                    contentDescription = null,
+                                    tint = BoundaryAmber,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Admin Control Console",
+                                    style = PlayerNameSecondary,
+                                    color = TextPrimary
+                                )
+                                Text(
+                                    text = "User management, Pro membership grant/revoke, and cloud metrics.",
+                                    style = BodyCaption,
+                                    color = TextSecondary
+                                )
+                            }
                             Icon(
-                                Icons.Default.AdminPanelSettings,
+                                Icons.Default.ChevronRight,
                                 contentDescription = null,
-                                tint = BoundaryAmber,
-                                modifier = Modifier.size(24.dp)
+                                tint = TextTertiary,
+                                modifier = Modifier.size(20.dp)
                             )
                         }
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "Admin Control Console",
-                                style = PlayerNameSecondary,
-                                color = TextPrimary
-                            )
-                            Text(
-                                text = "User management, Pro membership grant/revoke, and cloud metrics.",
-                                style = BodyCaption,
-                                color = TextSecondary
-                            )
-                        }
-                        Icon(
-                            Icons.Default.ChevronRight,
-                            contentDescription = null,
-                            tint = TextTertiary,
-                            modifier = Modifier.size(20.dp)
-                        )
                     }
                 }
             }

@@ -248,10 +248,14 @@ fun AppNavigation(
                             // Check remote Supabase first, then local Room cache
                             val remoteUser = if (email.isNotEmpty()) {
                                 SupabaseClient.getUserByEmail(email).getOrNull()
+                            } else if (googleId.isNotEmpty()) {
+                                SupabaseClient.getUserByGoogleId(googleId).getOrNull()
                             } else null
 
                             val localUser = if (email.isNotEmpty()) {
                                 scoringViewModel.repository.getUserByEmail(email)
+                            } else if (googleId.isNotEmpty()) {
+                                scoringViewModel.repository.getUserByGoogleId(googleId)
                             } else null
 
                             val existingUser = remoteUser ?: localUser
@@ -269,7 +273,7 @@ fun AppNavigation(
                                         scoringViewModel.repository.updateUser(updated)
                                     }
                                 }
-                                authManager.setLoggedIn(existingUser.userId, existingUser.phoneNumber)
+                                authManager.setLoggedIn(existingUser.userId, existingUser.phoneNumber, existingUser.email ?: email)
                                 navController.navigate(Screen.Home.route) {
                                     popUpTo(0) { inclusive = true }
                                 }
@@ -306,7 +310,7 @@ fun AppNavigation(
                             // Save to Supabase Central Database & local Room
                             SupabaseClient.signUpUser(newUser)
                             scoringViewModel.repository.insertUser(newUser)
-                            authManager.setLoggedIn(newUser.userId, cleanPhone)
+                            authManager.setLoggedIn(newUser.userId, cleanPhone, email)
                             navController.navigate(Screen.Home.route) {
                                 popUpTo(0) { inclusive = true }
                             }
@@ -323,7 +327,7 @@ fun AppNavigation(
                                 isPro = true
                             )
                             scoringViewModel.repository.insertUser(testUser)
-                            authManager.setLoggedIn(testUser.userId, testUser.phoneNumber)
+                            authManager.setLoggedIn(testUser.userId, testUser.phoneNumber, testUser.email)
                             navController.navigate(Screen.Home.route) {
                                 popUpTo(0) { inclusive = true }
                             }
@@ -960,9 +964,24 @@ fun AppNavigation(
 
             // Flow: App Settings & Preferences
             composable(Screen.Settings.route) {
+                var currentUserEmail by remember { mutableStateOf(authManager.getCurrentUserEmail()) }
+                LaunchedEffect(Unit) {
+                    if (currentUserEmail.isNullOrBlank()) {
+                        val currentUid = authManager.getCurrentUserId()
+                        if (currentUid.isNotBlank()) {
+                            val user = scoringViewModel.repository.getUserById(currentUid)
+                            if (user?.email != null) {
+                                currentUserEmail = user.email
+                            }
+                        }
+                    }
+                }
+                val isUserAdmin = authManager.isAdmin(currentUserEmail)
+
                 SettingsScreen(
                     themeManager = themeManager,
                     hapticManager = hapticManager,
+                    isAdmin = isUserAdmin,
                     onBackClick = {
                         hapticManager.tapUiClick()
                         navController.popBackStack()

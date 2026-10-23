@@ -22,7 +22,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cricsaga.app.data.local.ProManager
+import com.cricsaga.app.data.local.ProPlan
 import com.cricsaga.app.ui.theme.*
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -33,6 +35,11 @@ fun RedeemCodeScreen(
     val subscriptionState by proManager.subscriptionState.collectAsState()
     val scrollState = rememberScrollState()
     val hapticManager = com.cricsaga.app.ui.utils.LocalHapticManager.current
+    val coroutineScope = rememberCoroutineScope()
+
+    var redeemCodeInput by remember { mutableStateOf("") }
+    var isRedeeming by remember { mutableStateOf(false) }
+    var redeemFeedback by remember { mutableStateOf<Pair<Boolean, String>?>(null) }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -40,7 +47,7 @@ fun RedeemCodeScreen(
             TopAppBar(
                 title = {
                     Text(
-                        text = "Pro Membership & Perks",
+                        text = "CricSaga Pro Membership",
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onBackground,
                         fontSize = 18.sp
@@ -108,7 +115,7 @@ fun RedeemCodeScreen(
                     Spacer(modifier = Modifier.height(12.dp))
 
                     Text(
-                        text = if (subscriptionState.isActive) "CRICSAGA PRO VERIFIED" else "GRASSROOTS ATHLETE TIER",
+                        text = if (subscriptionState.isActive) "CRICSAGA PRO ACTIVE" else "GRASSROOTS ATHLETE TIER",
                         fontWeight = FontWeight.Black,
                         fontSize = 18.sp,
                         letterSpacing = 0.5.sp,
@@ -119,7 +126,7 @@ fun RedeemCodeScreen(
 
                     Text(
                         text = if (subscriptionState.isActive) {
-                            "Verified Pro Athlete Access • Unlimited match analytics, official PDF exports, and golden broadcast badge enabled on your profile."
+                            "Verified Pro Athlete Access • Plan: ${subscriptionState.plan?.title ?: "Pro"} • Status: ${subscriptionState.formattedExpiry}"
                         } else {
                             "Standard Community Athlete • Complete digital ball-by-ball scoring, squad rosters, and local match records are always free."
                         },
@@ -143,7 +150,7 @@ fun RedeemCodeScreen(
                             ) {
                                 Icon(Icons.Default.Verified, contentDescription = null, tint = BoundaryAmber, modifier = Modifier.size(14.dp))
                                 Text(
-                                    text = "ADMIN VERIFIED",
+                                    text = "VERIFIED ATHLETE",
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = BoundaryAmber
@@ -154,7 +161,140 @@ fun RedeemCodeScreen(
                 }
             }
 
-            // Section 2: What's Included in Pro
+            // Section 2: Available Pro Plans
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Text(
+                    text = "AVAILABLE MEMBERSHIP TIERS",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.sp,
+                    color = BoundaryAmber
+                )
+
+                // 1 Month Plan (₹99)
+                ProPlanCard(
+                    title = "1 Month Access",
+                    price = "₹99",
+                    duration = "30 Days Access",
+                    rateDetail = "₹3.30/day",
+                    badge = null,
+                    isHighlighted = false,
+                    isCurrent = subscriptionState.isActive && subscriptionState.plan == ProPlan.ONE_MONTH
+                )
+
+                // 1 Year Plan (₹199 - Best Value)
+                ProPlanCard(
+                    title = "1 Year Pass",
+                    price = "₹199",
+                    duration = "365 Days Access",
+                    rateDetail = "Save 83% vs Monthly",
+                    badge = "BEST VALUE • 83% OFF",
+                    isHighlighted = true,
+                    isCurrent = subscriptionState.isActive && subscriptionState.plan == ProPlan.ONE_YEAR
+                )
+
+                // Lifetime Plan (₹1,999)
+                ProPlanCard(
+                    title = "Lifetime VIP Pass",
+                    price = "₹1,999",
+                    duration = "Unlimited Forever",
+                    rateDetail = "Founder Status & All Future Features",
+                    badge = "FOUNDER VIP",
+                    isHighlighted = false,
+                    isCurrent = subscriptionState.isActive && subscriptionState.plan == ProPlan.LIFETIME
+                )
+            }
+
+            // Section 3: Redeem Tournament / Coordinator Code
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(14.dp),
+                color = MaterialTheme.colorScheme.surface,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+            ) {
+                Column(
+                    modifier = Modifier.padding(18.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(Icons.Default.ConfirmationNumber, contentDescription = null, tint = BoundaryAmber, modifier = Modifier.size(20.dp))
+                        Text(
+                            text = "Redeem Access Pass Code",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                    Text(
+                        text = "Enter a code provided by your tournament organizer, league coordinator, or CricSaga administrator.",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        lineHeight = 15.sp
+                    )
+
+                    OutlinedTextField(
+                        value = redeemCodeInput,
+                        onValueChange = {
+                            redeemCodeInput = it.uppercase()
+                            redeemFeedback = null
+                        },
+                        placeholder = { Text("e.g. CRIC-PRO-2026", fontSize = 12.sp) },
+                        singleLine = true,
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    Button(
+                        onClick = {
+                            val code = redeemCodeInput.trim()
+                            if (code.isBlank()) return@Button
+                            isRedeeming = true
+                            hapticManager?.tapUiClick()
+                            coroutineScope.launch {
+                                val result = proManager.activateProWithCode(code)
+                                isRedeeming = false
+                                if (result.isSuccess) {
+                                    hapticManager?.tapBoundaryFour()
+                                    redeemFeedback = true to (result.message.ifBlank { "Pro Access Activated!" })
+                                    redeemCodeInput = ""
+                                } else {
+                                    hapticManager?.tapWicket()
+                                    redeemFeedback = false to result.message
+                                }
+                            }
+                        },
+                        enabled = redeemCodeInput.isNotBlank() && !isRedeeming,
+                        colors = ButtonDefaults.buttonColors(containerColor = CrimsonPrimaryDark),
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        if (isRedeeming) {
+                            CircularProgressIndicator(modifier = Modifier.size(16.dp), color = Color.White, strokeWidth = 2.dp)
+                        } else {
+                            Text("REDEEM CODE", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color.White)
+                        }
+                    }
+
+                    redeemFeedback?.let { (success, message) ->
+                        Text(
+                            text = message,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = if (success) ForestSixPrimary else DismissalRed,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                }
+            }
+
+            // Section 4: What's Included in Pro
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(14.dp),
@@ -206,7 +346,7 @@ fun RedeemCodeScreen(
                 }
             }
 
-            // Section 3: Admin-Managed Policy Notice
+            // Section 5: Admin-Managed Policy Notice
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
@@ -243,6 +383,98 @@ fun RedeemCodeScreen(
             }
 
             Spacer(modifier = Modifier.height(16.dp))
+        }
+    }
+}
+
+@Composable
+private fun ProPlanCard(
+    title: String,
+    price: String,
+    duration: String,
+    rateDetail: String,
+    badge: String?,
+    isHighlighted: Boolean,
+    isCurrent: Boolean
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(14.dp),
+        color = if (isHighlighted) SlateSurfaceDark else MaterialTheme.colorScheme.surface,
+        border = BorderStroke(
+            if (isHighlighted || isCurrent) 1.5.dp else 1.dp,
+            if (isCurrent) ForestSixPrimary else if (isHighlighted) BoundaryAmber else MaterialTheme.colorScheme.outlineVariant
+        )
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = title,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 15.sp,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    if (badge != null) {
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = BoundaryAmber.copy(alpha = 0.15f),
+                            border = BorderStroke(0.5.dp, BoundaryAmber)
+                        ) {
+                            Text(
+                                text = badge,
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Black,
+                                color = BoundaryAmber,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
+                }
+                Text(
+                    text = price,
+                    fontWeight = FontWeight.Black,
+                    fontSize = 18.sp,
+                    color = if (isHighlighted) BoundaryAmber else CrimsonPrimaryDark
+                )
+            }
+            Spacer(modifier = Modifier.height(4.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = duration,
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = rateDetail,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = if (isHighlighted) BoundaryAmber.copy(alpha = 0.9f) else MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            if (isCurrent) {
+                Spacer(modifier = Modifier.height(6.dp))
+                Surface(
+                    shape = RoundedCornerShape(6.dp),
+                    color = ForestSixPrimary.copy(alpha = 0.15f)
+                ) {
+                    Text(
+                        text = "CURRENT ACTIVE TIER",
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = ForestSixPrimary,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                    )
+                }
+            }
         }
     }
 }

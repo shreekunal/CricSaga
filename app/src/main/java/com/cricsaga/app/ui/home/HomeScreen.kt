@@ -34,7 +34,9 @@ import com.cricsaga.app.data.local.entity.PostEntity
 import com.cricsaga.app.domain.model.MatchStatus
 import com.cricsaga.app.domain.model.PlayerRankingItem
 import com.cricsaga.app.ui.theme.*
+import com.cricsaga.app.ui.utils.AppUpdateInfo
 import com.cricsaga.app.ui.utils.ImageUtils
+import com.cricsaga.app.ui.utils.UpdateManager
 import kotlinx.coroutines.flow.Flow
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -99,6 +101,21 @@ fun HomeScreen(
     var showNotificationsDialog by remember { mutableStateOf(false) }
     var activeCommentPost by remember { mutableStateOf<PostEntity?>(null) }
     val hapticManager = com.cricsaga.app.ui.utils.LocalHapticManager.current
+    val context = LocalContext.current
+
+    // In-App OTA Update Check
+    var availableUpdate by remember { mutableStateOf<AppUpdateInfo?>(null) }
+    var showHomeUpdateDialog by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        val updateResult = UpdateManager.checkForUpdates()
+        updateResult.onSuccess { info ->
+            if (info.isUpdateAvailable) {
+                availableUpdate = info
+                showHomeUpdateDialog = true
+            }
+        }
+    }
 
     val commentsForActivePost by produceState<List<CommentEntity>>(initialValue = emptyList(), activeCommentPost) {
         val currentPost = activeCommentPost
@@ -459,6 +476,67 @@ fun HomeScreen(
             onAddComment = { text ->
                 onAddComment?.invoke(post.postId, text)
             }
+        )
+    }
+
+    if (showHomeUpdateDialog && availableUpdate != null) {
+        val info = availableUpdate!!
+        AlertDialog(
+            onDismissRequest = { if (!info.isForceUpdate) showHomeUpdateDialog = false },
+            containerColor = SlateSurfaceDark,
+            shape = RoundedCornerShape(16.dp),
+            title = {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(Icons.Default.SystemUpdate, contentDescription = null, tint = BoundaryAmber, modifier = Modifier.size(24.dp))
+                    Text(
+                        text = "New Update Available!",
+                        style = PlayerNamePrimary,
+                        color = TextPrimary
+                    )
+                }
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = "Version ${info.latestVersionName} is ready to install.",
+                        style = BodyCaption,
+                        color = BoundaryAmber,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = info.changelog,
+                        style = BodyCaption,
+                        color = TextSecondary
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        hapticManager?.tapBoundaryFour()
+                        showHomeUpdateDialog = false
+                        UpdateManager.downloadAndInstallApk(
+                            context = context,
+                            apkUrl = info.downloadUrl,
+                            versionName = info.latestVersionName
+                        )
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = ForestSixPrimary),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text("UPDATE NOW", color = Color.White, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = if (!info.isForceUpdate) {
+                {
+                    TextButton(onClick = { showHomeUpdateDialog = false }) {
+                        Text("Later", color = TextSecondary)
+                    }
+                }
+            } else null
         )
     }
 }

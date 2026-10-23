@@ -21,6 +21,11 @@ import kotlin.math.max
 
 object ImageUtils {
 
+    private val imageHttpClient: OkHttpClient = OkHttpClient.Builder()
+        .connectTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
+        .readTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+        .build()
+
     /**
      * Compresses an image from Uri into WebP format (lossy, quality 75, max 300x300),
      * and returns it as a Base64 string for zero-cost cloud storage in database text columns.
@@ -199,42 +204,43 @@ object ImageUtils {
     ): String? = withContext(Dispatchers.IO) {
         if (imageUrl.isNullOrBlank()) return@withContext null
         try {
+            val safeUserId = userId.replace(Regex("[^a-zA-Z0-9_-]"), "_")
             val avatarDir = File(context.filesDir, "avatars").apply {
                 if (!exists()) mkdirs()
             }
-            val destinationFile = File(avatarDir, "avatar_${userId}.webp")
+            val destinationFile = File(avatarDir, "avatar_${safeUserId}.webp")
 
             val request = Request.Builder().url(imageUrl).build()
-            val client = OkHttpClient()
-            val response = client.newCall(request).execute()
-            if (!response.isSuccessful) return@withContext null
+            imageHttpClient.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) return@withContext null
 
-            val bytes = response.body?.bytes() ?: return@withContext null
-            val originalBitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: return@withContext null
+                val bytes = response.body?.bytes() ?: return@withContext null
+                val originalBitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: return@withContext null
 
-            val maxDimension = 300
-            val width = originalBitmap.width
-            val height = originalBitmap.height
-            val scaledBitmap = if (width > maxDimension || height > maxDimension) {
-                val scale = maxDimension.toFloat() / max(width, height)
-                val matrix = Matrix().apply { postScale(scale, scale) }
-                Bitmap.createBitmap(originalBitmap, 0, 0, width, height, matrix, true)
-            } else {
-                originalBitmap
+                val maxDimension = 300
+                val width = originalBitmap.width
+                val height = originalBitmap.height
+                val scaledBitmap = if (width > maxDimension || height > maxDimension) {
+                    val scale = maxDimension.toFloat() / max(width, height)
+                    val matrix = Matrix().apply { postScale(scale, scale) }
+                    Bitmap.createBitmap(originalBitmap, 0, 0, width, height, matrix, true)
+                } else {
+                    originalBitmap
+                }
+
+                val format = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    Bitmap.CompressFormat.WEBP_LOSSY
+                } else {
+                    @Suppress("DEPRECATION")
+                    Bitmap.CompressFormat.WEBP
+                }
+
+                FileOutputStream(destinationFile).use { out ->
+                    scaledBitmap.compress(format, 80, out)
+                }
+
+                destinationFile.absolutePath
             }
-
-            val format = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                Bitmap.CompressFormat.WEBP_LOSSY
-            } else {
-                @Suppress("DEPRECATION")
-                Bitmap.CompressFormat.WEBP
-            }
-
-            FileOutputStream(destinationFile).use { out ->
-                scaledBitmap.compress(format, 80, out)
-            }
-
-            destinationFile.absolutePath
         } catch (e: Exception) {
             e.printStackTrace()
             null

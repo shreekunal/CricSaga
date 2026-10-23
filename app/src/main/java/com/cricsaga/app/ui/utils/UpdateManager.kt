@@ -36,7 +36,7 @@ object UpdateManager {
      * Can query a public raw URL on GitHub Releases, Cloudflare Pages, or a backend API.
      */
     suspend fun checkForUpdates(
-        manifestUrl: String = "https://raw.githubusercontent.com/cricsaga/cricsaga-app/main/version.json"
+        manifestUrl: String = "https://wyycmghdkcgdmoaaleki.supabase.co/storage/v1/object/public/app-updates/version.json"
     ): Result<AppUpdateInfo> = withContext(Dispatchers.IO) {
         try {
             val url = URL(manifestUrl)

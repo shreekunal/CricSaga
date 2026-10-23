@@ -1,9 +1,21 @@
+import java.util.Properties
+import java.io.FileInputStream
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
 }
+
+val localProperties = Properties().apply {
+    val localFile = rootProject.file("local.properties")
+    if (localFile.exists()) {
+        FileInputStream(localFile).use { load(it) }
+    }
+}
+val releaseStorePassword = localProperties.getProperty("KEYSTORE_PASSWORD") ?: System.getenv("KEYSTORE_PASSWORD") ?: "cricsaga2026"
+val releaseKeyPassword = localProperties.getProperty("KEY_PASSWORD") ?: System.getenv("KEY_PASSWORD") ?: "cricsaga2026"
 
 android {
     namespace = "com.cricsaga.app"
@@ -25,15 +37,16 @@ android {
     signingConfigs {
         create("release") {
             storeFile = file("cricsaga-release.jks")
-            storePassword = "cricsaga2026"
+            storePassword = releaseStorePassword
             keyAlias = "cricsaga"
-            keyPassword = "cricsaga2026"
+            keyPassword = releaseKeyPassword
         }
     }
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             signingConfig = signingConfigs.getByName("release")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
