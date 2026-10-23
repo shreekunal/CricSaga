@@ -239,98 +239,92 @@ fun AppNavigation(
             composable(Screen.PhoneLogin.route) {
                 PhoneLoginScreen(
                     onGoogleSignInSuccess = { account, onNeedsProfileCompletion ->
-                        coroutineScope.launch {
-                            val googleId = account.id ?: ""
-                            val email = account.email?.trim()?.lowercase() ?: ""
-                            val name = account.displayName?.trim() ?: "Player"
-                            val photoUrl = account.photoUrl?.toString()
+                        val googleId = account.id ?: ""
+                        val email = account.email?.trim()?.lowercase() ?: ""
+                        val name = account.displayName?.trim() ?: "Player"
+                        val photoUrl = account.photoUrl?.toString()
 
-                            // Check remote Supabase first, then local Room cache
-                            val remoteUser = if (email.isNotEmpty()) {
-                                SupabaseClient.getUserByEmail(email).getOrNull()
-                            } else if (googleId.isNotEmpty()) {
-                                SupabaseClient.getUserByGoogleId(googleId).getOrNull()
-                            } else null
+                        // Check remote Supabase first, then local Room cache
+                        val remoteUser = if (email.isNotEmpty()) {
+                            SupabaseClient.getUserByEmail(email).getOrNull()
+                        } else if (googleId.isNotEmpty()) {
+                            SupabaseClient.getUserByGoogleId(googleId).getOrNull()
+                        } else null
 
-                            val localUser = if (email.isNotEmpty()) {
-                                scoringViewModel.repository.getUserByEmail(email)
-                            } else if (googleId.isNotEmpty()) {
-                                scoringViewModel.repository.getUserByGoogleId(googleId)
-                            } else null
+                        val localUser = if (email.isNotEmpty()) {
+                            scoringViewModel.repository.getUserByEmail(email)
+                        } else if (googleId.isNotEmpty()) {
+                            scoringViewModel.repository.getUserByGoogleId(googleId)
+                        } else null
 
-                            val existingUser = remoteUser ?: localUser
+                        val existingUser = remoteUser ?: localUser
 
-                            if (existingUser != null) {
-                                // Existing user: ensure cached locally and log in!
-                                scoringViewModel.repository.insertUser(existingUser)
-                                // Download and cache Google avatar locally if available
-                                if (!photoUrl.isNullOrBlank()) {
-                                    val localPath = com.cricsaga.app.ui.utils.ImageUtils.downloadAndCacheProfileImage(
-                                        context, photoUrl, existingUser.userId
-                                    )
-                                    if (localPath != null && existingUser.profilePhotoUrl != localPath) {
-                                        val updated = existingUser.copy(profilePhotoUrl = localPath)
-                                        scoringViewModel.repository.updateUser(updated)
-                                    }
+                        if (existingUser != null) {
+                            // Existing user: ensure cached locally and log in!
+                            scoringViewModel.repository.insertUser(existingUser)
+                            // Download and cache Google avatar locally if available
+                            if (!photoUrl.isNullOrBlank()) {
+                                val localPath = com.cricsaga.app.ui.utils.ImageUtils.downloadAndCacheProfileImage(
+                                    context, photoUrl, existingUser.userId
+                                )
+                                if (localPath != null && existingUser.profilePhotoUrl != localPath) {
+                                    val updated = existingUser.copy(profilePhotoUrl = localPath)
+                                    scoringViewModel.repository.updateUser(updated)
                                 }
-                                authManager.setLoggedIn(existingUser.userId, existingUser.phoneNumber, existingUser.email ?: email)
-                                navController.navigate(Screen.Home.route) {
-                                    popUpTo(0) { inclusive = true }
-                                }
-                            } else {
-                                // First-time player: ask for 10-digit mobile number
-                                onNeedsProfileCompletion(googleId, name, email, photoUrl)
                             }
+                            authManager.setLoggedIn(existingUser.userId, existingUser.phoneNumber, existingUser.email ?: email)
+                            navController.navigate(Screen.Home.route) {
+                                popUpTo(0) { inclusive = true }
+                            }
+                        } else {
+                            // First-time player: ask for 10-digit mobile number
+                            onNeedsProfileCompletion(googleId, name, email, photoUrl)
                         }
                     },
                     onCompleteProfile = { googleId, name, email, photoUrl, phoneNumber, city, role ->
-                        coroutineScope.launch {
-                            val cleanPhone = phoneNumber.filter { it.isDigit() }.takeLast(10)
-                            val userId = "google_${if (googleId.isNotBlank()) googleId else cleanPhone}"
+                        val cleanPhone = phoneNumber.filter { it.isDigit() }.takeLast(10)
+                        val userId = "google_${if (googleId.isNotBlank()) googleId else cleanPhone}"
 
-                            // Cache Google avatar locally into WebP
-                            val localAvatarPath = com.cricsaga.app.ui.utils.ImageUtils.downloadAndCacheProfileImage(
-                                context, photoUrl, userId
-                            )
+                        // Cache Google avatar locally into WebP
+                        val localAvatarPath = com.cricsaga.app.ui.utils.ImageUtils.downloadAndCacheProfileImage(
+                            context, photoUrl, userId
+                        )
 
-                            val newUser = UserEntity(
-                                userId = userId,
-                                phoneNumber = cleanPhone,
-                                fullName = name,
-                                email = email,
-                                googleId = googleId,
-                                profilePhotoUrl = localAvatarPath ?: photoUrl,
-                                playingRole = role,
-                                battingStyle = com.cricsaga.app.domain.model.BattingStyle.RIGHT_HAND,
-                                bowlingStyle = com.cricsaga.app.domain.model.BowlingStyle.RIGHT_ARM_MEDIUM,
-                                city = city.ifBlank { "Mumbai" },
-                                isPro = false
-                            )
+                        val newUser = UserEntity(
+                            userId = userId,
+                            phoneNumber = cleanPhone,
+                            fullName = name,
+                            email = email,
+                            googleId = googleId,
+                            profilePhotoUrl = localAvatarPath ?: photoUrl,
+                            playingRole = role,
+                            battingStyle = com.cricsaga.app.domain.model.BattingStyle.RIGHT_HAND,
+                            bowlingStyle = com.cricsaga.app.domain.model.BowlingStyle.RIGHT_ARM_MEDIUM,
+                            city = city.ifBlank { "Mumbai" },
+                            isPro = false
+                        )
 
-                            // Save to Supabase Central Database & local Room
-                            SupabaseClient.signUpUser(newUser)
-                            scoringViewModel.repository.insertUser(newUser)
-                            authManager.setLoggedIn(newUser.userId, cleanPhone, email)
-                            navController.navigate(Screen.Home.route) {
-                                popUpTo(0) { inclusive = true }
-                            }
+                        // Save to Supabase Central Database & local Room
+                        SupabaseClient.signUpUser(newUser)
+                        scoringViewModel.repository.insertUser(newUser)
+                        authManager.setLoggedIn(newUser.userId, cleanPhone, email)
+                        navController.navigate(Screen.Home.route) {
+                            popUpTo(0) { inclusive = true }
                         }
                     },
                     onReviewerDemoSignIn = {
-                        coroutineScope.launch {
-                            val testUser = scoringViewModel.repository.getUserByPhone("9988776655") ?: UserEntity(
-                                userId = "user_9988776655",
-                                phoneNumber = "9988776655",
-                                fullName = "Indus Reviewer",
-                                email = "reviewer@cricsaga.app",
-                                city = "Bengaluru",
-                                isPro = true
-                            )
-                            scoringViewModel.repository.insertUser(testUser)
-                            authManager.setLoggedIn(testUser.userId, testUser.phoneNumber, testUser.email)
-                            navController.navigate(Screen.Home.route) {
-                                popUpTo(0) { inclusive = true }
-                            }
+                        val testUser = scoringViewModel.repository.getUserByPhone("9988776655") ?: UserEntity(
+                            userId = "user_9988776655",
+                            phoneNumber = "9988776655",
+                            fullName = "Indus Reviewer",
+                            email = "reviewer@cricsaga.app",
+                            city = "Bengaluru",
+                            isPro = true
+                        )
+                        scoringViewModel.repository.insertUser(testUser)
+                        authManager.setLoggedIn(testUser.userId, testUser.phoneNumber, testUser.email)
+                        navController.navigate(Screen.Home.route) {
+                            popUpTo(0) { inclusive = true }
                         }
                     }
                 )

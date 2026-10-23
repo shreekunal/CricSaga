@@ -30,6 +30,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.cricsaga.app.R
 import com.cricsaga.app.domain.model.PlayingRole
 import com.cricsaga.app.ui.theme.*
@@ -37,15 +39,16 @@ import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.common.api.ApiException
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PhoneLoginScreen(
-    onGoogleSignInSuccess: (
+    onGoogleSignInSuccess: suspend (
         account: GoogleSignInAccount,
         onNeedsProfileCompletion: (googleId: String, name: String, email: String, photoUrl: String?) -> Unit
     ) -> Unit,
-    onCompleteProfile: (
+    onCompleteProfile: suspend (
         googleId: String,
         name: String,
         email: String,
@@ -54,9 +57,10 @@ fun PhoneLoginScreen(
         city: String,
         role: PlayingRole
     ) -> Unit,
-    onReviewerDemoSignIn: () -> Unit
+    onReviewerDemoSignIn: suspend () -> Unit
 ) {
     val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
     val activity = remember(context) {
         var ctx = context
         while (ctx is android.content.ContextWrapper) {
@@ -69,7 +73,9 @@ fun PhoneLoginScreen(
     val hapticManager = com.cricsaga.app.ui.utils.LocalHapticManager.current
     val scrollState = rememberScrollState()
 
-    var isGoogleSigningIn by remember { mutableStateOf(false) }
+    var isBusy by remember { mutableStateOf(false) }
+    var busyTitle by remember { mutableStateOf("Signing In") }
+    var busySubtitle by remember { mutableStateOf("Connecting to Google...") }
     var authErrorMessage by remember { mutableStateOf<String?>(null) }
 
     // Easter Egg: Tap logo 5 times to reveal Indus Store Reviewer Access
@@ -102,7 +108,6 @@ fun PhoneLoginScreen(
     val googleSignInLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
     ) { result ->
-        isGoogleSigningIn = false
         val data = result.data
         if (data != null) {
             val task = GoogleSignIn.getSignedInAccountFromIntent(data)
@@ -110,17 +115,30 @@ fun PhoneLoginScreen(
                 val account = task.getResult(ApiException::class.java)
                 if (account != null) {
                     authErrorMessage = null
-                    onGoogleSignInSuccess(account) { gId, gName, gEmail, gPhoto ->
-                        pendingGoogleId = gId
-                        pendingGoogleName = gName
-                        pendingGoogleEmail = gEmail
-                        pendingGooglePhotoUrl = gPhoto
-                        showProfileCompletionDialog = true
+                    isBusy = true
+                    busyTitle = "Authenticating Player"
+                    busySubtitle = "Syncing credentials & cloud profile..."
+                    coroutineScope.launch {
+                        try {
+                            onGoogleSignInSuccess(account) { gId, gName, gEmail, gPhoto ->
+                                isBusy = false
+                                pendingGoogleId = gId
+                                pendingGoogleName = gName
+                                pendingGoogleEmail = gEmail
+                                pendingGooglePhotoUrl = gPhoto
+                                showProfileCompletionDialog = true
+                            }
+                        } catch (e: Exception) {
+                            isBusy = false
+                            authErrorMessage = "Sign in error: ${e.localizedMessage}"
+                        }
                     }
                 } else {
+                    isBusy = false
                     authErrorMessage = "Could not retrieve Google account details. Please try again."
                 }
             } catch (e: ApiException) {
+                isBusy = false
                 authErrorMessage = when (e.statusCode) {
                     10 -> "Google Setup Required: App SHA-1 is not registered in Google Cloud Console (Error 10: DEVELOPER_ERROR)."
                     12500 -> "Google Sign-In failed (Error 12500). Please check Google Play Services on your device."
@@ -129,10 +147,12 @@ fun PhoneLoginScreen(
                     else -> "Google Sign-In failed (${e.statusCode}): ${e.localizedMessage}"
                 }
             } catch (e: Exception) {
+                isBusy = false
                 authErrorMessage = "Sign in error: ${e.localizedMessage}"
             }
         } else {
             // Data was null; user cancelled without selecting
+            isBusy = false
             authErrorMessage = null
         }
     }
@@ -198,12 +218,13 @@ fun PhoneLoginScreen(
 
                 Spacer(modifier = Modifier.height(26.dp))
 
-                // Main Google Authentication Card
-                Card(
+                // Modern Auth Container
+                Surface(
                     modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                    shape = RoundedCornerShape(18.dp),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                    shape = RoundedCornerShape(20.dp),
+                    color = SlateSurfaceDark,
+                    border = BorderStroke(1.dp, CardBorderDark),
+                    shadowElevation = 4.dp
                 ) {
                     Column(
                         modifier = Modifier
@@ -211,32 +232,8 @@ fun PhoneLoginScreen(
                             .padding(22.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        // Badge
-                        Surface(
-                            shape = RoundedCornerShape(20.dp),
-                            color = BoundaryAmber.copy(alpha = 0.12f),
-                            border = BorderStroke(0.5.dp, BoundaryAmber.copy(alpha = 0.4f))
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                Icon(Icons.Default.Verified, contentDescription = null, tint = BoundaryAmber, modifier = Modifier.size(13.dp))
-                                Text(
-                                    text = "VERIFIED ATHLETE IDENTITY",
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = BoundaryAmber,
-                                    letterSpacing = 0.5.sp
-                                )
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(12.dp))
-
                         Text(
-                            text = "Instant 1-Tap Athlete Sign-In",
+                            text = "Athlete Access",
                             fontSize = 17.sp,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface,
@@ -284,15 +281,17 @@ fun PhoneLoginScreen(
                             onClick = {
                                 hapticManager?.tapUiClick()
                                 authErrorMessage = null
-                                isGoogleSigningIn = true
+                                isBusy = true
+                                busyTitle = "Connecting to Google"
+                                busySubtitle = "Opening Google Sign-In..."
                                 try {
                                     googleSignInLauncher.launch(googleSignInClient.signInIntent)
                                 } catch (e: Exception) {
-                                    isGoogleSigningIn = false
+                                    isBusy = false
                                     authErrorMessage = "Could not open Google sign-in: ${e.localizedMessage}"
                                 }
                             },
-                            enabled = !isGoogleSigningIn,
+                            enabled = !isBusy,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(52.dp),
@@ -303,34 +302,19 @@ fun PhoneLoginScreen(
                             ),
                             elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)
                         ) {
-                            if (isGoogleSigningIn) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(22.dp),
-                                    color = CrimsonPrimaryDark,
-                                    strokeWidth = 2.5.dp
-                                )
-                                Spacer(modifier = Modifier.width(10.dp))
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.Center
+                            ) {
+                                GoogleBrandBadge()
+                                Spacer(modifier = Modifier.width(12.dp))
                                 Text(
-                                    text = "Connecting to Google...",
+                                    text = "CONTINUE WITH GOOGLE",
+                                    fontWeight = FontWeight.Black,
                                     fontSize = 13.sp,
-                                    fontWeight = FontWeight.Bold,
+                                    letterSpacing = 0.5.sp,
                                     color = Color(0xFF1F1F1F)
                                 )
-                            } else {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.Center
-                                ) {
-                                    GoogleBrandBadge()
-                                    Spacer(modifier = Modifier.width(12.dp))
-                                    Text(
-                                        text = "CONTINUE WITH GOOGLE",
-                                        fontWeight = FontWeight.Black,
-                                        fontSize = 13.sp,
-                                        letterSpacing = 0.5.sp,
-                                        color = Color(0xFF1F1F1F)
-                                    )
-                                }
                             }
                         }
 
@@ -388,8 +372,19 @@ fun PhoneLoginScreen(
                             OutlinedButton(
                                 onClick = {
                                     hapticManager?.tapUiClick()
-                                    onReviewerDemoSignIn()
+                                    isBusy = true
+                                    busyTitle = "Loading Reviewer Demo"
+                                    busySubtitle = "Preparing Indus testing environment..."
+                                    coroutineScope.launch {
+                                        try {
+                                            onReviewerDemoSignIn()
+                                        } catch (e: Exception) {
+                                            isBusy = false
+                                            authErrorMessage = "Reviewer sign in error: ${e.localizedMessage}"
+                                        }
+                                    }
                                 },
+                                enabled = !isBusy,
                                 shape = RoundedCornerShape(8.dp),
                                 border = BorderStroke(1.dp, BoundaryAmber.copy(alpha = 0.6f)),
                                 modifier = Modifier.fillMaxWidth()
@@ -417,6 +412,88 @@ fun PhoneLoginScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                 textAlign = TextAlign.Center
             )
+        }
+
+        // =========================================================================
+        // Full-Screen Authentication Busy Screen
+        // =========================================================================
+        if (isBusy) {
+            Dialog(
+                onDismissRequest = { /* Block dismissal while auth is active */ },
+                properties = DialogProperties(
+                    dismissOnBackPress = false,
+                    dismissOnClickOutside = false,
+                    usePlatformDefaultWidth = false
+                )
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.75f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Surface(
+                        shape = RoundedCornerShape(20.dp),
+                        color = SlateSurfaceDark,
+                        border = BorderStroke(1.dp, CardBorderDark),
+                        shadowElevation = 16.dp,
+                        modifier = Modifier
+                            .padding(horizontal = 32.dp)
+                            .fillMaxWidth(0.85f)
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(vertical = 28.dp, horizontal = 24.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(62.dp)
+                                    .clip(CircleShape)
+                                    .background(CrimsonPrimaryDark.copy(alpha = 0.14f))
+                                    .border(1.5.dp, CrimsonPrimaryDark.copy(alpha = 0.5f), CircleShape),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Image(
+                                    painter = painterResource(id = R.drawable.logo_round),
+                                    contentDescription = "CricSaga",
+                                    modifier = Modifier
+                                        .size(44.dp)
+                                        .clip(CircleShape)
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.height(20.dp))
+
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(34.dp),
+                                color = CrimsonPrimaryDark,
+                                strokeWidth = 3.dp
+                            )
+
+                            Spacer(modifier = Modifier.height(18.dp))
+
+                            Text(
+                                text = busyTitle,
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = TextPrimary,
+                                textAlign = TextAlign.Center
+                            )
+
+                            Spacer(modifier = Modifier.height(6.dp))
+
+                            Text(
+                                text = busySubtitle,
+                                fontSize = 12.sp,
+                                color = TextSecondary,
+                                textAlign = TextAlign.Center,
+                                lineHeight = 16.sp
+                            )
+                        }
+                    }
+                }
+            }
         }
 
         // =========================================================================
@@ -455,18 +532,15 @@ fun PhoneLoginScreen(
                     }
                 },
                 text = {
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         Text(
-                            text = "Enter your 10-digit mobile number so captains and league coordinators can add you to match squads and scorecards.",
+                            text = "To list your match performances in local club tournaments and turf scorecards, enter your 10-digit mobile number.",
                             style = BodyCaption,
                             color = TextSecondary,
                             lineHeight = 16.sp
                         )
 
-                        // Mobile Number
+                        // Phone Number
                         OutlinedTextField(
                             value = compPhone,
                             onValueChange = {
@@ -546,15 +620,25 @@ fun PhoneLoginScreen(
                             }
                             hapticManager?.tapBoundaryFour()
                             showProfileCompletionDialog = false
-                            onCompleteProfile(
-                                pendingGoogleId,
-                                pendingGoogleName,
-                                pendingGoogleEmail,
-                                pendingGooglePhotoUrl,
-                                phoneTrimmed,
-                                compCity,
-                                compRole
-                            )
+                            isBusy = true
+                            busyTitle = "Setting Up Athlete Profile"
+                            busySubtitle = "Saving credentials & cloud roster sync..."
+                            coroutineScope.launch {
+                                try {
+                                    onCompleteProfile(
+                                        pendingGoogleId,
+                                        pendingGoogleName,
+                                        pendingGoogleEmail,
+                                        pendingGooglePhotoUrl,
+                                        phoneTrimmed,
+                                        compCity,
+                                        compRole
+                                    )
+                                } catch (e: Exception) {
+                                    isBusy = false
+                                    authErrorMessage = "Profile setup error: ${e.localizedMessage}"
+                                }
+                            }
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = CrimsonPrimaryDark),
                         shape = RoundedCornerShape(8.dp),
