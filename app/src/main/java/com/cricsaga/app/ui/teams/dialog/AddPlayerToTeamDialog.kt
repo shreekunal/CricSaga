@@ -203,15 +203,20 @@ private fun ExistingAthleteTab(
 ) {
     var searchQuery by remember { mutableStateOf("") }
 
-    // Filter out users already in this squad, then match search query
-    val availableUsers = remember(allUsers, currentSquadUserIds, searchQuery) {
-        val query = searchQuery.trim().lowercase()
-        allUsers.filter { user ->
-            user.userId !in currentSquadUserIds &&
-                    (query.isEmpty() ||
-                            user.fullName.lowercase().contains(query) ||
-                            (user.email?.lowercase()?.contains(query) == true) ||
-                            user.phoneNumber.contains(query))
+    // Filter out users already in this squad, only after user enters at least 2 search characters (to protect servers and avoid upfront list clutter)
+    val trimmedQuery = searchQuery.trim().lowercase()
+    val isSearchActive = trimmedQuery.length >= 2
+
+    val availableUsers = remember(allUsers, currentSquadUserIds, trimmedQuery) {
+        if (!isSearchActive) {
+            emptyList()
+        } else {
+            allUsers.filter { user ->
+                user.userId !in currentSquadUserIds &&
+                        (user.fullName.lowercase().contains(trimmedQuery) ||
+                                (user.email?.lowercase()?.contains(trimmedQuery) == true) ||
+                                user.phoneNumber.contains(trimmedQuery))
+            }
         }
     }
 
@@ -245,7 +250,50 @@ private fun ExistingAthleteTab(
 
         Spacer(modifier = Modifier.height(10.dp))
 
-        if (availableUsers.isEmpty()) {
+        if (!isSearchActive) {
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth(),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.padding(20.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.PersonSearch,
+                        contentDescription = null,
+                        tint = CrimsonPrimaryDark.copy(alpha = 0.8f),
+                        modifier = Modifier.size(42.dp)
+                    )
+                    Text(
+                        text = "Search Athletes",
+                        color = TextPrimary,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 15.sp
+                    )
+                    Text(
+                        text = "Type at least 2 characters of their name, Gmail, or phone to find registered players.",
+                        color = TextSecondary,
+                        fontSize = 12.sp,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    OutlinedButton(
+                        onClick = onSwitchToRegister,
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = CrimsonPrimaryDark),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, CrimsonPrimaryDark.copy(alpha = 0.6f)),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Icon(Icons.Default.PersonAdd, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Or Register New Athlete")
+                    }
+                }
+            }
+        } else if (availableUsers.isEmpty()) {
             Box(
                 modifier = Modifier
                     .weight(1f)
@@ -258,7 +306,7 @@ private fun ExistingAthleteTab(
                     modifier = Modifier.padding(20.dp)
                 ) {
                     Text(
-                        text = if (searchQuery.isEmpty()) "No other registered athletes found." else "No athlete matches \"$searchQuery\"",
+                        text = "No athlete matches \"$searchQuery\"",
                         color = TextSecondary,
                         fontSize = 13.sp
                     )

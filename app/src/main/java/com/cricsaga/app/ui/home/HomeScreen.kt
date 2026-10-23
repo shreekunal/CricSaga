@@ -108,7 +108,7 @@ fun HomeScreen(
     var showHomeUpdateDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
-        val updateResult = UpdateManager.checkForUpdates()
+        val updateResult = UpdateManager.checkForUpdates(context)
         updateResult.onSuccess { info ->
             if (info.isUpdateAvailable) {
                 availableUpdate = info

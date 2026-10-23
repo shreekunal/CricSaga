@@ -25,7 +25,13 @@ fun BowlerSelectionDialog(
     val eligibleBowlers = bowlingSquad.filter {
         it.userId != lastBowlerId && (bowlerOversMap[it.userId] ?: 0) < maxOversPerBowler
     }
-    var selectedBowler by remember { mutableStateOf(eligibleBowlers.firstOrNull() ?: bowlingSquad.firstOrNull { it.userId != lastBowlerId }) }
+    var selectedBowler by remember {
+        mutableStateOf(
+            eligibleBowlers.firstOrNull()
+                ?: bowlingSquad.firstOrNull { it.userId != lastBowlerId }
+                ?: bowlingSquad.firstOrNull()
+        )
+    }
     val hapticManager = com.cricsaga.app.ui.utils.LocalHapticManager.current
 
     AlertDialog(
@@ -59,7 +65,13 @@ fun BowlerSelectionDialog(
                         val oversBowled = bowlerOversMap[bowler.userId] ?: 0
                         val isQuotaFull = oversBowled >= maxOversPerBowler
                         val isPreviousBowler = bowler.userId == lastBowlerId
-                        val isEnabled = !isPreviousBowler && !isQuotaFull
+                        val isEnabled = if (bowlingSquad.size <= 1) {
+                            true
+                        } else if (eligibleBowlers.isEmpty()) {
+                            !isPreviousBowler || bowlingSquad.size <= 1
+                        } else {
+                            !isPreviousBowler && !isQuotaFull
+                        }
                         val isSelected = selectedBowler?.userId == bowler.userId
 
                         val statusSuffix = when {

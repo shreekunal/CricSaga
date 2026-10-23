@@ -11,17 +11,23 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface TeamDao {
-    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertTeam(team: TeamEntity)
 
-    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertTeams(teams: List<TeamEntity>)
 
-    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertTeamMember(member: TeamMemberEntity)
 
-    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertTeamMembers(members: List<TeamMemberEntity>)
+
+    @Query("DELETE FROM teams WHERE teamId NOT IN (:keepTeamIds)")
+    suspend fun deleteTeamsNotIn(keepTeamIds: List<String>)
+
+    @Query("DELETE FROM team_members")
+    suspend fun clearAllTeamMembers()
 
     @Query("SELECT * FROM teams WHERE teamId = :teamId")
     suspend fun getTeamById(teamId: String): TeamEntity?

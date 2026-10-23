@@ -407,7 +407,7 @@ fun SettingsScreen(
                                     hapticManager.tapUiClick()
                                     isCheckingUpdate = true
                                     coroutineScope.launch {
-                                        val result = UpdateManager.checkForUpdates()
+                                        val result = UpdateManager.checkForUpdates(context)
                                         isCheckingUpdate = false
                                         result.onSuccess { info ->
                                             if (info.isUpdateAvailable) {

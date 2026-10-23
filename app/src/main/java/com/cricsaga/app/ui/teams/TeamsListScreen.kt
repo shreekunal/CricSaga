@@ -137,31 +137,36 @@ fun TeamsListScreen(
                         OutlinedTextField(
                             value = teamName,
                             onValueChange = { teamName = it },
-                            label = { Text("Team Name (e.g. Royal Kings)") },
+                            label = { Text("Team Name") },
+                            placeholder = { Text("e.g. Royal Kings") },
                             singleLine = true
                         )
                         OutlinedTextField(
                             value = teamCode,
-                            onValueChange = { teamCode = it.uppercase() },
+                            onValueChange = { if (it.length <= 4) teamCode = it.uppercase() },
                             label = { Text("Short Code (e.g. RK)") },
+                            placeholder = { Text("e.g. RK") },
                             singleLine = true
                         )
                         OutlinedTextField(
                             value = city,
                             onValueChange = { city = it },
-                            label = { Text("City") },
+                            label = { Text("City / Region (Optional)") },
+                            placeholder = { Text("e.g. Mumbai") },
                             singleLine = true
                         )
                     }
                 },
                 confirmButton = {
+                    val canCreate = teamName.trim().isNotBlank() && teamCode.trim().isNotBlank()
                     Button(
                         onClick = {
-                            if (teamName.isNotBlank()) {
-                                onCreateTeam(teamName, teamCode, city)
+                            if (canCreate) {
+                                onCreateTeam(teamName.trim(), teamCode.trim(), city.trim())
                                 showCreateTeamDialog = false
                             }
                         },
+                        enabled = canCreate,
                         colors = ButtonDefaults.buttonColors(containerColor = CrimsonPrimaryDark)
                     ) {
                         Text("CREATE", fontWeight = FontWeight.Bold)

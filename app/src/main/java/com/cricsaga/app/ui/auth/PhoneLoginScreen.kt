@@ -284,11 +284,16 @@ fun PhoneLoginScreen(
                                 isBusy = true
                                 busyTitle = "Connecting to Google"
                                 busySubtitle = "Opening Google Sign-In..."
-                                try {
-                                    googleSignInLauncher.launch(googleSignInClient.signInIntent)
-                                } catch (e: Exception) {
-                                    isBusy = false
-                                    authErrorMessage = "Could not open Google sign-in: ${e.localizedMessage}"
+                                // Explicitly sign out first to clear cached account session in Google Play Services.
+                                // This ensures the Google Account Chooser bottom sheet is always displayed,
+                                // enabling seamless account switching between multiple Gmail accounts.
+                                googleSignInClient.signOut().addOnCompleteListener {
+                                    try {
+                                        googleSignInLauncher.launch(googleSignInClient.signInIntent)
+                                    } catch (e: Exception) {
+                                        isBusy = false
+                                        authErrorMessage = "Could not open Google sign-in: ${e.localizedMessage}"
+                                    }
                                 }
                             },
                             enabled = !isBusy,

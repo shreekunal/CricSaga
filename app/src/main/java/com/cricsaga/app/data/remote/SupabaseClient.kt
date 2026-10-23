@@ -493,6 +493,100 @@ object SupabaseClient {
         }
     }
 
+    suspend fun getAllTeams(): Result<List<TeamEntity>> = withContext(Dispatchers.IO) {
+        try {
+            val req = newRequestBuilder("teams?select=*&order=created_at.desc").get().build()
+            httpClient.newCall(req).execute().use { res ->
+                if (!res.isSuccessful) return@withContext Result.success(emptyList())
+                val body = res.body?.string() ?: "[]"
+                val array = JSONArray(body)
+                val list = mutableListOf<TeamEntity>()
+                for (i in 0 until array.length()) {
+                    list.add(parseTeam(array.getJSONObject(i)))
+                }
+                Result.success(list)
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun getAllTeamMembers(): Result<List<Pair<String, String>>> = withContext(Dispatchers.IO) {
+        try {
+            val req = newRequestBuilder("team_members?select=team_id,user_id").get().build()
+            httpClient.newCall(req).execute().use { res ->
+                if (!res.isSuccessful) return@withContext Result.success(emptyList())
+                val body = res.body?.string() ?: "[]"
+                val array = JSONArray(body)
+                val list = mutableListOf<Pair<String, String>>()
+                for (i in 0 until array.length()) {
+                    val o = array.getJSONObject(i)
+                    list.add(Pair(o.optString("team_id"), o.optString("user_id")))
+                }
+                Result.success(list)
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun deleteTeam(teamId: String): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            // Delete associated matches first to satisfy foreign key constraint
+            val delMatchesReq = newRequestBuilder("matches?or=(team_a_id.eq.$teamId,team_b_id.eq.$teamId)").delete().build()
+            httpClient.newCall(delMatchesReq).execute().close()
+
+            // Delete team members
+            val delMembersReq = newRequestBuilder("team_members?team_id=eq.$teamId").delete().build()
+            httpClient.newCall(delMembersReq).execute().close()
+
+            // Delete the team itself
+            val delTeamReq = newRequestBuilder("teams?team_id=eq.$teamId").delete().build()
+            httpClient.newCall(delTeamReq).execute().close()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun removeTeamMember(teamId: String, userId: String): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val req = newRequestBuilder("team_members?team_id=eq.$teamId&user_id=eq.$userId").delete().build()
+            httpClient.newCall(req).execute().close()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun getAllMatches(): Result<List<MatchEntity>> = withContext(Dispatchers.IO) {
+        try {
+            val req = newRequestBuilder("matches?select=*&order=created_at.desc").get().build()
+            httpClient.newCall(req).execute().use { res ->
+                if (!res.isSuccessful) return@withContext Result.success(emptyList())
+                val body = res.body?.string() ?: "[]"
+                val array = JSONArray(body)
+                val list = mutableListOf<MatchEntity>()
+                for (i in 0 until array.length()) {
+                    list.add(parseMatch(array.getJSONObject(i)))
+                }
+                Result.success(list)
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun deleteMatch(matchId: String): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val req = newRequestBuilder("matches?match_id=eq.$matchId").delete().build()
+            httpClient.newCall(req).execute().close()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     suspend fun getLiveMatches(): Result<List<MatchEntity>> = withContext(Dispatchers.IO) {
         try {
             val req = newRequestBuilder("matches?match_status=eq.LIVE&order=created_at.desc&limit=10")
@@ -505,33 +599,45 @@ object SupabaseClient {
                 val array = JSONArray(body)
                 val list = mutableListOf<MatchEntity>()
                 for (i in 0 until array.length()) {
-                    val o = array.getJSONObject(i)
-                list.add(
-                    MatchEntity(
-                        matchId = o.optString("match_id"),
-                        matchTitle = o.optString("match_title"),
-                        teamAId = o.optString("team_a_id"),
-                        teamBId = o.optString("team_b_id"),
-                        totalOvers = o.optInt("total_overs", 20),
-                        ballType = runCatching { BallType.valueOf(o.optString("ball_type")) }.getOrDefault(BallType.TENNIS_LIGHT),
-                        tossWinnerTeamId = o.optString("toss_winner_team_id").takeIf { it.isNotEmpty() && it != "null" },
-                        tossDecision = runCatching { TossDecision.valueOf(o.optString("toss_decision")) }.getOrNull(),
-                        maxOversPerBowler = o.optInt("max_overs_per_bowler", 4),
-                        isLbwEnabled = o.optBoolean("is_lbw_enabled", false),
-                        isFreeHitEnabled = o.optBoolean("is_free_hit_enabled", true),
-                        matchStatus = runCatching { MatchStatus.valueOf(o.optString("match_status")) }.getOrDefault(MatchStatus.SCHEDULED),
-                        winnerTeamId = o.optString("winner_team_id").takeIf { it.isNotEmpty() && it != "null" },
-                        resultSummary = o.optString("result_summary").takeIf { it.isNotEmpty() && it != "null" },
-                        playerOfTheMatchId = o.optString("player_of_the_match_id").takeIf { it.isNotEmpty() && it != "null" },
-                        createdAt = o.optLong("created_at", System.currentTimeMillis())
-                    )
-                )
+                    list.add(parseMatch(array.getJSONObject(i)))
+                }
+                Result.success(list)
             }
-            Result.success(list)
-        }
-    } catch (e: Exception) {
+        } catch (e: Exception) {
             Result.failure(e)
         }
+    }
+
+    private fun parseTeam(o: JSONObject): TeamEntity {
+        return TeamEntity(
+            teamId = o.optString("team_id"),
+            teamName = o.optString("team_name"),
+            shortCode = o.optString("short_code"),
+            city = o.optString("city", ""),
+            captainId = o.optString("captain_id").takeIf { it.isNotEmpty() && it != "null" },
+            createdAt = o.optLong("created_at", System.currentTimeMillis())
+        )
+    }
+
+    private fun parseMatch(o: JSONObject): MatchEntity {
+        return MatchEntity(
+            matchId = o.optString("match_id"),
+            matchTitle = o.optString("match_title"),
+            teamAId = o.optString("team_a_id"),
+            teamBId = o.optString("team_b_id"),
+            totalOvers = o.optInt("total_overs", 20),
+            ballType = runCatching { BallType.valueOf(o.optString("ball_type")) }.getOrDefault(BallType.TENNIS_LIGHT),
+            tossWinnerTeamId = o.optString("toss_winner_team_id").takeIf { it.isNotEmpty() && it != "null" },
+            tossDecision = runCatching { TossDecision.valueOf(o.optString("toss_decision")) }.getOrNull(),
+            maxOversPerBowler = o.optInt("max_overs_per_bowler", 4),
+            isLbwEnabled = o.optBoolean("is_lbw_enabled", false),
+            isFreeHitEnabled = o.optBoolean("is_free_hit_enabled", true),
+            matchStatus = runCatching { MatchStatus.valueOf(o.optString("match_status")) }.getOrDefault(MatchStatus.SCHEDULED),
+            winnerTeamId = o.optString("winner_team_id").takeIf { it.isNotEmpty() && it != "null" },
+            resultSummary = o.optString("result_summary").takeIf { it.isNotEmpty() && it != "null" },
+            playerOfTheMatchId = o.optString("player_of_the_match_id").takeIf { it.isNotEmpty() && it != "null" },
+            createdAt = o.optLong("created_at", System.currentTimeMillis())
+        )
     }
 
     private fun parseUser(obj: JSONObject): UserEntity {

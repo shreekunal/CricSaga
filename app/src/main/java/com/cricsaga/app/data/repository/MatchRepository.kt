@@ -281,6 +281,9 @@ class MatchRepository(private val database: CricSagaDatabase) {
 
     suspend fun deleteTeam(teamId: String) = withContext(Dispatchers.IO) {
         teamDao.deleteTeam(teamId)
+        try {
+            SupabaseClient.deleteTeam(teamId)
+        } catch (_: Exception) {}
     }
 
     suspend fun getTeamStats(teamId: String): TeamStatsSummary = withContext(Dispatchers.IO) {
@@ -589,6 +592,9 @@ class MatchRepository(private val database: CricSagaDatabase) {
 
     suspend fun removePlayerFromTeam(teamId: String, userId: String) = withContext(Dispatchers.IO) {
         teamDao.removeTeamMember(teamId, userId)
+        try {
+            SupabaseClient.removeTeamMember(teamId, userId)
+        } catch (_: Exception) {}
     }
 
     suspend fun setTeamCaptain(teamId: String, captainId: String) = withContext(Dispatchers.IO) {
@@ -773,6 +779,69 @@ class MatchRepository(private val database: CricSagaDatabase) {
 
     suspend fun deleteUserById(userId: String) = withContext(Dispatchers.IO) {
         userDao.deleteUserById(userId)
+        try {
+            SupabaseClient.deleteUser(userId)
+        } catch (_: Exception) {}
+    }
+
+    suspend fun clearLocalCache() = withContext(Dispatchers.IO) {
+        try {
+            database.clearAllTables()
+        } catch (_: Exception) {}
+    }
+
+    suspend fun syncRemoteToLocal(currentUserId: String? = null) = withContext(Dispatchers.IO) {
+        try {
+            // 1. Sync Users from cloud
+            val usersResult = SupabaseClient.getAllUsers()
+            if (usersResult.isSuccess) {
+                val remoteUsers = usersResult.getOrNull() ?: emptyList()
+                if (remoteUsers.isNotEmpty()) {
+                    userDao.insertUsers(remoteUsers)
+                }
+            }
+
+            // 2. Sync Teams from cloud
+            val teamsResult = SupabaseClient.getAllTeams()
+            if (teamsResult.isSuccess) {
+                val remoteTeams = teamsResult.getOrNull() ?: emptyList()
+                val remoteTeamIds = remoteTeams.map { it.teamId }
+                if (remoteTeams.isNotEmpty()) {
+                    teamDao.insertTeams(remoteTeams)
+                    teamDao.deleteTeamsNotIn(remoteTeamIds)
+                } else {
+                    teamDao.deleteTeamsNotIn(listOf("__none__"))
+                }
+            }
+
+            // 3. Sync Team Members from cloud
+            val membersResult = SupabaseClient.getAllTeamMembers()
+            if (membersResult.isSuccess) {
+                val remoteMembers = membersResult.getOrNull() ?: emptyList()
+                teamDao.clearAllTeamMembers()
+                if (remoteMembers.isNotEmpty()) {
+                    val memberEntities = remoteMembers.map { (teamId, userId) ->
+                        TeamMemberEntity(teamId = teamId, userId = userId)
+                    }
+                    teamDao.insertTeamMembers(memberEntities)
+                }
+            }
+
+            // 4. Sync Matches from cloud
+            val matchesResult = SupabaseClient.getAllMatches()
+            if (matchesResult.isSuccess) {
+                val remoteMatches = matchesResult.getOrNull() ?: emptyList()
+                val remoteMatchIds = remoteMatches.map { it.matchId }
+                if (remoteMatches.isNotEmpty()) {
+                    matchDao.insertMatches(remoteMatches)
+                    matchDao.deleteMatchesNotIn(remoteMatchIds)
+                } else {
+                    matchDao.deleteMatchesNotIn(listOf("__none__"))
+                }
+            }
+        } catch (_: Exception) {
+            // Offline-resilient: retain local SQLite cache if network is unreachable
+        }
     }
 
     suspend fun getUserCount(): Int = withContext(Dispatchers.IO) {

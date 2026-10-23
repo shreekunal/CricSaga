@@ -290,9 +290,14 @@ class ScoringEngine(
                 currentNonStriker = temp
             }
 
-            // If wicket fell and next striker is specified
-            if (deliv.dismissal != null && deliv.nextStrikerIdAfterDismissal != null) {
-                currentStriker = deliv.nextStrikerIdAfterDismissal
+            // If wicket fell and incoming batter is specified, replace the dismissed batter at the appropriate end
+            if (deliv.dismissal != null && !deliv.nextStrikerIdAfterDismissal.isNullOrBlank()) {
+                val dismissedId = deliv.dismissal.dismissedPlayerId
+                if (dismissedId == currentNonStriker) {
+                    currentNonStriker = deliv.nextStrikerIdAfterDismissal
+                } else {
+                    currentStriker = deliv.nextStrikerIdAfterDismissal
+                }
             }
 
             // End of Over strike switch (occurs on the 6th legal delivery of the over)

@@ -398,6 +398,8 @@ class ScoringViewModel(application: Application) : AndroidViewModel(application)
 
     fun recordExtra(extraType: ExtraType) {
         val eng = engine ?: return
+        val priorBalls = eng.state.totalLegalDeliveries
+        val priorBowlerId = eng.state.currentBowlerId
         val currentInningsId = _uiState.value.inningsId
         val extraRuns = if (extraType == ExtraType.WIDE || extraType == ExtraType.NO_BALL) 1 else 1
 
@@ -429,7 +431,12 @@ class ScoringViewModel(application: Application) : AndroidViewModel(application)
                 )
             }
         }
-        updateUiState("Recorded ${extraType.name}")
+        val overJustCompleted = (state.totalLegalDeliveries > priorBalls && state.totalLegalDeliveries % 6 == 0)
+        updateUiState(
+            message = "Recorded ${extraType.name}",
+            showBowlerDialog = overJustCompleted,
+            lastCompletedBowlerId = if (overJustCompleted) priorBowlerId else _uiState.value.lastCompletedBowlerId
+        )
     }
 
     fun openDismissalDialog() {
@@ -442,6 +449,8 @@ class ScoringViewModel(application: Application) : AndroidViewModel(application)
 
     fun confirmDismissal(dismissal: DismissalDetails, incomingBatsmanId: String) {
         val eng = engine ?: return
+        val priorBalls = eng.state.totalLegalDeliveries
+        val priorBowlerId = eng.state.currentBowlerId
         val currentInningsId = _uiState.value.inningsId
 
         val state = eng.recordDelivery(
@@ -487,7 +496,12 @@ class ScoringViewModel(application: Application) : AndroidViewModel(application)
             showDismissalDialog = false,
             battingBench = updatedBench
         )
-        updateUiState("OUT! ${dismissal.dismissalType.name}. Next batsman in.")
+        val overJustCompleted = (state.totalLegalDeliveries > priorBalls && state.totalLegalDeliveries % 6 == 0)
+        updateUiState(
+            message = "OUT! ${dismissal.dismissalType.name}. Next batsman in.",
+            showBowlerDialog = overJustCompleted,
+            lastCompletedBowlerId = if (overJustCompleted) priorBowlerId else _uiState.value.lastCompletedBowlerId
+        )
     }
 
     fun onNextBowlerSelected(newBowler: UserEntity) {
@@ -768,10 +782,12 @@ class ScoringViewModel(application: Application) : AndroidViewModel(application)
                     totalOversAllotted = match.totalOvers,
                     playerNames = playerNames
                 )
+                val inn1BattingSquad = if (inn1.battingTeamId == match.teamAId) teamASquad else teamBSquad
+                val inn1BowlingSquad = if (inn1.battingTeamId == match.teamAId) teamBSquad else teamASquad
                 val firstDel = inn1Records.firstOrNull()
-                val striker = firstDel?.strikerId ?: teamASquad.firstOrNull()?.userId ?: ""
-                val nonStriker = firstDel?.nonStrikerId ?: teamASquad.getOrNull(1)?.userId ?: ""
-                val bowler = firstDel?.bowlerId ?: teamBSquad.firstOrNull()?.userId ?: ""
+                val striker = firstDel?.strikerId ?: inn1BattingSquad.firstOrNull()?.userId ?: ""
+                val nonStriker = firstDel?.nonStrikerId ?: inn1BattingSquad.getOrNull(1)?.userId ?: ""
+                val bowler = firstDel?.bowlerId ?: inn1BowlingSquad.firstOrNull()?.userId ?: ""
                 if (striker.isNotEmpty() && nonStriker.isNotEmpty() && bowler.isNotEmpty()) {
                     e.startInnings(striker, nonStriker, bowler)
                     inn1Records.forEach { r ->
@@ -798,10 +814,12 @@ class ScoringViewModel(application: Application) : AndroidViewModel(application)
                     targetRuns = target,
                     playerNames = playerNames
                 )
+                val inn2BattingSquad = if (inn2.battingTeamId == match.teamAId) teamASquad else teamBSquad
+                val inn2BowlingSquad = if (inn2.battingTeamId == match.teamAId) teamBSquad else teamASquad
                 val firstDel = inn2Records.firstOrNull()
-                val striker = firstDel?.strikerId ?: teamBSquad.firstOrNull()?.userId ?: ""
-                val nonStriker = firstDel?.nonStrikerId ?: teamBSquad.getOrNull(1)?.userId ?: ""
-                val bowler = firstDel?.bowlerId ?: teamASquad.firstOrNull()?.userId ?: ""
+                val striker = firstDel?.strikerId ?: inn2BattingSquad.firstOrNull()?.userId ?: ""
+                val nonStriker = firstDel?.nonStrikerId ?: inn2BattingSquad.getOrNull(1)?.userId ?: ""
+                val bowler = firstDel?.bowlerId ?: inn2BowlingSquad.firstOrNull()?.userId ?: ""
                 if (striker.isNotEmpty() && nonStriker.isNotEmpty() && bowler.isNotEmpty()) {
                     e.startInnings(striker, nonStriker, bowler)
                     inn2Records.forEach { r ->

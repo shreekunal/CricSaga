@@ -36,9 +36,25 @@ object UpdateManager {
      * Can query a public raw URL on GitHub Releases, Cloudflare Pages, or a backend API.
      */
     suspend fun checkForUpdates(
+        context: Context? = null,
         manifestUrl: String = "https://wyycmghdkcgdmoaaleki.supabase.co/storage/v1/object/public/app-updates/version.json"
     ): Result<AppUpdateInfo> = withContext(Dispatchers.IO) {
         try {
+            val currentCode = if (context != null) {
+                try {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                        context.packageManager.getPackageInfo(context.packageName, 0).longVersionCode.toInt()
+                    } else {
+                        @Suppress("DEPRECATION")
+                        context.packageManager.getPackageInfo(context.packageName, 0).versionCode
+                    }
+                } catch (_: Exception) {
+                    BuildConfig.VERSION_CODE
+                }
+            } else {
+                BuildConfig.VERSION_CODE
+            }
+
             val url = URL(manifestUrl)
             val connection = (url.openConnection() as HttpURLConnection).apply {
                 connectTimeout = 8000
@@ -52,13 +68,13 @@ object UpdateManager {
                 reader.close()
                 val json = JSONObject(response)
 
-                val latestVersionCode = json.optInt("latest_version_code", BuildConfig.VERSION_CODE)
+                val latestVersionCode = json.optInt("latest_version_code", currentCode)
                 val latestVersionName = json.optString("latest_version_name", BuildConfig.VERSION_NAME)
                 val downloadUrl = json.optString("apk_url", "")
                 val changelog = json.optString("changelog", "Performance improvements and bug fixes.")
                 val isForceUpdate = json.optBoolean("is_force_update", false)
 
-                val isUpdateAvailable = latestVersionCode > BuildConfig.VERSION_CODE
+                val isUpdateAvailable = latestVersionCode > currentCode
 
                 Result.success(
                     AppUpdateInfo(

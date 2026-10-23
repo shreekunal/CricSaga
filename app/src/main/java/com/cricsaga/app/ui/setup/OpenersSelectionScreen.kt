@@ -60,7 +60,7 @@ fun OpenersSelectionScreen(
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
-                            text = "$battingTeamName vs $bowlingTeamName",
+                            text = "Step 2 of 2: $battingTeamName vs $bowlingTeamName",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -275,7 +275,7 @@ fun OpenersSelectionScreen(
                     .height(52.dp)
             ) {
                 Text(
-                    text = "LET'S PLAY! START SCORING",
+                    text = "START MATCH & SCORING",
                     fontWeight = FontWeight.Bold,
                     fontSize = 15.sp,
                     color = if (canStart) Color.White else MaterialTheme.colorScheme.onSurfaceVariant

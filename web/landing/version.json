@@ -1,8 +1,8 @@
 {
-  "latest_version_code": 3,
-  "latest_version_name": "1.0.2",
+  "latest_version_code": 5,
+  "latest_version_name": "1.0.4",
   "apk_url": "https://wyycmghdkcgdmoaaleki.supabase.co/storage/v1/object/public/app-updates/app-release.apk",
-  "changelog": "Unified Team & Player Management with Gmail as Single Source of Truth, pre-match empty squad validation, and clean team creation with 0 mock players.",
+  "changelog": "Google Account Switching, Bidirectional Cloud Sync between Room SQLite & Supabase, automatic cache isolation on logout, zero mock data in Top Players, exact 5-over match lifecycle verification.",
   "is_force_update": false,
   "min_supported_version_code": 1
 }

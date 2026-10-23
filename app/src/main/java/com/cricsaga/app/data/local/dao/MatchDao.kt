@@ -15,6 +15,15 @@ interface MatchDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertMatch(match: MatchEntity)
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertMatches(matches: List<MatchEntity>)
+
+    @Query("DELETE FROM matches WHERE matchId = :matchId")
+    suspend fun deleteMatch(matchId: String)
+
+    @Query("DELETE FROM matches WHERE matchId NOT IN (:keepMatchIds)")
+    suspend fun deleteMatchesNotIn(keepMatchIds: List<String>)
+
     @Update
     suspend fun updateMatch(match: MatchEntity)
 

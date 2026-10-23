@@ -57,20 +57,25 @@ fun MatchSetupScreen(
         ballType: BallType,
         tossWinnerId: String,
         tossDecision: TossDecision,
-        maxOversPerBowler: Int
+        maxOversPerBowler: Int,
+        venue: String
     ) -> Unit
 ) {
     var teamA by remember { mutableStateOf(teams.getOrNull(0)?.teamId ?: "") }
-    var teamB by remember { mutableStateOf(teams.getOrNull(1)?.teamId ?: "") }
+    var teamB by remember {
+        mutableStateOf(
+            if (teams.size > 1 && teams[1].teamId != teams[0].teamId) teams[1].teamId else ""
+        )
+    }
     var totalOvers by remember { mutableIntStateOf(20) }
     var selectedBallType by remember { mutableStateOf(BallType.TENNIS_LIGHT) }
     var tossWinnerId by remember { mutableStateOf(teams.getOrNull(0)?.teamId ?: "") }
     var tossDecision by remember { mutableStateOf(TossDecision.BAT) }
-    var venue by remember { mutableStateOf("Shivaji Park Ground #2, Dadar") }
+    var venue by remember { mutableStateOf("") }
     var maxOversPerBowler by remember { mutableIntStateOf(4) }
     var isBoxCricket by remember { mutableStateOf(false) }
 
-    var showAddTeamDialog by remember { mutableStateOf(false) }
+    var addTeamTargetSlot by remember { mutableStateOf<String?>(null) }
     var teamIdForAddPlayer by remember { mutableStateOf<String?>(null) }
     var emptyTeamAlertTarget by remember { mutableStateOf<TeamEntity?>(null) }
 
@@ -87,13 +92,19 @@ fun MatchSetupScreen(
     }.collectAsState(initial = emptyList())
 
     LaunchedEffect(teams) {
-        if (teamA.isEmpty() && teams.isNotEmpty()) {
+        if (teams.isEmpty()) {
+            teamA = ""
+            teamB = ""
+            tossWinnerId = ""
+            return@LaunchedEffect
+        }
+        if (teamA.isEmpty() || teams.none { it.teamId == teamA }) {
             teamA = teams[0].teamId
         }
-        if (teamB.isEmpty() && teams.size > 1) {
-            teamB = teams[1].teamId
+        if (teamB == teamA || (teamB.isNotEmpty() && teams.none { it.teamId == teamB })) {
+            teamB = teams.firstOrNull { it.teamId != teamA }?.teamId ?: ""
         }
-        if (tossWinnerId.isEmpty() && teamA.isNotEmpty()) {
+        if (tossWinnerId != teamA && tossWinnerId != teamB) {
             tossWinnerId = teamA
         }
     }
@@ -111,7 +122,7 @@ fun MatchSetupScreen(
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
-                            text = "Configure Teams & Playing Conditions",
+                            text = "Step 1 of 2: Teams, Format & Toss",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -181,7 +192,7 @@ fun MatchSetupScreen(
                         FilledTonalButton(
                             onClick = {
                                 hapticManager?.tapUiClick()
-                                showAddTeamDialog = true
+                                addTeamTargetSlot = if (teamA.isEmpty()) "A" else "B"
                             },
                             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
                             shape = RoundedCornerShape(8.dp),
@@ -223,7 +234,7 @@ fun MatchSetupScreen(
                                 Button(
                                     onClick = {
                                         hapticManager?.tapUiClick()
-                                        showAddTeamDialog = true
+                                        addTeamTargetSlot = "A"
                                     },
                                     colors = ButtonDefaults.buttonColors(containerColor = CrimsonPrimaryDark),
                                     shape = RoundedCornerShape(8.dp)
@@ -250,7 +261,10 @@ fun MatchSetupScreen(
                                     onClick = {
                                         hapticManager?.tapUiClick()
                                         teamA = t.teamId
-                                        if (tossWinnerId.isEmpty() || tossWinnerId != teamA && tossWinnerId != teamB) {
+                                        if (teamB == t.teamId) {
+                                            teamB = teams.firstOrNull { it.teamId != t.teamId }?.teamId ?: ""
+                                        }
+                                        if (tossWinnerId != t.teamId && tossWinnerId != teamB) {
                                             tossWinnerId = t.teamId
                                         }
                                     },
@@ -290,38 +304,64 @@ fun MatchSetupScreen(
                         )
 
                         // Team B Selector
-                        Text(
-                            text = "Team B (Away):",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 12.sp
-                        )
-                        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            items(teams.filter { it.teamId != teamA }) { t ->
-                                val isSelected = teamB == t.teamId
-                                FilterChip(
-                                    selected = isSelected,
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Team B (Away):",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 12.sp
+                            )
+                            if (teams.size <= 1) {
+                                TextButton(
                                     onClick = {
                                         hapticManager?.tapUiClick()
-                                        teamB = t.teamId
+                                        addTeamTargetSlot = "B"
                                     },
-                                    label = {
-                                        Text(
-                                            text = t.teamName,
-                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                                        )
-                                    },
-                                    colors = FilterChipDefaults.filterChipColors(
-                                        selectedContainerColor = Color(0xFF059669),
-                                        selectedLabelColor = Color.White,
-                                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                                        labelColor = MaterialTheme.colorScheme.onSurface
-                                    )
-                                )
+                                    contentPadding = PaddingValues(0.dp)
+                                ) {
+                                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(14.dp), tint = CrimsonPrimaryDark)
+                                    Spacer(modifier = Modifier.width(2.dp))
+                                    Text("Create Opponent", fontSize = 11.sp, color = CrimsonPrimaryDark, fontWeight = FontWeight.Bold)
+                                }
                             }
                         }
 
-                        // Team B Squad Preview Card
+                        val availableTeamBs = teams.filter { it.teamId != teamA }
+                        if (availableTeamBs.isNotEmpty()) {
+                            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                items(availableTeamBs) { t ->
+                                    val isSelected = teamB == t.teamId
+                                    FilterChip(
+                                        selected = isSelected,
+                                        onClick = {
+                                            hapticManager?.tapUiClick()
+                                            teamB = t.teamId
+                                            if (tossWinnerId != teamA && tossWinnerId != t.teamId) {
+                                                tossWinnerId = teamA
+                                            }
+                                        },
+                                        label = {
+                                            Text(
+                                                text = t.teamName,
+                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                            )
+                                        },
+                                        colors = FilterChipDefaults.filterChipColors(
+                                            selectedContainerColor = Color(0xFF059669),
+                                            selectedLabelColor = Color.White,
+                                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                            labelColor = MaterialTheme.colorScheme.onSurface
+                                        )
+                                    )
+                                }
+                            }
+                        }
+
+                        // Team B Squad Preview Card or Opponent Placeholder Card
                         val selectedTeamB = teams.find { it.teamId == teamB }
                         if (selectedTeamB != null) {
                             TeamSquadOverviewCard(
@@ -333,6 +373,48 @@ fun MatchSetupScreen(
                                     teamIdForAddPlayer = selectedTeamB.teamId
                                 }
                             )
+                        } else {
+                            Surface(
+                                modifier = Modifier.fillMaxWidth(),
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                                shape = RoundedCornerShape(12.dp),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(14.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = "No Opponent (Team B) Selected",
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 13.sp,
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                        Text(
+                                            text = if (teams.size <= 1) "Create a second team to compete against" else "Select an away team from the chips above",
+                                            fontSize = 11.sp,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                    FilledTonalButton(
+                                        onClick = {
+                                            hapticManager?.tapUiClick()
+                                            addTeamTargetSlot = "B"
+                                        },
+                                        shape = RoundedCornerShape(8.dp),
+                                        colors = ButtonDefaults.filledTonalButtonColors(
+                                            containerColor = CrimsonPrimaryDark.copy(alpha = 0.12f),
+                                            contentColor = CrimsonPrimaryDark
+                                        )
+                                    ) {
+                                        Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(14.dp))
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("Create Team B", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -380,7 +462,7 @@ fun MatchSetupScreen(
                                 onClick = {
                                     hapticManager?.tapUiClick()
                                     totalOvers = ov
-                                    maxOversPerBowler = (ov / 5).coerceIn(1, 4)
+                                    maxOversPerBowler = kotlin.math.ceil(ov / 5.0).toInt().coerceIn(1, 5)
                                 },
                                 label = {
                                     Text(
@@ -459,7 +541,7 @@ fun MatchSetupScreen(
                     OutlinedTextField(
                         value = venue,
                         onValueChange = { venue = it },
-                        label = { Text("Ground / Turf Venue") },
+                        label = { Text("Ground / Turf Venue (Optional)") },
                         placeholder = { Text("e.g. Shivaji Park Ground #2, Dadar") },
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedTextColor = MaterialTheme.colorScheme.onSurface,
@@ -563,35 +645,57 @@ fun MatchSetupScreen(
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Medium
                     )
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        FilterChip(
-                            selected = tossWinnerId == teamA,
-                            onClick = {
-                                hapticManager?.tapUiClick()
-                                tossWinnerId = teamA
-                            },
-                            label = { Text(teamAName) },
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = CrimsonPrimaryDark,
-                                selectedLabelColor = Color.White,
-                                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                                labelColor = MaterialTheme.colorScheme.onSurface
+
+                    if (teamA.isEmpty() || teamB.isEmpty() || teamA == teamB) {
+                        Surface(
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = "Select both Team A and Team B above to choose toss winner.",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontSize = 12.sp,
+                                modifier = Modifier.padding(10.dp)
                             )
-                        )
-                        FilterChip(
-                            selected = tossWinnerId == teamB,
-                            onClick = {
-                                hapticManager?.tapUiClick()
-                                tossWinnerId = teamB
-                            },
-                            label = { Text(teamBName) },
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = Color(0xFF059669),
-                                selectedLabelColor = Color.White,
-                                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                                labelColor = MaterialTheme.colorScheme.onSurface
+                        }
+                    } else {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            FilterChip(
+                                selected = tossWinnerId == teamA,
+                                onClick = {
+                                    hapticManager?.tapUiClick()
+                                    tossWinnerId = teamA
+                                },
+                                leadingIcon = if (tossWinnerId == teamA) {
+                                    { Icon(Icons.Default.SportsCricket, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp)) }
+                                } else null,
+                                label = { Text(teamAName, fontWeight = if (tossWinnerId == teamA) FontWeight.Bold else FontWeight.Normal) },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = CrimsonPrimaryDark,
+                                    selectedLabelColor = Color.White,
+                                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                    labelColor = MaterialTheme.colorScheme.onSurface
+                                )
                             )
-                        )
+                            FilterChip(
+                                selected = tossWinnerId == teamB,
+                                onClick = {
+                                    hapticManager?.tapUiClick()
+                                    tossWinnerId = teamB
+                                },
+                                leadingIcon = if (tossWinnerId == teamB) {
+                                    { Icon(Icons.Default.SportsCricket, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp)) }
+                                } else null,
+                                label = { Text(teamBName, fontWeight = if (tossWinnerId == teamB) FontWeight.Bold else FontWeight.Normal) },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = CrimsonPrimaryDark,
+                                    selectedLabelColor = Color.White,
+                                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                    labelColor = MaterialTheme.colorScheme.onSurface
+                                )
+                            )
+                        }
                     }
 
                     Text(
@@ -633,10 +737,23 @@ fun MatchSetupScreen(
                 }
             }
 
-            // Squad Minimum Notice
+            // Squad Minimum Notice & Action Guidance
             val canAttemptStart = teamA.isNotEmpty() && teamB.isNotEmpty() && teamA != teamB
 
-            if (teamA.isNotEmpty() && teamB.isNotEmpty() && (teamASquad.size < 2 || teamBSquad.size < 2)) {
+            if (teamA.isEmpty() || teamB.isEmpty() || teamA == teamB) {
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = "Select two distinct teams above to configure match openers.",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 12.sp,
+                        modifier = Modifier.padding(12.dp)
+                    )
+                }
+            } else if (teamASquad.size < 2 || teamBSquad.size < 2) {
                 Surface(
                     color = BoundaryAmber.copy(alpha = 0.15f),
                     shape = RoundedCornerShape(8.dp),
@@ -644,7 +761,7 @@ fun MatchSetupScreen(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(
-                        text = "Each team must have at least 2 players in its squad to begin a match. Tap below to add squad members.",
+                        text = "Each team must have at least 2 players in its squad to begin a match. Tap '+ Player' on the squad cards above.",
                         color = MaterialTheme.colorScheme.onSurface,
                         fontSize = 12.sp,
                         modifier = Modifier.padding(12.dp)
@@ -652,7 +769,7 @@ fun MatchSetupScreen(
                 }
             }
 
-            // Start Match Button
+            // Proceed to Openers Selection Button
             Button(
                 onClick = {
                     hapticManager?.tapUiClick()
@@ -675,7 +792,8 @@ fun MatchSetupScreen(
                             selectedBallType,
                             tossWinnerId,
                             tossDecision,
-                            maxOversPerBowler
+                            maxOversPerBowler,
+                            venue.trim()
                         )
                     }
                 },
@@ -691,7 +809,7 @@ fun MatchSetupScreen(
                     .height(52.dp)
             ) {
                 Text(
-                    text = "SELECT OPENERS & START",
+                    text = "NEXT: SELECT OPENERS →",
                     fontWeight = FontWeight.Bold,
                     fontSize = 15.sp,
                     color = if (canAttemptStart) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
@@ -744,19 +862,26 @@ fun MatchSetupScreen(
     }
 
     // Dialog: Create New Team on the go
-    if (showAddTeamDialog) {
+    addTeamTargetSlot?.let { targetSlot ->
         AddTeamOnTheGoDialog(
-            onDismiss = { showAddTeamDialog = false },
+            slotLabel = if (targetSlot == "A") "Team A (Home)" else "Team B (Away)",
+            onDismiss = { addTeamTargetSlot = null },
             onCreate = { name, code, city ->
                 onCreateTeam(name, code, city) { newId ->
-                    if (teamA.isEmpty()) {
-                        teamA = newId
-                        tossWinnerId = newId
-                    } else if (teamB.isEmpty()) {
+                    if (targetSlot == "B") {
                         teamB = newId
+                        if (teamA == newId) {
+                            teamA = teams.firstOrNull { it.teamId != newId }?.teamId ?: ""
+                        }
+                    } else {
+                        teamA = newId
+                        if (teamB == newId) {
+                            teamB = teams.firstOrNull { it.teamId != newId }?.teamId ?: ""
+                        }
+                        tossWinnerId = newId
                     }
                 }
-                showAddTeamDialog = false
+                addTeamTargetSlot = null
             }
         )
     }
@@ -989,12 +1114,15 @@ private fun PlayerMiniChip(player: UserEntity) {
  */
 @Composable
 private fun AddTeamOnTheGoDialog(
+    slotLabel: String = "",
     onDismiss: () -> Unit,
     onCreate: (name: String, code: String, city: String) -> Unit
 ) {
     var teamName by remember { mutableStateOf("") }
     var teamCode by remember { mutableStateOf("") }
-    var city by remember { mutableStateOf("Mumbai") }
+    var city by remember { mutableStateOf("") }
+
+    val canCreate = teamName.trim().isNotBlank() && teamCode.trim().isNotBlank()
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -1003,7 +1131,7 @@ private fun AddTeamOnTheGoDialog(
         title = {
             Column {
                 Text(
-                    text = "Create New Team",
+                    text = if (slotLabel.isNotEmpty()) "Create $slotLabel Team" else "Create New Team",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
@@ -1022,16 +1150,7 @@ private fun AddTeamOnTheGoDialog(
             ) {
                 OutlinedTextField(
                     value = teamName,
-                    onValueChange = {
-                        teamName = it
-                        if (teamCode.isEmpty() && it.isNotEmpty()) {
-                            teamCode = it.split(" ")
-                                .mapNotNull { part -> part.firstOrNull() }
-                                .joinToString("")
-                                .take(3)
-                                .uppercase()
-                        }
-                    },
+                    onValueChange = { teamName = it },
                     label = { Text("Team Name") },
                     placeholder = { Text("e.g. Shivaji Park XI") },
                     singleLine = true,
@@ -1053,6 +1172,7 @@ private fun AddTeamOnTheGoDialog(
                     value = teamCode,
                     onValueChange = { if (it.length <= 4) teamCode = it.uppercase() },
                     label = { Text("Short Code (e.g. SPX)") },
+                    placeholder = { Text("e.g. SPX") },
                     singleLine = true,
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedTextColor = MaterialTheme.colorScheme.onSurface,
@@ -1071,7 +1191,7 @@ private fun AddTeamOnTheGoDialog(
                 OutlinedTextField(
                     value = city,
                     onValueChange = { city = it },
-                    label = { Text("City / Region") },
+                    label = { Text("City / Region (Optional)") },
                     placeholder = { Text("e.g. Mumbai") },
                     singleLine = true,
                     colors = OutlinedTextFieldDefaults.colors(
@@ -1092,12 +1212,11 @@ private fun AddTeamOnTheGoDialog(
         confirmButton = {
             Button(
                 onClick = {
-                    if (teamName.isNotBlank()) {
-                        val code = teamCode.ifBlank { teamName.take(3).uppercase() }
-                        onCreate(teamName.trim(), code, city.trim())
+                    if (canCreate) {
+                        onCreate(teamName.trim(), teamCode.trim(), city.trim())
                     }
                 },
-                enabled = teamName.isNotBlank(),
+                enabled = canCreate,
                 colors = ButtonDefaults.buttonColors(containerColor = CrimsonPrimaryDark),
                 shape = RoundedCornerShape(8.dp)
             ) {

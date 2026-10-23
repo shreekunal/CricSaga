@@ -18,6 +18,8 @@ import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavType
 import androidx.navigation.compose.*
 import androidx.navigation.navArgument
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.cricsaga.app.data.local.AuthManager
 import com.cricsaga.app.data.local.AuthState
 import com.cricsaga.app.data.local.ProManager
@@ -100,6 +102,13 @@ fun AppNavigation(
     LaunchedEffect(currentUser?.isPro) {
         currentUser?.let { user ->
             proManager.syncUserProStatus(user.isPro)
+        }
+    }
+
+    // Two-Way Cloud Reconciliation on App Launch / User Login
+    LaunchedEffect(currentUserId) {
+        if (currentUserId.isNotBlank()) {
+            scoringViewModel.repository.syncRemoteToLocal(currentUserId)
         }
     }
     val allUsers by scoringViewModel.repository.getAllUsers().collectAsState(initial = emptyList())
@@ -368,35 +377,10 @@ fun AppNavigation(
                 val matches by scoringViewModel.allMatches.collectAsState()
                 val topBatters by scoringViewModel.topBatters.collectAsState()
                 val topBowlers by scoringViewModel.topBowlers.collectAsState()
-                val topPlayersToFollow = remember(topBatters, topBowlers, allUsers, currentUserId) {
-                    val ranked = (topBatters + topBowlers)
+                val topPlayersToFollow = remember(topBatters, topBowlers, currentUserId) {
+                    (topBatters + topBowlers)
                         .distinctBy { it.userId }
                         .filter { it.userId != currentUserId }
-                    if (ranked.isNotEmpty()) {
-                        ranked
-                    } else {
-                        allUsers.filter { it.userId != currentUserId }.mapIndexed { idx, u ->
-                            val initials = u.fullName.split(" ")
-                                .filter { it.isNotBlank() }
-                                .take(2)
-                                .map { it.first().uppercaseChar() }
-                                .joinToString("")
-                                .ifEmpty { "P" }
-                            com.cricsaga.app.domain.model.PlayerRankingItem(
-                                rank = idx + 1,
-                                userId = u.userId,
-                                playerName = u.fullName,
-                                initials = initials,
-                                role = u.playingRole.name.replace("_", " ").lowercase().replaceFirstChar { it.uppercase() },
-                                teamName = u.city.ifBlank { "Mumbai" },
-                                city = u.city.ifBlank { "Mumbai" },
-                                matches = 5 + idx * 2,
-                                runs = 180 + idx * 35,
-                                wickets = 6 + idx,
-                                isVerified = true
-                            )
-                        }
-                    }
                 }
                 HomeScreen(
                     isPro = subscriptionState.isActive,
@@ -784,9 +768,19 @@ fun AppNavigation(
                     },
                     onLogout = {
                         hapticManager.tapUiClick()
-                        authManager.logout()
-                        navController.navigate(Screen.PhoneLogin.route) {
-                            popUpTo(0) { inclusive = true }
+                        coroutineScope.launch {
+                            try {
+                                val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+                                    .requestEmail()
+                                    .requestProfile()
+                                    .build()
+                                GoogleSignIn.getClient(context, gso).signOut()
+                            } catch (_: Exception) {}
+                            authManager.logout()
+                            scoringViewModel.repository.clearLocalCache()
+                            navController.navigate(Screen.PhoneLogin.route) {
+                                popUpTo(0) { inclusive = true }
+                            }
                         }
                     }
                 )
@@ -1044,9 +1038,19 @@ fun AppNavigation(
                     },
                     onLogout = {
                         hapticManager.tapUiClick()
-                        authManager.logout()
-                        navController.navigate(Screen.PhoneLogin.route) {
-                            popUpTo(0) { inclusive = true }
+                        coroutineScope.launch {
+                            try {
+                                val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+                                    .requestEmail()
+                                    .requestProfile()
+                                    .build()
+                                GoogleSignIn.getClient(context, gso).signOut()
+                            } catch (_: Exception) {}
+                            authManager.logout()
+                            scoringViewModel.repository.clearLocalCache()
+                            navController.navigate(Screen.PhoneLogin.route) {
+                                popUpTo(0) { inclusive = true }
+                            }
                         }
                     }
                 )
@@ -1126,8 +1130,9 @@ fun AppNavigation(
                     getTeamMembersFlow = { teamId ->
                         scoringViewModel.repository.getTeamMembers(teamId)
                     },
-                    onProceedToOpeners = { title, teamA, teamB, overs, ballType, tossWinner, decision, maxOversPerBowler ->
-                        tempTitle = title
+                    onProceedToOpeners = { title, teamA, teamB, overs, ballType, tossWinner, decision, maxOversPerBowler, venue ->
+                        val cleanTitle = if (venue.isNotBlank()) "$title • $venue" else title
+                        tempTitle = cleanTitle
                         tempTeamAId = teamA
                         tempTeamBId = teamB
                         tempOvers = overs
