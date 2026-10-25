@@ -290,4 +290,122 @@ class ScoringEngineTest {
         assertEquals("team_tigers", result.winnerTeamId)
         assertTrue(result.resultSummary.contains("Tigers won by 10 wickets"))
     }
+
+    @Test
+    fun testMaidenOverCalculatedAccurately() {
+        // Bowl 6 consecutive dot balls in the 1st over
+        repeat(6) {
+            engine.recordDelivery(runsOffBat = 0)
+        }
+
+        val bowler = engine.state.bowlers[bowlerId]
+        assertNotNull(bowler)
+        assertEquals(6, bowler?.legalBalls)
+        assertEquals(0, bowler?.runsConceded)
+        assertEquals(1, bowler?.maidens)
+    }
+
+    @Test
+    fun testOverWithByesIsStillMaiden() {
+        // Byes do not count against bowler's conceded runs in cricket
+        repeat(5) {
+            engine.recordDelivery(runsOffBat = 0)
+        }
+        engine.recordDelivery(runsOffBat = 0, extraType = ExtraType.BYE, extraRuns = 2)
+
+        val bowler = engine.state.bowlers[bowlerId]
+        assertNotNull(bowler)
+        assertEquals(6, bowler?.legalBalls)
+        assertEquals(0, bowler?.runsConceded)
+        assertEquals(1, bowler?.maidens)
+        assertEquals(2, engine.state.totalRuns) // Innings has 2 runs, but bowler conceded 0
+    }
+
+    @Test
+    fun testOverWithWideIsNotMaiden() {
+        // A wide ball concedes 1 run against bowler
+        engine.recordDelivery(runsOffBat = 0, extraType = ExtraType.WIDE, extraRuns = 1)
+        repeat(6) {
+            engine.recordDelivery(runsOffBat = 0)
+        }
+
+        val bowler = engine.state.bowlers[bowlerId]
+        assertNotNull(bowler)
+        assertEquals(6, bowler?.legalBalls)
+        assertEquals(1, bowler?.runsConceded)
+        assertEquals(0, bowler?.maidens) // Not a maiden because wide conceded 1 run
+    }
+
+    @Test
+    fun testWicketMaidenOver() {
+        // 5 dots and 1 bowled dismissal -> Wicket Maiden
+        repeat(5) {
+            engine.recordDelivery(runsOffBat = 0)
+        }
+        engine.recordDelivery(
+            runsOffBat = 0,
+            dismissal = DismissalDetails(DismissalType.BOWLED, strikerId),
+            incomingBatsmanId = incomingBatsmanId
+        )
+
+        val bowler = engine.state.bowlers[bowlerId]
+        assertNotNull(bowler)
+        assertEquals(6, bowler?.legalBalls)
+        assertEquals(0, bowler?.runsConceded)
+        assertEquals(1, bowler?.wickets)
+        assertEquals(1, bowler?.maidens) // Valid wicket maiden
+    }
+
+    @Test
+    fun testFallOfWicketsRecordsChronologicalTeamScoreAndOvers() {
+        // Ball 1: 4 runs off bat (Team score = 4)
+        engine.recordDelivery(runsOffBat = 4)
+
+        // Ball 2: Bowled dismissal (Team score = 4, Wicket = 1, Over = 0.1)
+        engine.recordDelivery(
+            runsOffBat = 0,
+            dismissal = DismissalDetails(DismissalType.BOWLED, strikerId),
+            incomingBatsmanId = incomingBatsmanId
+        )
+
+        // Ball 3: 6 runs off bat by new striker (Team score = 10)
+        engine.recordDelivery(runsOffBat = 6)
+
+        // Ball 4: Caught dismissal (Team score = 10, Wicket = 2, Over = 0.3)
+        engine.recordDelivery(
+            runsOffBat = 0,
+            dismissal = DismissalDetails(DismissalType.CAUGHT, incomingBatsmanId),
+            incomingBatsmanId = "p4"
+        )
+
+        val fow = engine.state.fallOfWickets
+        assertEquals(2, fow.size)
+
+        // Wicket 1 verification: team score at fall was 4, not batter's individual runs
+        assertEquals(1, fow[0].wicketNumber)
+        assertEquals(4, fow[0].scoreAtDismissal)
+        assertEquals("0.1", fow[0].oversAtDismissal)
+        assertEquals("Rohit Sharma", fow[0].batsmanName)
+        assertEquals(DismissalType.BOWLED, fow[0].dismissalType)
+
+        // Wicket 2 verification: team score at fall was 10, chronological order maintained
+        assertEquals(2, fow[1].wicketNumber)
+        assertEquals(10, fow[1].scoreAtDismissal)
+        assertEquals("0.3", fow[1].oversAtDismissal)
+        assertEquals("Suryakumar Yadav", fow[1].batsmanName)
+        assertEquals(DismissalType.CAUGHT, fow[1].dismissalType)
+    }
+
+    @Test
+    fun testMultiRunExtrasIncrementTotalRunsCorrectly() {
+        // 5 Wides: 1 penalty + 4 overthrows
+        val state1 = engine.recordDelivery(extraType = ExtraType.WIDE, extraRuns = 5)
+        assertEquals(5, state1.totalRuns)
+        assertEquals(0, state1.totalLegalDeliveries)
+
+        // 2 Leg Byes
+        val state2 = engine.recordDelivery(extraType = ExtraType.LEG_BYE, extraRuns = 2)
+        assertEquals(7, state2.totalRuns)
+        assertEquals(1, state2.totalLegalDeliveries)
+    }
 }

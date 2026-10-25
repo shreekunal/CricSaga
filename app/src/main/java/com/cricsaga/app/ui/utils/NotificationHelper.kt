@@ -47,7 +47,7 @@ object NotificationHelper {
     fun sendMatchEventNotification(context: Context, title: String, message: String, notificationId: Int = 101) {
         try {
             val builder = NotificationCompat.Builder(context, CHANNEL_MATCH_EVENTS)
-                .setSmallIcon(R.drawable.ic_launcher)
+                .setSmallIcon(R.drawable.ic_notification)
                 .setContentTitle(title)
                 .setContentText(message)
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
@@ -69,7 +69,7 @@ object NotificationHelper {
     fun sendCommunityNotification(context: Context, title: String, message: String, notificationId: Int = 102) {
         try {
             val builder = NotificationCompat.Builder(context, CHANNEL_COMMUNITY)
-                .setSmallIcon(R.drawable.ic_launcher)
+                .setSmallIcon(R.drawable.ic_notification)
                 .setContentTitle(title)
                 .setContentText(message)
                 .setPriority(NotificationCompat.PRIORITY_DEFAULT)
@@ -77,6 +77,9 @@ object NotificationHelper {
 
             val manager = NotificationManagerCompat.from(context)
             manager.notify(notificationId, builder.build())
+        } catch (e: SecurityException) {
+            // Handled when POST_NOTIFICATIONS runtime permission is not granted on Android 13+
+            e.printStackTrace()
         } catch (e: Exception) {
             e.printStackTrace()
         }

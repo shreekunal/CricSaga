@@ -2,6 +2,7 @@ package com.cricsaga.app.data.local
 
 import android.content.Context
 import com.cricsaga.app.data.local.entity.RedeemCodeEntity
+import com.cricsaga.app.data.remote.SupabaseClient
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -84,23 +85,29 @@ class ProManager(context: Context) {
         return state.isActive
     }
 
-    fun syncUserProStatus(isPro: Boolean) {
+    fun syncUserProStatus(isPro: Boolean, planName: String? = null, expiresAt: Long? = null) {
         if (isPro) {
+            val currentState = loadSubscriptionState()
+            val resolvedPlan = planName?.let { runCatching { ProPlan.valueOf(it) }.getOrNull() }
+                ?: (if (currentState.isActive && currentState.plan != null) currentState.plan else ProPlan.LIFETIME)
+            val resolvedExpiresAt = expiresAt
+                ?: (if (currentState.isActive && currentState.expiresAt > 0) currentState.expiresAt else (if (resolvedPlan == ProPlan.LIFETIME) Long.MAX_VALUE else System.currentTimeMillis() + 30L * 24 * 3600 * 1000))
+
             val now = System.currentTimeMillis()
             prefs.edit()
                 .putBoolean("is_pro_active", true)
-                .putString("pro_plan", ProPlan.LIFETIME.name)
-                .putString("redeemed_code", "ADMIN_VERIFIED")
-                .putLong("pro_activated_at", now)
-                .putLong("pro_expires_at", Long.MAX_VALUE)
+                .putString("pro_plan", resolvedPlan.name)
+                .putString("redeemed_code", if (currentState.redeemedCode.isNotEmpty()) currentState.redeemedCode else "ADMIN_VERIFIED")
+                .putLong("pro_activated_at", if (currentState.activatedAt > 0) currentState.activatedAt else now)
+                .putLong("pro_expires_at", resolvedExpiresAt)
                 .apply()
 
             _subscriptionState.value = ProSubscriptionState(
                 isActive = true,
-                plan = ProPlan.LIFETIME,
-                redeemedCode = "ADMIN_VERIFIED",
-                activatedAt = now,
-                expiresAt = Long.MAX_VALUE
+                plan = resolvedPlan,
+                redeemedCode = if (currentState.redeemedCode.isNotEmpty()) currentState.redeemedCode else "ADMIN_VERIFIED",
+                activatedAt = if (currentState.activatedAt > 0) currentState.activatedAt else now,
+                expiresAt = resolvedExpiresAt
             )
             (isProFlow as MutableStateFlow).value = true
         } else {
@@ -153,26 +160,8 @@ class ProManager(context: Context) {
     }
 
     suspend fun seedDefaultCodesIfEmpty() = withContext(Dispatchers.IO) {
-        if (redeemCodeDao.getCount() == 0) {
-            val initialCodes = listOf(
-                // 1 Month Tier (₹99)
-                RedeemCodeEntity("MONTH-99-A1", ProPlan.ONE_MONTH, 30),
-                RedeemCodeEntity("MONTH-99-B2", ProPlan.ONE_MONTH, 30),
-                RedeemCodeEntity("CRIC-MONTH-2026", ProPlan.ONE_MONTH, 30),
-
-                // 1 Year Tier (₹199)
-                RedeemCodeEntity("ANNUAL-199-A1", ProPlan.ONE_YEAR, 365),
-                RedeemCodeEntity("ANNUAL-199-B2", ProPlan.ONE_YEAR, 365),
-                RedeemCodeEntity("CRIC-PRO-2026", ProPlan.ONE_YEAR, 365),
-                RedeemCodeEntity("PRO-SAGA-TURF", ProPlan.ONE_YEAR, 365),
-
-                // Lifetime VIP Tier (₹1,999)
-                RedeemCodeEntity("VIP-1999-A1", ProPlan.LIFETIME, 36500),
-                RedeemCodeEntity("CRICSAGA-VIP", ProPlan.LIFETIME, 36500),
-                RedeemCodeEntity("FOUNDER-1999", ProPlan.LIFETIME, 36500)
-            )
-            redeemCodeDao.insertCodes(initialCodes)
-        }
+        // No hardcoded promotional codes seeded into local client SQLite.
+        // Redeem codes are validated and provisioned securely via remote admin backend.
     }
 
     suspend fun activateProWithCode(code: String, userId: String = "user_me"): RedeemResult = withContext(Dispatchers.IO) {
@@ -182,7 +171,19 @@ class ProManager(context: Context) {
         }
 
         // Query the dedicated redeem_codes table
-        val codeEntity = redeemCodeDao.getCode(cleanCode)
+        var codeEntity = redeemCodeDao.getCode(cleanCode)
+
+        if (codeEntity == null) {
+            // Check cloud redeem_codes if not present locally
+            try {
+                val cloudRes = com.cricsaga.app.data.remote.SupabaseClient.redeemCode(cleanCode, userId)
+                val cloudEntity = cloudRes.getOrNull()
+                if (cloudEntity != null) {
+                    redeemCodeDao.insertCode(cloudEntity)
+                    codeEntity = cloudEntity
+                }
+            } catch (_: Exception) {}
+        }
 
         if (codeEntity == null) {
             return@withContext RedeemResult(false, null, "Invalid redeem code. Please verify the code or contact support.")
@@ -244,15 +245,19 @@ class ProManager(context: Context) {
     }
 
     suspend fun createCustomRedeemCode(code: String, plan: ProPlan, durationDays: Int = 30) = withContext(Dispatchers.IO) {
+        val cleanCode = code.trim().uppercase()
         val entity = RedeemCodeEntity(
-            code = code.trim().uppercase(),
+            code = cleanCode,
             plan = plan,
             durationDays = durationDays
         )
         redeemCodeDao.insertCode(entity)
+        SupabaseClient.createRemoteRedeemCode(cleanCode, plan.name, durationDays)
     }
 
     suspend fun deleteRedeemCode(code: String) = withContext(Dispatchers.IO) {
-        redeemCodeDao.deleteCode(code)
+        val cleanCode = code.trim().uppercase()
+        redeemCodeDao.deleteCode(cleanCode)
+        SupabaseClient.deleteRemoteRedeemCode(cleanCode)
     }
 }

@@ -3,11 +3,14 @@ package com.cricsaga.app.ui.navigation
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AdminPanelSettings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -99,9 +102,9 @@ fun AppNavigation(
     }
     val currentUser by scoringViewModel.repository.getUserFlowById(currentUserId).collectAsState(initial = null)
 
-    LaunchedEffect(currentUser?.isPro) {
+    LaunchedEffect(currentUser?.isPro, currentUser?.proPlan, currentUser?.proExpiresAt) {
         currentUser?.let { user ->
-            proManager.syncUserProStatus(user.isPro)
+            proManager.syncUserProStatus(user.isPro, user.proPlan, user.proExpiresAt)
         }
     }
 
@@ -134,7 +137,10 @@ fun AppNavigation(
         Screen.Rankings,
         Screen.Profile
     )
-    val showBottomBar = currentRoute in bottomBarScreens.map { it.route } && authState !is AuthState.Unauthenticated
+    val currentUserEmail = currentUser?.email ?: authManager.getCurrentUserEmail()
+    val isCurrentAdmin = authManager.isAdmin(currentUserEmail)
+    var isAdminPreviewMode by remember { mutableStateOf(false) }
+    val showBottomBar = currentRoute in bottomBarScreens.map { it.route } && authState !is AuthState.Unauthenticated && (!isCurrentAdmin || isAdminPreviewMode)
     val showTopHeader = showBottomBar
 
     // Transient Match Setup State across screens
@@ -155,34 +161,80 @@ fun AppNavigation(
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            if (showTopHeader) {
-                com.cricsaga.app.ui.components.CricSagaTopHeader(
-                    isPro = subscriptionState.isActive,
-                    currentUserName = currentUser?.fullName ?: "Player",
-                    currentUserAvatarUrl = currentUser?.profilePhotoUrl,
-                    unreadMessageCount = unreadChatCount,
-                    isDarkTheme = currentDark,
-                    onThemeToggleClick = {
-                        hapticManager.tapUiClick()
-                        themeManager.toggleTheme(currentDark)
-                    },
-                    onProfileClick = {
-                        hapticManager.tapUiClick()
-                        navController.navigate(Screen.Profile.route)
-                    },
-                    onJoinPlusClick = {
-                        hapticManager.tapUiClick()
-                        navController.navigate(Screen.Redeem.route)
-                    },
-                    onMessagesClick = {
-                        hapticManager.tapUiClick()
-                        navController.navigate(Screen.Messages.route)
-                    },
-                    onSettingsClick = {
-                        hapticManager.tapUiClick()
-                        navController.navigate(Screen.Settings.route)
+            Column {
+                if (isCurrentAdmin && isAdminPreviewMode) {
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                hapticManager.tapUiClick()
+                                isAdminPreviewMode = false
+                                navController.navigate(Screen.AdminDashboard.route) {
+                                    popUpTo(Screen.Home.route) { inclusive = false }
+                                }
+                            },
+                        color = CrimsonPrimaryDark
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 6.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    Icons.Default.AdminPanelSettings,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Admin Mode Active • Player App Preview",
+                                    color = Color.White,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                            Text(
+                                text = "RETURN TO ROOT ➔",
+                                color = BoundaryAmber,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Black
+                            )
+                        }
                     }
-                )
+                }
+                if (showTopHeader) {
+                    com.cricsaga.app.ui.components.CricSagaTopHeader(
+                        isPro = subscriptionState.isActive,
+                        currentUserName = currentUser?.fullName ?: "Player",
+                        currentUserAvatarUrl = currentUser?.profilePhotoUrl,
+                        unreadMessageCount = unreadChatCount,
+                        isDarkTheme = currentDark,
+                        onThemeToggleClick = {
+                            hapticManager.tapUiClick()
+                            themeManager.toggleTheme(currentDark)
+                        },
+                        onProfileClick = {
+                            hapticManager.tapUiClick()
+                            navController.navigate(Screen.Profile.route)
+                        },
+                        onJoinPlusClick = {
+                            hapticManager.tapUiClick()
+                            navController.navigate(Screen.Redeem.route)
+                        },
+                        onMessagesClick = {
+                            hapticManager.tapUiClick()
+                            navController.navigate(Screen.Messages.route)
+                        },
+                        onSettingsClick = {
+                            hapticManager.tapUiClick()
+                            navController.navigate(Screen.Settings.route)
+                        }
+                    )
+                }
             }
         },
         bottomBar = {
@@ -241,7 +293,11 @@ fun AppNavigation(
     ) { paddingValues ->
         NavHost(
             navController = navController,
-            startDestination = if (authState is AuthState.Unauthenticated) Screen.PhoneLogin.route else Screen.Home.route,
+            startDestination = when {
+                authState is AuthState.Unauthenticated -> Screen.PhoneLogin.route
+                isCurrentAdmin -> Screen.AdminDashboard.route
+                else -> Screen.Home.route
+            },
             modifier = Modifier.padding(paddingValues)
         ) {
             // Auth Flow: Single Source of Truth Google Sign-In
@@ -268,6 +324,32 @@ fun AppNavigation(
 
                         val existingUser = remoteUser ?: localUser
 
+                        // Direct Administrator Recognition: seed and route immediately to Admin Console
+                        if (authManager.isAdmin(email)) {
+                            val adminUser = existingUser?.copy(
+                                email = email,
+                                isPro = true,
+                                phoneNumber = existingUser.phoneNumber.ifBlank { AuthManager.PRIMARY_ADMIN_PHONE },
+                                fullName = if (existingUser.fullName.isNotBlank() && existingUser.fullName != "Player") existingUser.fullName else (if (name.isNotBlank() && name != "Player") name else "CricSaga Administrator")
+                            ) ?: UserEntity(
+                                userId = AuthManager.PRIMARY_ADMIN_USER_ID,
+                                phoneNumber = AuthManager.PRIMARY_ADMIN_PHONE,
+                                fullName = if (name.isNotBlank() && name != "Player") name else "CricSaga Administrator",
+                                email = email,
+                                googleId = googleId,
+                                profilePhotoUrl = photoUrl,
+                                isPro = true,
+                                city = "Admin HQ"
+                            )
+                            scoringViewModel.repository.insertUser(adminUser)
+                            try { SupabaseClient.signUpUser(adminUser) } catch (_: Exception) {}
+                            authManager.setLoggedIn(adminUser.userId, adminUser.phoneNumber, adminUser.email ?: email)
+                            navController.navigate(Screen.AdminDashboard.route) {
+                                popUpTo(0) { inclusive = true }
+                            }
+                            return@PhoneLoginScreen
+                        }
+
                         if (existingUser != null) {
                             if (existingUser.phoneNumber.isBlank()) {
                                 // Athlete was pre-registered by email by a team captain!
@@ -287,7 +369,8 @@ fun AppNavigation(
                                     }
                                 }
                                 authManager.setLoggedIn(existingUser.userId, existingUser.phoneNumber, existingUser.email ?: email)
-                                navController.navigate(Screen.Home.route) {
+                                val targetRoute = if (authManager.isAdmin(existingUser.email ?: email)) Screen.AdminDashboard.route else Screen.Home.route
+                                navController.navigate(targetRoute) {
                                     popUpTo(0) { inclusive = true }
                                 }
                             }
@@ -332,22 +415,8 @@ fun AppNavigation(
                             scoringViewModel.repository.insertUser(finalUser)
                         }
                         authManager.setLoggedIn(finalUser.userId, cleanPhone, email)
-                        navController.navigate(Screen.Home.route) {
-                            popUpTo(0) { inclusive = true }
-                        }
-                    },
-                    onReviewerDemoSignIn = {
-                        val testUser = scoringViewModel.repository.getUserByPhone("9988776655") ?: UserEntity(
-                            userId = "user_9988776655",
-                            phoneNumber = "9988776655",
-                            fullName = "Indus Reviewer",
-                            email = "reviewer@cricsaga.app",
-                            city = "Bengaluru",
-                            isPro = true
-                        )
-                        scoringViewModel.repository.insertUser(testUser)
-                        authManager.setLoggedIn(testUser.userId, testUser.phoneNumber, testUser.email)
-                        navController.navigate(Screen.Home.route) {
+                        val targetRoute = if (authManager.isAdmin(finalUser.email ?: email)) Screen.AdminDashboard.route else Screen.Home.route
+                        navController.navigate(targetRoute) {
                             popUpTo(0) { inclusive = true }
                         }
                     }
@@ -768,20 +837,7 @@ fun AppNavigation(
                     },
                     onLogout = {
                         hapticManager.tapUiClick()
-                        coroutineScope.launch {
-                            try {
-                                val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-                                    .requestEmail()
-                                    .requestProfile()
-                                    .build()
-                                GoogleSignIn.getClient(context, gso).signOut()
-                            } catch (_: Exception) {}
-                            authManager.logout()
-                            scoringViewModel.repository.clearLocalCache()
-                            navController.navigate(Screen.PhoneLogin.route) {
-                                popUpTo(0) { inclusive = true }
-                            }
-                        }
+                        handleAppLogout(context, coroutineScope, authManager, proManager, scoringViewModel.repository, navController)
                     }
                 )
             }
@@ -1038,35 +1094,48 @@ fun AppNavigation(
                     },
                     onLogout = {
                         hapticManager.tapUiClick()
-                        coroutineScope.launch {
-                            try {
-                                val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-                                    .requestEmail()
-                                    .requestProfile()
-                                    .build()
-                                GoogleSignIn.getClient(context, gso).signOut()
-                            } catch (_: Exception) {}
-                            authManager.logout()
-                            scoringViewModel.repository.clearLocalCache()
-                            navController.navigate(Screen.PhoneLogin.route) {
-                                popUpTo(0) { inclusive = true }
-                            }
-                        }
+                        handleAppLogout(context, coroutineScope, authManager, proManager, scoringViewModel.repository, navController)
                     }
                 )
             }
 
-            // Flow: Admin Dashboard Console
+            // Flow: Admin Dashboard Console (Gated exclusively to verified admins)
             composable(Screen.AdminDashboard.route) {
-                AdminDashboardScreen(
-                    scoringViewModel = scoringViewModel,
-                    proManager = proManager,
-                    currentUserId = currentUserId,
-                    onBackClick = {
-                        hapticManager.tapUiClick()
+                val emailToCheck = currentUser?.email ?: authManager.getCurrentUserEmail()
+                val isUserAdmin = authManager.isAdmin(emailToCheck)
+                if (!isUserAdmin) {
+                    LaunchedEffect(Unit) {
+                        Toast.makeText(context, "Unauthorized access: Administrator privileges required.", Toast.LENGTH_SHORT).show()
                         navController.popBackStack()
                     }
-                )
+                } else {
+                    AdminDashboardScreen(
+                        scoringViewModel = scoringViewModel,
+                        proManager = proManager,
+                        authManager = authManager,
+                        currentUserId = currentUserId,
+                        onNavigateToPlayerApp = {
+                            hapticManager.tapUiClick()
+                            isAdminPreviewMode = true
+                            navController.navigate(Screen.Home.route)
+                        },
+                        onInspectMatchScorecard = { matchId ->
+                            hapticManager.tapUiClick()
+                            scoringViewModel.loadMatchById(matchId) { isLive ->
+                                if (isLive) {
+                                    navController.navigate(Screen.LiveScoring.route)
+                                } else {
+                                    navController.navigate(Screen.FullScorecard.route)
+                                }
+                            }
+                        },
+                        onLogout = {
+                            hapticManager.tapUiClick()
+                            isAdminPreviewMode = false
+                            handleAppLogout(context, coroutineScope, authManager, proManager, scoringViewModel.repository, navController)
+                        }
+                    )
+                }
             }
 
             // Flow: Pro Redeem Code & Pricing Screen
@@ -1163,8 +1232,9 @@ fun AppNavigation(
 
             // Flow: Openers Selection
             composable(Screen.OpenersSelection.route) {
-                val currentBattingSquad = if (tempBattingSquad.isNotEmpty()) tempBattingSquad else scoringViewModel.uiState.value.battingSquad
-                val currentBowlingSquad = if (tempBowlingSquad.isNotEmpty()) tempBowlingSquad else scoringViewModel.uiState.value.bowlingSquad
+                val scoringUiState by scoringViewModel.uiState.collectAsState()
+                val currentBattingSquad = if (tempBattingSquad.isNotEmpty()) tempBattingSquad else scoringUiState.battingSquad
+                val currentBowlingSquad = if (tempBowlingSquad.isNotEmpty()) tempBowlingSquad else scoringUiState.bowlingSquad
 
                 OpenersSelectionScreen(
                     battingTeamName = tempBattingTeamName.ifEmpty { "Batting Team" },
@@ -1257,10 +1327,15 @@ fun AppNavigation(
                         nonStriker = uiState.nonStriker,
                         fieldingSquad = uiState.bowlingSquad,
                         battingBench = uiState.battingBench,
+                        bowler = uiState.bowler,
                         onDismissRequest = { scoringViewModel.closeDismissalDialog() },
-                        onConfirmWicket = { dismissal, incomingId ->
+                        onConfirmWicket = { dismissal, incomingId, isWideBall ->
                             hapticManager.tapWicket()
-                            scoringViewModel.confirmDismissal(dismissal, incomingId)
+                            scoringViewModel.confirmDismissal(
+                                dismissal = dismissal,
+                                incomingBatsmanId = incomingId,
+                                extraType = if (isWideBall) ExtraType.WIDE else ExtraType.NONE
+                            )
                         }
                     )
                 }
@@ -1410,6 +1485,33 @@ fun AppNavigation(
                     }
                 )
             }
+        }
+    }
+}
+
+private fun handleAppLogout(
+    context: android.content.Context,
+    coroutineScope: kotlinx.coroutines.CoroutineScope,
+    authManager: com.cricsaga.app.data.local.AuthManager,
+    proManager: com.cricsaga.app.data.local.ProManager,
+    repository: com.cricsaga.app.data.repository.MatchRepository,
+    navController: androidx.navigation.NavHostController
+) {
+    coroutineScope.launch {
+        try {
+            val gso = com.google.android.gms.auth.api.signin.GoogleSignInOptions.Builder(
+                com.google.android.gms.auth.api.signin.GoogleSignInOptions.DEFAULT_SIGN_IN
+            )
+                .requestEmail()
+                .requestProfile()
+                .build()
+            com.google.android.gms.auth.api.signin.GoogleSignIn.getClient(context, gso).signOut()
+        } catch (_: Exception) {}
+        proManager.deactivatePro()
+        authManager.logout()
+        // FIX DAT-02: Do NOT purge local match records on logout; preserve offline matches and rosters
+        navController.navigate(Screen.PhoneLogin.route) {
+            popUpTo(0) { inclusive = true }
         }
     }
 }

@@ -38,6 +38,9 @@ interface TeamDao {
     @Query("SELECT * FROM teams ORDER BY teamName ASC")
     fun getAllTeams(): Flow<List<TeamEntity>>
 
+    @Query("SELECT COUNT(*) FROM teams")
+    fun getTeamCountFlow(): Flow<Int>
+
     @Query("""
         SELECT DISTINCT t.* FROM teams t
         LEFT JOIN team_members tm ON t.teamId = tm.teamId

@@ -20,19 +20,19 @@ import com.cricsaga.app.domain.model.ExtraType
             entity = UserEntity::class,
             parentColumns = ["userId"],
             childColumns = ["strikerId"],
-            onDelete = ForeignKey.RESTRICT
+            onDelete = ForeignKey.CASCADE
         ),
         ForeignKey(
             entity = UserEntity::class,
             parentColumns = ["userId"],
             childColumns = ["nonStrikerId"],
-            onDelete = ForeignKey.RESTRICT
+            onDelete = ForeignKey.CASCADE
         ),
         ForeignKey(
             entity = UserEntity::class,
             parentColumns = ["userId"],
             childColumns = ["bowlerId"],
-            onDelete = ForeignKey.RESTRICT
+            onDelete = ForeignKey.CASCADE
         )
     ],
     indices = [

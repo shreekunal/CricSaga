@@ -14,8 +14,8 @@ val localProperties = Properties().apply {
         FileInputStream(localFile).use { load(it) }
     }
 }
-val releaseStorePassword = localProperties.getProperty("KEYSTORE_PASSWORD") ?: System.getenv("KEYSTORE_PASSWORD") ?: "cricsaga2026"
-val releaseKeyPassword = localProperties.getProperty("KEY_PASSWORD") ?: System.getenv("KEY_PASSWORD") ?: "cricsaga2026"
+val releaseStorePassword = localProperties.getProperty("KEYSTORE_PASSWORD") ?: System.getenv("KEYSTORE_PASSWORD") ?: ""
+val releaseKeyPassword = localProperties.getProperty("KEY_PASSWORD") ?: System.getenv("KEY_PASSWORD") ?: ""
 
 android {
     namespace = "com.cricsaga.app"
@@ -44,6 +44,9 @@ android {
     }
 
     buildTypes {
+        debug {
+            signingConfig = signingConfigs.getByName("release")
+        }
         release {
             isMinifyEnabled = true
             isShrinkResources = true

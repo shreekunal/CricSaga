@@ -16,9 +16,13 @@ import com.cricsaga.app.domain.engine.MatchResultCalculator
 import com.cricsaga.app.domain.engine.ScoringEngine
 import com.cricsaga.app.domain.model.*
 import com.cricsaga.app.ui.home.GrassrootsHeroItem
+import com.cricsaga.app.ui.utils.BroadcastNotifier
+import com.cricsaga.app.ui.utils.NotificationHelper
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.util.UUID
 
 data class ScoringUiState(
@@ -62,6 +66,7 @@ class ScoringViewModel(application: Application) : AndroidViewModel(application)
 
     val repository: MatchRepository
     private var engine: ScoringEngine? = null
+    private val scoringMutex = Mutex()
 
     val allMatches: StateFlow<List<MatchEntity>>
 
@@ -200,6 +205,11 @@ class ScoringViewModel(application: Application) : AndroidViewModel(application)
                 linkedMatchId = linkedMatchId,
                 performanceTag = performanceTag
             )
+            NotificationHelper.sendCommunityNotification(
+                context = getApplication(),
+                title = "Post Shared",
+                message = "Your update was shared with the grassroots community."
+            )
         }
     }
 
@@ -290,6 +300,7 @@ class ScoringViewModel(application: Application) : AndroidViewModel(application)
         maxOversPerBowler: Int = 4
     ) {
         viewModelScope.launch {
+            val currentUserId = (com.cricsaga.app.data.local.AuthManager(getApplication()).authState.value as? com.cricsaga.app.data.local.AuthState.Authenticated)?.userId
             val result = repository.createMatch(
                 title = title,
                 teamAId = teamAId,
@@ -297,7 +308,8 @@ class ScoringViewModel(application: Application) : AndroidViewModel(application)
                 totalOvers = totalOvers,
                 ballType = ballType,
                 tossWinnerTeamId = tossWinnerId,
-                tossDecision = tossDecision
+                tossDecision = tossDecision,
+                createdByUserId = currentUserId
             )
 
             val playerNames = (battingSquad + bowlingSquad).associate { it.userId to it.fullName }
@@ -352,91 +364,118 @@ class ScoringViewModel(application: Application) : AndroidViewModel(application)
 
     fun recordDelivery(runsOffBat: Int) {
         val eng = engine ?: return
-        val priorBalls = eng.state.totalLegalDeliveries
-        val priorBowlerId = eng.state.currentBowlerId
-
-        val state = eng.recordDelivery(runsOffBat = runsOffBat)
-        val lastRecord = eng.history.lastOrNull()
-        val currentMatchId = _uiState.value.matchId
         val currentInningsId = _uiState.value.inningsId
+        viewModelScope.launch {
+            scoringMutex.withLock {
+                val priorBalls = eng.state.totalLegalDeliveries
+                val priorBowlerId = eng.state.currentBowlerId
+                val strikerId = eng.state.strikerId
+                val prevRuns = eng.state.batsmen[strikerId]?.runs ?: 0
 
-        if (lastRecord != null && currentInningsId.isNotEmpty()) {
-            viewModelScope.launch {
-                val entity = DeliveryEntity(
-                    deliveryId = UUID.randomUUID().toString(),
-                    inningsId = currentInningsId,
-                    deliveryIndex = lastRecord.deliveryIndex,
-                    overNumber = lastRecord.overNumber,
-                    ballInOver = lastRecord.ballInOver,
-                    strikerId = lastRecord.strikerId,
-                    nonStrikerId = lastRecord.nonStrikerId,
-                    bowlerId = lastRecord.bowlerId,
-                    runsOffBat = runsOffBat,
-                    extraType = ExtraType.NONE,
-                    extraRuns = 0,
-                    isLegalDelivery = true,
-                    timestamp = lastRecord.timestamp
-                )
-                repository.recordDelivery(
-                    delivery = entity,
-                    newTotalRuns = state.totalRuns,
-                    newTotalWickets = state.totalWickets,
-                    newTotalBalls = state.totalLegalDeliveries
+                val state = eng.recordDelivery(runsOffBat = runsOffBat)
+                val lastRecord = eng.history.lastOrNull()
+
+                if (lastRecord != null && currentInningsId.isNotEmpty()) {
+                    val entity = DeliveryEntity(
+                        deliveryId = UUID.randomUUID().toString(),
+                        inningsId = currentInningsId,
+                        deliveryIndex = lastRecord.deliveryIndex,
+                        overNumber = lastRecord.overNumber,
+                        ballInOver = lastRecord.ballInOver,
+                        strikerId = lastRecord.strikerId,
+                        nonStrikerId = lastRecord.nonStrikerId,
+                        bowlerId = lastRecord.bowlerId,
+                        runsOffBat = runsOffBat,
+                        extraType = ExtraType.NONE,
+                        extraRuns = 0,
+                        isLegalDelivery = true,
+                        timestamp = lastRecord.timestamp
+                    )
+                    repository.recordDelivery(
+                        delivery = entity,
+                        newTotalRuns = state.totalRuns,
+                        newTotalWickets = state.totalWickets,
+                        newTotalBalls = state.totalLegalDeliveries
+                    )
+                }
+
+                // Milestone notification & banner check
+                val newScore = state.batsmen[strikerId]
+                val newRuns = newScore?.runs ?: 0
+                val newBalls = newScore?.ballsFaced ?: 0
+                val strikerName = _uiState.value.battingSquad.find { it.userId == strikerId }?.fullName ?: "Batter"
+
+                if (prevRuns < 50 && newRuns >= 50) {
+                    BroadcastNotifier.postMilestone(strikerName, "Fifty (50*)", "$newRuns runs off $newBalls balls")
+                    NotificationHelper.sendMatchEventNotification(
+                        getApplication(),
+                        "Milestone: Fifty!",
+                        "$strikerName reached 50 ($newRuns off $newBalls balls)"
+                    )
+                } else if (prevRuns < 100 && newRuns >= 100) {
+                    BroadcastNotifier.postMilestone(strikerName, "Century (100*)", "$newRuns runs off $newBalls balls")
+                    NotificationHelper.sendMatchEventNotification(
+                        getApplication(),
+                        "Milestone: Century!",
+                        "$strikerName reached 100 ($newRuns off $newBalls balls)"
+                    )
+                }
+
+                // Check if over was just completed (6th legal ball bowled)
+                val overJustCompleted = (state.totalLegalDeliveries > priorBalls && state.totalLegalDeliveries % 6 == 0)
+
+                updateUiState(
+                    message = "Recorded $runsOffBat run${if (runsOffBat == 1) "" else "s"}",
+                    showBowlerDialog = overJustCompleted,
+                    lastCompletedBowlerId = if (overJustCompleted) priorBowlerId else _uiState.value.lastCompletedBowlerId
                 )
             }
         }
-
-        // Check if over was just completed (6th legal ball bowled)
-        val overJustCompleted = (state.totalLegalDeliveries > priorBalls && state.totalLegalDeliveries % 6 == 0)
-
-        updateUiState(
-            message = "Recorded $runsOffBat run${if (runsOffBat == 1) "" else "s"}",
-            showBowlerDialog = overJustCompleted,
-            lastCompletedBowlerId = if (overJustCompleted) priorBowlerId else _uiState.value.lastCompletedBowlerId
-        )
     }
 
-    fun recordExtra(extraType: ExtraType) {
+    fun recordExtra(extraType: ExtraType, runs: Int = 1) {
         val eng = engine ?: return
-        val priorBalls = eng.state.totalLegalDeliveries
-        val priorBowlerId = eng.state.currentBowlerId
         val currentInningsId = _uiState.value.inningsId
-        val extraRuns = if (extraType == ExtraType.WIDE || extraType == ExtraType.NO_BALL) 1 else 1
+        viewModelScope.launch {
+            scoringMutex.withLock {
+                val priorBalls = eng.state.totalLegalDeliveries
+                val priorBowlerId = eng.state.currentBowlerId
+                val extraRuns = if (runs > 0) runs else 1
 
-        val state = eng.recordDelivery(extraType = extraType, extraRuns = extraRuns)
-        val lastRecord = eng.history.lastOrNull()
+                val state = eng.recordDelivery(extraType = extraType, extraRuns = extraRuns)
+                val lastRecord = eng.history.lastOrNull()
 
-        if (lastRecord != null && currentInningsId.isNotEmpty()) {
-            viewModelScope.launch {
-                val entity = DeliveryEntity(
-                    deliveryId = UUID.randomUUID().toString(),
-                    inningsId = currentInningsId,
-                    deliveryIndex = lastRecord.deliveryIndex,
-                    overNumber = lastRecord.overNumber,
-                    ballInOver = lastRecord.ballInOver,
-                    strikerId = lastRecord.strikerId,
-                    nonStrikerId = lastRecord.nonStrikerId,
-                    bowlerId = lastRecord.bowlerId,
-                    runsOffBat = 0,
-                    extraType = extraType,
-                    extraRuns = extraRuns,
-                    isLegalDelivery = lastRecord.isLegalDelivery,
-                    timestamp = lastRecord.timestamp
-                )
-                repository.recordDelivery(
-                    delivery = entity,
-                    newTotalRuns = state.totalRuns,
-                    newTotalWickets = state.totalWickets,
-                    newTotalBalls = state.totalLegalDeliveries
+                if (lastRecord != null && currentInningsId.isNotEmpty()) {
+                    val entity = DeliveryEntity(
+                        deliveryId = UUID.randomUUID().toString(),
+                        inningsId = currentInningsId,
+                        deliveryIndex = lastRecord.deliveryIndex,
+                        overNumber = lastRecord.overNumber,
+                        ballInOver = lastRecord.ballInOver,
+                        strikerId = lastRecord.strikerId,
+                        nonStrikerId = lastRecord.nonStrikerId,
+                        bowlerId = lastRecord.bowlerId,
+                        runsOffBat = 0,
+                        extraType = extraType,
+                        extraRuns = extraRuns,
+                        isLegalDelivery = lastRecord.isLegalDelivery,
+                        timestamp = lastRecord.timestamp
+                    )
+                    repository.recordDelivery(
+                        delivery = entity,
+                        newTotalRuns = state.totalRuns,
+                        newTotalWickets = state.totalWickets,
+                        newTotalBalls = state.totalLegalDeliveries
+                    )
+                }
+                val overJustCompleted = (state.totalLegalDeliveries > priorBalls && state.totalLegalDeliveries % 6 == 0)
+                updateUiState(
+                    message = "Recorded ${extraType.name}",
+                    showBowlerDialog = overJustCompleted,
+                    lastCompletedBowlerId = if (overJustCompleted) priorBowlerId else _uiState.value.lastCompletedBowlerId
                 )
             }
         }
-        val overJustCompleted = (state.totalLegalDeliveries > priorBalls && state.totalLegalDeliveries % 6 == 0)
-        updateUiState(
-            message = "Recorded ${extraType.name}",
-            showBowlerDialog = overJustCompleted,
-            lastCompletedBowlerId = if (overJustCompleted) priorBowlerId else _uiState.value.lastCompletedBowlerId
-        )
     }
 
     fun openDismissalDialog() {
@@ -447,94 +486,139 @@ class ScoringViewModel(application: Application) : AndroidViewModel(application)
         _uiState.value = _uiState.value.copy(showDismissalDialog = false)
     }
 
-    fun confirmDismissal(dismissal: DismissalDetails, incomingBatsmanId: String) {
+    fun confirmDismissal(
+        dismissal: DismissalDetails,
+        incomingBatsmanId: String,
+        extraType: ExtraType = ExtraType.NONE
+    ) {
         val eng = engine ?: return
-        val priorBalls = eng.state.totalLegalDeliveries
-        val priorBowlerId = eng.state.currentBowlerId
         val currentInningsId = _uiState.value.inningsId
-
-        val state = eng.recordDelivery(
-            dismissal = dismissal,
-            incomingBatsmanId = incomingBatsmanId,
-            nextStrikerIdAfterDismissal = incomingBatsmanId
-        )
-        val lastRecord = eng.history.lastOrNull()
-
-        if (lastRecord != null && currentInningsId.isNotEmpty()) {
-            viewModelScope.launch {
-                val entity = DeliveryEntity(
-                    deliveryId = UUID.randomUUID().toString(),
-                    inningsId = currentInningsId,
-                    deliveryIndex = lastRecord.deliveryIndex,
-                    overNumber = lastRecord.overNumber,
-                    ballInOver = lastRecord.ballInOver,
-                    strikerId = lastRecord.strikerId,
-                    nonStrikerId = lastRecord.nonStrikerId,
-                    bowlerId = lastRecord.bowlerId,
-                    runsOffBat = 0,
-                    isWicket = true,
-                    dismissalType = dismissal.dismissalType,
-                    dismissedPlayerId = dismissal.dismissedPlayerId,
-                    primaryFielderId = dismissal.primaryFielderId,
-                    runsCompletedBeforeDismissal = dismissal.runsCompletedBeforeDismissal,
-                    nextStrikerIdAfterDismissal = incomingBatsmanId,
-                    timestamp = lastRecord.timestamp
+        viewModelScope.launch {
+            scoringMutex.withLock {
+                val priorBalls = eng.state.totalLegalDeliveries
+                val priorBowlerId = eng.state.currentBowlerId
+                val effectiveFielderId = if (dismissal.dismissalType == DismissalType.CAUGHT_AND_BOWLED && dismissal.primaryFielderId.isNullOrBlank()) {
+                    priorBowlerId
+                } else {
+                    dismissal.primaryFielderId
+                }
+                val effectiveDismissal = dismissal.copy(primaryFielderId = effectiveFielderId)
+                val completedRuns = effectiveDismissal.runsCompletedBeforeDismissal
+                val (runsOffBatValue, calculatedExtraRuns) = when (extraType) {
+                    ExtraType.WIDE -> 0 to (1 + completedRuns)
+                    ExtraType.BYE, ExtraType.LEG_BYE -> 0 to completedRuns
+                    ExtraType.NO_BALL -> completedRuns to 1
+                    ExtraType.PENALTY -> 0 to completedRuns
+                    ExtraType.NONE -> completedRuns to 0
+                }
+                val state = eng.recordDelivery(
+                    runsOffBat = runsOffBatValue,
+                    extraType = extraType,
+                    extraRuns = calculatedExtraRuns,
+                    dismissal = effectiveDismissal,
+                    incomingBatsmanId = incomingBatsmanId,
+                    nextStrikerIdAfterDismissal = incomingBatsmanId
                 )
-                repository.recordDelivery(
-                    delivery = entity,
-                    newTotalRuns = state.totalRuns,
-                    newTotalWickets = state.totalWickets,
-                    newTotalBalls = state.totalLegalDeliveries
+                val lastRecord = eng.history.lastOrNull()
+
+                if (lastRecord != null && currentInningsId.isNotEmpty()) {
+                    val entity = DeliveryEntity(
+                        deliveryId = UUID.randomUUID().toString(),
+                        inningsId = currentInningsId,
+                        deliveryIndex = lastRecord.deliveryIndex,
+                        overNumber = lastRecord.overNumber,
+                        ballInOver = lastRecord.ballInOver,
+                        strikerId = lastRecord.strikerId,
+                        nonStrikerId = lastRecord.nonStrikerId,
+                        bowlerId = lastRecord.bowlerId,
+                        runsOffBat = runsOffBatValue,
+                        extraType = extraType,
+                        extraRuns = calculatedExtraRuns,
+                        isLegalDelivery = lastRecord.isLegalDelivery,
+                        isWicket = true,
+                        dismissalType = effectiveDismissal.dismissalType,
+                        dismissedPlayerId = effectiveDismissal.dismissedPlayerId,
+                        primaryFielderId = effectiveDismissal.primaryFielderId,
+                        runsCompletedBeforeDismissal = effectiveDismissal.runsCompletedBeforeDismissal,
+                        nextStrikerIdAfterDismissal = incomingBatsmanId,
+                        timestamp = lastRecord.timestamp
+                    )
+                    repository.recordDelivery(
+                        delivery = entity,
+                        newTotalRuns = state.totalRuns,
+                        newTotalWickets = state.totalWickets,
+                        newTotalBalls = state.totalLegalDeliveries
+                    )
+                }
+
+                // Wicket Notification
+                val dismissedName = (_uiState.value.battingSquad.find { it.userId == dismissal.dismissedPlayerId }?.fullName) ?: "Batter"
+                val dismissedScore = state.batsmen[dismissal.dismissedPlayerId]
+                val batRuns = dismissedScore?.runs ?: 0
+                val batBalls = dismissedScore?.ballsFaced ?: 0
+                NotificationHelper.sendMatchEventNotification(
+                    getApplication(),
+                    "WICKET! ${dismissal.dismissalType.name}",
+                    "$dismissedName dismissed for $batRuns ($batBalls b)"
+                )
+
+                // Update bench
+                val updatedBench = _uiState.value.battingBench.filter { it.userId != incomingBatsmanId }
+
+                _uiState.value = _uiState.value.copy(
+                    showDismissalDialog = false,
+                    battingBench = updatedBench
+                )
+                val overJustCompleted = (state.totalLegalDeliveries > priorBalls && state.totalLegalDeliveries % 6 == 0)
+                updateUiState(
+                    message = "OUT! ${dismissal.dismissalType.name}. Next batsman in.",
+                    showBowlerDialog = overJustCompleted,
+                    lastCompletedBowlerId = if (overJustCompleted) priorBowlerId else _uiState.value.lastCompletedBowlerId
                 )
             }
         }
-
-        // Update bench
-        val updatedBench = _uiState.value.battingBench.filter { it.userId != incomingBatsmanId }
-
-        _uiState.value = _uiState.value.copy(
-            showDismissalDialog = false,
-            battingBench = updatedBench
-        )
-        val overJustCompleted = (state.totalLegalDeliveries > priorBalls && state.totalLegalDeliveries % 6 == 0)
-        updateUiState(
-            message = "OUT! ${dismissal.dismissalType.name}. Next batsman in.",
-            showBowlerDialog = overJustCompleted,
-            lastCompletedBowlerId = if (overJustCompleted) priorBowlerId else _uiState.value.lastCompletedBowlerId
-        )
     }
 
     fun onNextBowlerSelected(newBowler: UserEntity) {
         val eng = engine ?: return
-        eng.changeBowler(newBowler.userId)
-        _uiState.value = _uiState.value.copy(
-            showBowlerDialog = false,
-            bowler = newBowler,
-            scoreState = eng.state,
-            lastActionMessage = "Over completed. ${newBowler.fullName} bowling."
-        )
+        viewModelScope.launch {
+            scoringMutex.withLock {
+                eng.changeBowler(newBowler.userId)
+                _uiState.value = _uiState.value.copy(
+                    showBowlerDialog = false,
+                    bowler = newBowler,
+                    scoreState = eng.state,
+                    lastActionMessage = "Over completed. ${newBowler.fullName} bowling."
+                )
+            }
+        }
     }
 
     fun undo() {
         val eng = engine ?: return
         val currentInningsId = _uiState.value.inningsId
-        val state = eng.undo() ?: return
-
         viewModelScope.launch {
-            repository.undoLastDelivery(
-                inningsId = currentInningsId,
-                revertedRuns = state.totalRuns,
-                revertedWickets = state.totalWickets,
-                revertedBalls = state.totalLegalDeliveries
-            )
+            scoringMutex.withLock {
+                val state = eng.undo() ?: return@withLock
+                repository.undoLastDelivery(
+                    inningsId = currentInningsId,
+                    revertedRuns = state.totalRuns,
+                    revertedWickets = state.totalWickets,
+                    revertedBalls = state.totalLegalDeliveries
+                )
+                updateUiState("Delivery undone from memory & SQLite")
+            }
         }
-        updateUiState("Delivery undone from memory & SQLite")
     }
 
     fun rotateStrike() {
         val eng = engine ?: return
-        eng.rotateStrike()
-        updateUiState("Strike rotated manually")
+        viewModelScope.launch {
+            scoringMutex.withLock {
+                eng.rotateStrike()
+                updateUiState("Strike rotated manually")
+            }
+        }
     }
 
     fun onStartSecondInningsClicked() {
@@ -670,6 +754,14 @@ class ScoringViewModel(application: Application) : AndroidViewModel(application)
             viewModelScope.launch {
                 repository.completeInnings(_uiState.value.inningsId)
             }
+            val target = state.totalRuns + 1
+            val rrr = target.toDouble() / _uiState.value.totalOvers.coerceAtLeast(1)
+            BroadcastNotifier.postInningsBreak(target, rrr)
+            NotificationHelper.sendMatchEventNotification(
+                getApplication(),
+                "Innings Break: Target $target",
+                "${_uiState.value.battingTeamName} finished on ${state.totalRuns}/${state.totalWickets} (${state.oversFormatted} ov). Target is $target."
+            )
             _uiState.value = _uiState.value.copy(
                 scoreState = state,
                 innings1Score = state,
@@ -704,6 +796,14 @@ class ScoringViewModel(application: Application) : AndroidViewModel(application)
                     innings2 = state
                 )
 
+                BroadcastNotifier.postResult(result.resultSummary, candidatePOTM?.fullName)
+                NotificationHelper.sendMatchEventNotification(
+                    getApplication(),
+                    "Match Result: ${_uiState.value.matchTitle.ifBlank { "Match Completed" }}",
+                    result.resultSummary
+                )
+
+                val allSquadIds = allPlayers.map { it.userId }.toSet()
                 viewModelScope.launch {
                     repository.completeInnings(_uiState.value.inningsId)
                     repository.completeMatch(
@@ -713,8 +813,10 @@ class ScoringViewModel(application: Application) : AndroidViewModel(application)
                         playerOfTheMatchId = candidatePOTM?.userId
                     )
                     repository.recordMatchPlayerStats(
+                        matchId = _uiState.value.matchId,
                         innings1 = _uiState.value.innings1Score,
-                        innings2 = state
+                        innings2 = state,
+                        squadPlayerIds = allSquadIds
                     )
                 }
 
@@ -748,6 +850,10 @@ class ScoringViewModel(application: Application) : AndroidViewModel(application)
 
     fun loadMatchById(matchId: String, onLoaded: (isLive: Boolean) -> Unit) {
         viewModelScope.launch {
+            try {
+                repository.syncScorecardForMatch(matchId)
+            } catch (_: Exception) {}
+
             val match = repository.getMatch(matchId) ?: return@launch
             val inningsList = repository.getInningsListForMatch(matchId)
             val teamA = repository.getTeam(match.teamAId)
@@ -776,14 +882,16 @@ class ScoringViewModel(application: Application) : AndroidViewModel(application)
 
             // Replay Innings 1
             val eng1 = inn1?.let {
+                val inn1BattingSquad = if (inn1.battingTeamId == match.teamAId) teamASquad else teamBSquad
+                val inn1BowlingSquad = if (inn1.battingTeamId == match.teamAId) teamBSquad else teamASquad
+                val maxWkts = (inn1BattingSquad.size - 1).coerceAtLeast(1)
                 val e = ScoringEngine(
                     matchId = matchId,
                     inningsNumber = 1,
                     totalOversAllotted = match.totalOvers,
+                    maxWickets = maxWkts,
                     playerNames = playerNames
                 )
-                val inn1BattingSquad = if (inn1.battingTeamId == match.teamAId) teamASquad else teamBSquad
-                val inn1BowlingSquad = if (inn1.battingTeamId == match.teamAId) teamBSquad else teamASquad
                 val firstDel = inn1Records.firstOrNull()
                 val striker = firstDel?.strikerId ?: inn1BattingSquad.firstOrNull()?.userId ?: ""
                 val nonStriker = firstDel?.nonStrikerId ?: inn1BattingSquad.getOrNull(1)?.userId ?: ""
@@ -791,6 +899,12 @@ class ScoringViewModel(application: Application) : AndroidViewModel(application)
                 if (striker.isNotEmpty() && nonStriker.isNotEmpty() && bowler.isNotEmpty()) {
                     e.startInnings(striker, nonStriker, bowler)
                     inn1Records.forEach { r ->
+                        if (r.bowlerId.isNotBlank() && r.bowlerId != e.state.currentBowlerId) {
+                            e.changeBowler(r.bowlerId)
+                        }
+                        if (r.strikerId.isNotBlank() && r.strikerId == e.state.nonStrikerId) {
+                            e.rotateStrike()
+                        }
                         e.recordDelivery(
                             runsOffBat = r.runsOffBat,
                             extraType = r.extraType,
@@ -807,15 +921,17 @@ class ScoringViewModel(application: Application) : AndroidViewModel(application)
             // Replay Innings 2 if present
             val eng2 = inn2?.let {
                 val target = (inn1?.totalRuns ?: eng1?.state?.totalRuns ?: 0) + 1
+                val inn2BattingSquad = if (inn2.battingTeamId == match.teamAId) teamASquad else teamBSquad
+                val inn2BowlingSquad = if (inn2.battingTeamId == match.teamAId) teamBSquad else teamASquad
+                val maxWkts = (inn2BattingSquad.size - 1).coerceAtLeast(1)
                 val e = ScoringEngine(
                     matchId = matchId,
                     inningsNumber = 2,
                     totalOversAllotted = match.totalOvers,
                     targetRuns = target,
+                    maxWickets = maxWkts,
                     playerNames = playerNames
                 )
-                val inn2BattingSquad = if (inn2.battingTeamId == match.teamAId) teamASquad else teamBSquad
-                val inn2BowlingSquad = if (inn2.battingTeamId == match.teamAId) teamBSquad else teamASquad
                 val firstDel = inn2Records.firstOrNull()
                 val striker = firstDel?.strikerId ?: inn2BattingSquad.firstOrNull()?.userId ?: ""
                 val nonStriker = firstDel?.nonStrikerId ?: inn2BattingSquad.getOrNull(1)?.userId ?: ""
@@ -823,6 +939,12 @@ class ScoringViewModel(application: Application) : AndroidViewModel(application)
                 if (striker.isNotEmpty() && nonStriker.isNotEmpty() && bowler.isNotEmpty()) {
                     e.startInnings(striker, nonStriker, bowler)
                     inn2Records.forEach { r ->
+                        if (r.bowlerId.isNotBlank() && r.bowlerId != e.state.currentBowlerId) {
+                            e.changeBowler(r.bowlerId)
+                        }
+                        if (r.strikerId.isNotBlank() && r.strikerId == e.state.nonStrikerId) {
+                            e.rotateStrike()
+                        }
                         e.recordDelivery(
                             runsOffBat = r.runsOffBat,
                             extraType = r.extraType,

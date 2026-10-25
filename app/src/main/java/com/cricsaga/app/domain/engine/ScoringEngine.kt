@@ -162,10 +162,17 @@ class ScoringEngine(
         }.toMutableMap()
 
         val currentOverTimeline = mutableListOf<OverTimelineBall>()
+        val fowList = mutableListOf<FallOfWicket>()
 
         var currentStriker = initialStrikerId
         var currentNonStriker = initialNonStrikerId
         var currentBowler = initialBowlerId
+
+        // Over-by-over maiden and bowler figures tracking
+        var currentOverBowlerRuns = 0
+        var currentOverBowlerId: String? = null
+        var isSingleBowlerInOver = true
+        var overCompleted = false
 
         for (deliv in deliveryHistory) {
             val strikerId = deliv.strikerId
@@ -203,12 +210,32 @@ class ScoringEngine(
             val updatedLegalBalls = bowler.legalBalls + legalBallIncrement
             val updatedRunsConceded = bowler.runsConceded + runsChargedToBowler
 
+            if (currentOverBowlerId == null) {
+                currentOverBowlerId = bowlerId
+            } else if (currentOverBowlerId != bowlerId) {
+                isSingleBowlerInOver = false
+            }
+            currentOverBowlerRuns += runsChargedToBowler
+
             var isBowlerWicket = false
 
             // 4. Dismissal Resolution
             if (deliv.dismissal != null) {
                 totalWickets += 1
                 val dismissedId = deliv.dismissal.dismissedPlayerId
+                val dismissedName = playerNames[dismissedId] ?: batsmenMap[dismissedId]?.playerName ?: "Batsman"
+                val completedOvs = totalLegalDeliveries / 6
+                val ballsInOv = totalLegalDeliveries % 6
+                fowList.add(
+                    FallOfWicket(
+                        wicketNumber = totalWickets,
+                        scoreAtDismissal = totalRuns,
+                        oversAtDismissal = "$completedOvs.$ballsInOv",
+                        batsmanName = dismissedName,
+                        batsmanId = dismissedId,
+                        dismissalType = deliv.dismissal.dismissalType
+                    )
+                )
 
                 // Check if wicket is credited to bowler
                 isBowlerWicket = when (deliv.dismissal.dismissalType) {
@@ -262,9 +289,10 @@ class ScoringEngine(
                 else -> "${deliv.runsOffBat}"
             }
 
-            // If an over was completed on the prior legal ball, reset current over timeline
-            if (deliv.isLegalDelivery && (totalLegalDeliveries - 1) % 6 == 0 && (totalLegalDeliveries - 1) > 0 && currentOverTimeline.size >= 6) {
+            // Reset current over timeline on the first ball of a new over
+            if (overCompleted) {
                 currentOverTimeline.clear()
+                overCompleted = false
             }
             currentOverTimeline.add(
                 OverTimelineBall(
@@ -302,13 +330,33 @@ class ScoringEngine(
 
             // End of Over strike switch (occurs on the 6th legal delivery of the over)
             if (deliv.isLegalDelivery && totalLegalDeliveries % 6 == 0) {
+                // Check if completed over was a maiden (conceded zero bowler runs by a single bowler)
+                if (isSingleBowlerInOver && currentOverBowlerRuns == 0) {
+                    val bowlerIdToUpdate = currentOverBowlerId ?: bowlerId
+                    val finishedBowler = bowlersMap[bowlerIdToUpdate]
+                    if (finishedBowler != null) {
+                        bowlersMap[bowlerIdToUpdate] = finishedBowler.copy(maidens = finishedBowler.maidens + 1)
+                    }
+                }
+                currentOverBowlerRuns = 0
+                currentOverBowlerId = null
+                isSingleBowlerInOver = true
+
                 val temp = currentStriker
                 currentStriker = currentNonStriker
                 currentNonStriker = temp
-                currentOverTimeline.clear() // Over completed
+                overCompleted = true // Completed over remains visible until next over begins
             }
 
             currentBowler = bowlerId
+        }
+
+        // Update active bowler's currentOverRuns for incomplete over
+        if (totalLegalDeliveries % 6 != 0) {
+            val activeBowler = bowlersMap[currentBowler]
+            if (activeBowler != null) {
+                bowlersMap[currentBowler] = activeBowler.copy(currentOverRuns = currentOverBowlerRuns)
+            }
         }
 
         // Check Innings Completion
@@ -341,6 +389,7 @@ class ScoringEngine(
             batsmen = batsmenMap,
             bowlers = bowlersMap,
             currentOverBalls = currentOverTimeline,
+            fallOfWickets = fowList,
             isCompleted = isCompleted,
             completionReason = completionReason,
             statusMessage = statusMessage

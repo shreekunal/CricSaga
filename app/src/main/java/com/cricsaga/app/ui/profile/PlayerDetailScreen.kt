@@ -87,11 +87,15 @@ fun PlayerDetailScreen(
     val totalRunsConceded = stats?.runsConceded ?: 0
     val totalMaidens = stats?.maidens ?: 0
 
-    val batAvg = if (totalInnings > 0) String.format(java.util.Locale.US, "%.1f", totalRuns.toDouble() / totalInnings.toDouble()) else "0.0"
+    val batAvg = String.format(java.util.Locale.US, "%.1f", stats?.battingAverage ?: 0.0)
     val batSr = if (totalBalls > 0) String.format(java.util.Locale.US, "%.1f", (totalRuns.toDouble() / totalBalls.toDouble()) * 100.0) else "0.0"
     val oversBowledFormatted = "${totalBallsBowled / 6}.${totalBallsBowled % 6}"
     val bowlEcon = if (totalBallsBowled > 0) String.format(java.util.Locale.US, "%.2f", totalRunsConceded.toDouble() / (totalBallsBowled.toDouble() / 6.0)) else "0.0"
     val bowlAvg = if (totalWickets > 0) String.format(java.util.Locale.US, "%.2f", totalRunsConceded.toDouble() / totalWickets.toDouble()) else "0.0"
+
+    val catchesCount = stats?.catches ?: 0
+    val runOutsCount = stats?.runOuts ?: 0
+    val stumpingsCount = stats?.stumpings ?: 0
 
     val archetype = when {
         (batSr.toDoubleOrNull() ?: 0.0) >= 140.0 -> "POWER HITTER"
@@ -450,8 +454,8 @@ fun PlayerDetailScreen(
                                         HonourBadgeCard(
                                             icon = Icons.Default.Shield,
                                             title = "SAFE HANDS",
-                                            subtitle = "0 Catches",
-                                            isUnlocked = false,
+                                            subtitle = if (catchesCount > 0) "$catchesCount Catches" else "0 Catches",
+                                            isUnlocked = catchesCount > 0,
                                             modifier = Modifier.weight(1f)
                                         )
                                     }
@@ -471,7 +475,7 @@ fun PlayerDetailScreen(
                                     TableStatRow("Bowling Economy", if (totalBallsBowled > 0) bowlEcon else "-")
                                     TableStatRow("Best Bowling", "-")
                                     TableStatRow("Fifties / Hundreds", "$totalFifties / $totalHundreds")
-                                    TableStatRow("Catches / Run Outs", "0 / 0")
+                                    TableStatRow("Catches / Run Outs", "$catchesCount / $runOutsCount")
                                 }
                             }
                         }
@@ -561,10 +565,9 @@ fun PlayerDetailScreen(
                                         Icon(Icons.Default.Shield, contentDescription = null, tint = TextSecondary, modifier = Modifier.size(16.dp))
                                     }
                                     Spacer(modifier = Modifier.height(10.dp))
-                                    TableStatRow("Catches", "0")
-                                    TableStatRow("Direct Run Outs", "0")
-                                    TableStatRow("Assisted Run Outs", "0")
-                                    TableStatRow("Stumpings", "0")
+                                    TableStatRow("Catches", "$catchesCount")
+                                    TableStatRow("Run Outs", "$runOutsCount")
+                                    TableStatRow("Stumpings", "$stumpingsCount")
                                 }
                             }
                         }
@@ -721,8 +724,8 @@ fun PlayerDetailScreen(
                                         HonourBadgeCard(
                                             icon = Icons.Default.Shield,
                                             title = "SAFE HANDS",
-                                            subtitle = "0 Catches",
-                                            isUnlocked = false,
+                                            subtitle = if (catchesCount > 0) "$catchesCount Catches" else "0 Catches",
+                                            isUnlocked = catchesCount > 0,
                                             modifier = Modifier.weight(1f)
                                         )
                                     }

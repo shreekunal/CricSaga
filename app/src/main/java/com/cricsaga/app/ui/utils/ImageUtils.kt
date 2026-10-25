@@ -27,6 +27,50 @@ object ImageUtils {
         .build()
 
     /**
+     * Calculates an optimal power-of-two inSampleSize to protect against Out-Of-Memory (OOM) errors.
+     */
+    fun calculateInSampleSize(options: BitmapFactory.Options, reqWidth: Int, reqHeight: Int): Int {
+        val height = options.outHeight
+        val width = options.outWidth
+        var inSampleSize = 1
+
+        if (height > reqHeight || width > reqWidth) {
+            val halfHeight = height / 2
+            val halfWidth = width / 2
+
+            while ((halfHeight / inSampleSize) >= reqHeight && (halfWidth / inSampleSize) >= reqWidth) {
+                inSampleSize *= 2
+            }
+        }
+        return inSampleSize
+    }
+
+    /**
+     * Decodes a memory-efficient subsampled Bitmap from a content Uri.
+     */
+    fun decodeSampledBitmapFromUri(context: Context, uri: Uri, reqWidth: Int, reqHeight: Int): Bitmap? {
+        return try {
+            val options = BitmapFactory.Options().apply {
+                inJustDecodeBounds = true
+            }
+            context.contentResolver.openInputStream(uri)?.use { stream ->
+                BitmapFactory.decodeStream(stream, null, options)
+            }
+
+            if (options.outWidth <= 0 || options.outHeight <= 0) return null
+
+            options.inSampleSize = calculateInSampleSize(options, reqWidth, reqHeight)
+            options.inJustDecodeBounds = false
+
+            context.contentResolver.openInputStream(uri)?.use { stream ->
+                BitmapFactory.decodeStream(stream, null, options)
+            }
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    /**
      * Compresses an image from Uri into WebP format (lossy, quality 75, max 300x300),
      * and returns it as a Base64 string for zero-cost cloud storage in database text columns.
      */
@@ -37,10 +81,8 @@ object ImageUtils {
         quality: Int = 75
     ): String? {
         return try {
-            val inputStream: InputStream? = context.contentResolver.openInputStream(uri)
-            val originalBitmap = BitmapFactory.decodeStream(inputStream)
-            inputStream?.close()
-            if (originalBitmap == null) return null
+            val originalBitmap = decodeSampledBitmapFromUri(context, uri, maxDimension * 2, maxDimension * 2)
+                ?: return null
 
             val width = originalBitmap.width
             val height = originalBitmap.height
@@ -99,12 +141,8 @@ object ImageUtils {
      */
     fun saveProfileImageFromUri(context: Context, uri: Uri, userId: String): String? {
         return try {
-            val contentResolver = context.contentResolver
-            val inputStream: InputStream? = contentResolver.openInputStream(uri)
-            val originalBitmap = BitmapFactory.decodeStream(inputStream)
-            inputStream?.close()
-
-            if (originalBitmap == null) return null
+            val originalBitmap = decodeSampledBitmapFromUri(context, uri, 600, 600)
+                ?: return null
 
             // Scale down to max 300x300 for crisp avatars while maintaining small footprint
             val maxDimension = 300
@@ -148,9 +186,7 @@ object ImageUtils {
             if (base64Bitmap != null) return base64Bitmap
         }
         return try {
-            val inputStream = context.contentResolver.openInputStream(uri)
-            val bitmap = BitmapFactory.decodeStream(inputStream)
-            inputStream?.close()
+            val bitmap = decodeSampledBitmapFromUri(context, uri, 1080, 1080)
             bitmap?.asImageBitmap() ?: loadBitmapFromPath(uri.path)
         } catch (e: Exception) {
             loadBitmapFromPath(uri.path ?: uriString)

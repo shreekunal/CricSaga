@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <paths xmlns:android="http://schemas.android.com/apk/res/android">
-    <cache-path name="shared_cache" path="."/>
-    <external-cache-path name="external_cache" path="."/>
-    <files-path name="internal_files" path="."/>
-    <external-files-path name="external_files" path="."/>
+    <cache-path name="shared_images" path="images/"/>
+    <cache-path name="shared_docs" path="docs/"/>
+    <files-path name="shared_avatars" path="avatars/"/>
+    <external-files-path name="shared_downloads" path="Download/"/>
 </paths>

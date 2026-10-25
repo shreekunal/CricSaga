@@ -17,7 +17,7 @@ CricSaga is a high-performance, native Android cricket scoring, analytics, and g
 1. **Zero Learning Curve:** Matches the exact scoring keypad geometry (`0-3`, `4, 6, Wd, Nb`, `B, Lb, OUT, UNDO`) familiar to scorers, eliminating cognitive friction and retraining.
 2. **100% Offline-First Integrity:** Pure Kotlin domain engine and local Room SQLite persistence with Write-Ahead Logging (WAL). Matches never freeze or lose state during remote ground cellular dropouts.
 3. **Respectful & Transparent Monetization:**
-   - 3 transparent pricing tiers: **3 Months (₹99)**, **1 Year (₹199)**, and **Lifetime VIP (₹2,000)**.
+   - 3 transparent pricing tiers: **1 Month (₹99)**, **1 Year (₹199)**, and **Lifetime VIP (₹1,999)**.
    - Dedicated single-use `redeem_codes` SQLite validation table for direct UPI and ground distribution.
    - Minimal inline text sponsor banners on free tier; strictly zero video popups, zero interstitial interruptions between deliveries, and zero gambling/betting ads.
 4. **All-Weather Readability:** Full dynamic theme switching between **Dark Stadium Mode** (deep OLED slate `#0A0B0E`) and **Crisp Sunlight Light Mode** (high-contrast `#F4F5F8` with pure white cards) engineered for intense midday sun on open grounds.
@@ -85,7 +85,7 @@ flowchart TD
 
 ## 3. Database Architecture & Schema Catalog (Room v8)
 
-The application uses an SQLite database managed through Android Room with Write-Ahead Logging (`WAL`). Schema version is locked at **Version 8**.
+The application uses an SQLite database managed through Android Room with Write-Ahead Logging (`WAL`). Schema version is **Version 13**.
 
 ### 3.1 Entity Catalog & Relations
 

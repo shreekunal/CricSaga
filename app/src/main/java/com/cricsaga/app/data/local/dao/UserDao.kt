@@ -36,11 +36,17 @@ interface UserDao {
     @Query("SELECT * FROM users ORDER BY fullName ASC")
     fun getAllUsers(): Flow<List<UserEntity>>
 
+    @Query("SELECT * FROM users ORDER BY fullName ASC")
+    suspend fun getAllUsersList(): List<UserEntity>
+
     @Query("UPDATE users SET city = :city WHERE userId = :userId")
     suspend fun updateUserCity(userId: String, city: String)
 
     @Query("UPDATE users SET isPro = :isPro WHERE userId = :userId")
     suspend fun updateUserProStatus(userId: String, isPro: Boolean)
+
+    @Query("UPDATE users SET isPro = :isPro, proPlan = :proPlan, proExpiresAt = :proExpiresAt WHERE userId = :userId")
+    suspend fun updateUserProPlan(userId: String, isPro: Boolean, proPlan: String?, proExpiresAt: Long?)
 
     @Query("UPDATE users SET password = :password WHERE userId = :userId")
     suspend fun updateUserPassword(userId: String, password: String)
@@ -50,4 +56,10 @@ interface UserDao {
 
     @Query("SELECT COUNT(*) FROM users")
     suspend fun getUserCount(): Int
+
+    @Query("SELECT COUNT(*) FROM users")
+    fun getUserCountFlow(): Flow<Int>
+
+    @Query("SELECT COUNT(*) FROM users WHERE isPro = 1")
+    fun getProUserCountFlow(): Flow<Int>
 }

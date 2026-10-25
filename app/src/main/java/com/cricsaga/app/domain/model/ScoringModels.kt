@@ -67,6 +67,15 @@ data class OverTimelineBall(
     val isWicket: Boolean
 )
 
+data class FallOfWicket(
+    val wicketNumber: Int,
+    val scoreAtDismissal: Int,
+    val oversAtDismissal: String,
+    val batsmanName: String,
+    val batsmanId: String,
+    val dismissalType: DismissalType
+)
+
 data class InningsScoreState(
     val totalRuns: Int = 0,
     val totalWickets: Int = 0,
@@ -78,6 +87,7 @@ data class InningsScoreState(
     val batsmen: Map<String, BatsmanScore> = emptyMap(),
     val bowlers: Map<String, BowlerFigures> = emptyMap(),
     val currentOverBalls: List<OverTimelineBall> = emptyList(),
+    val fallOfWickets: List<FallOfWicket> = emptyList(),
     val targetRuns: Int? = null,
     val isCompleted: Boolean = false,
     val completionReason: InningsCompletionReason? = null,

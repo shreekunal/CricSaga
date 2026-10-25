@@ -14,6 +14,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cricsaga.app.domain.model.InningsScoreState
 import com.cricsaga.app.ui.theme.*
+import java.util.Locale
 
 @Composable
 fun InningsBreakDialog(
@@ -78,7 +79,7 @@ fun InningsBreakDialog(
                             color = TextPrimary
                         )
                         Text(
-                            text = "${firstInningsState.oversFormatted} ov • CRR: ${String.format("%.2f", firstInningsState.currentRunRate)}",
+                            text = "${firstInningsState.oversFormatted} ov • CRR: ${String.format(Locale.US, "%.2f", firstInningsState.currentRunRate)}",
                             fontSize = 12.sp,
                             color = MutedGrey
                         )
@@ -117,7 +118,7 @@ fun InningsBreakDialog(
                             textAlign = TextAlign.Center
                         )
                         Text(
-                            text = "Required Run Rate: ${String.format("%.2f", rrr)} per over",
+                            text = "Required Run Rate: ${String.format(Locale.US, "%.2f", rrr)} per over",
                             fontSize = 11.sp,
                             color = BoundaryAmber,
                             fontWeight = FontWeight.Medium

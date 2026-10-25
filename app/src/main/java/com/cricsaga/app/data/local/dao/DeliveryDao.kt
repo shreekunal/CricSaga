@@ -12,6 +12,9 @@ interface DeliveryDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertDelivery(delivery: DeliveryEntity)
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertDeliveries(deliveries: List<DeliveryEntity>)
+
     @Query("DELETE FROM deliveries WHERE deliveryId = :deliveryId")
     suspend fun deleteDelivery(deliveryId: String)
 
@@ -26,4 +29,25 @@ interface DeliveryDao {
 
     @Query("DELETE FROM deliveries WHERE inningsId = :inningsId AND deliveryIndex = (SELECT MAX(deliveryIndex) FROM deliveries WHERE inningsId = :inningsId)")
     suspend fun deleteLastDelivery(inningsId: String): Int
+
+    @Query("SELECT COUNT(*) FROM deliveries")
+    fun getDeliveryCountFlow(): Flow<Int>
+
+    @Query("SELECT COUNT(*) FROM deliveries")
+    suspend fun getDeliveryCount(): Int
+
+    @Query("SELECT COALESCE(SUM(runsOffBat + extraRuns), 0) FROM deliveries")
+    fun getTotalRunsFlow(): Flow<Int>
+
+    @Query("SELECT COALESCE(SUM(runsOffBat + extraRuns), 0) FROM deliveries")
+    suspend fun getTotalRuns(): Int
+
+    @Query("SELECT COUNT(*) FROM deliveries WHERE runsOffBat = 4")
+    fun getFourCountFlow(): Flow<Int>
+
+    @Query("SELECT COUNT(*) FROM deliveries WHERE runsOffBat = 6")
+    fun getSixCountFlow(): Flow<Int>
+
+    @Query("SELECT COUNT(*) FROM deliveries WHERE isWicket = 1")
+    fun getWicketCountFlow(): Flow<Int>
 }

@@ -26,14 +26,16 @@ fun DismissalBottomSheet(
     nonStriker: UserEntity?,
     fieldingSquad: List<UserEntity>,
     battingBench: List<UserEntity>,
+    bowler: UserEntity? = null,
     onDismissRequest: () -> Unit,
-    onConfirmWicket: (DismissalDetails, incomingBatsmanId: String) -> Unit
+    onConfirmWicket: (DismissalDetails, incomingBatsmanId: String, isWideBall: Boolean) -> Unit
 ) {
     var selectedType by remember { mutableStateOf(DismissalType.CAUGHT) }
     var selectedDismissedPlayerId by remember { mutableStateOf(striker?.userId ?: "") }
     var selectedFielderId by remember { mutableStateOf(fieldingSquad.firstOrNull()?.userId ?: "") }
     var selectedIncomingId by remember { mutableStateOf(battingBench.firstOrNull()?.userId ?: "") }
     var runsCompletedBeforeOut by remember { mutableIntStateOf(0) }
+    var isWideDelivery by remember { mutableStateOf(false) }
     val hapticManager = com.cricsaga.app.ui.utils.LocalHapticManager.current
 
     ModalBottomSheet(
@@ -172,6 +174,22 @@ fun DismissalBottomSheet(
                 }
             }
 
+            // Optional: Dismissal on Wide delivery
+            if (selectedType in listOf(DismissalType.STUMPED, DismissalType.RUN_OUT)) {
+                FilterChip(
+                    selected = isWideDelivery,
+                    onClick = {
+                        hapticManager?.tapUiClick()
+                        isWideDelivery = !isWideDelivery
+                    },
+                    label = { Text(if (isWideDelivery) "Delivery was Wide: YES (+1 Wide)" else "Occurred on Wide Ball?") },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = BoundaryAmber,
+                        selectedLabelColor = Color.Black
+                    )
+                )
+            }
+
             Spacer(modifier = Modifier.height(6.dp))
 
             // Confirm Button
@@ -181,10 +199,14 @@ fun DismissalBottomSheet(
                     val dismissal = DismissalDetails(
                         dismissalType = selectedType,
                         dismissedPlayerId = if (selectedType in listOf(DismissalType.RUN_OUT, DismissalType.RETIRED_HURT, DismissalType.RETIRED_OUT)) selectedDismissedPlayerId else (striker?.userId ?: ""),
-                        primaryFielderId = if (selectedType in listOf(DismissalType.CAUGHT, DismissalType.RUN_OUT, DismissalType.STUMPED)) selectedFielderId else null,
+                        primaryFielderId = when (selectedType) {
+                            DismissalType.CAUGHT, DismissalType.RUN_OUT, DismissalType.STUMPED -> selectedFielderId
+                            DismissalType.CAUGHT_AND_BOWLED -> bowler?.userId
+                            else -> null
+                        },
                         runsCompletedBeforeDismissal = if (selectedType == DismissalType.RUN_OUT) runsCompletedBeforeOut else 0
                     )
-                    onConfirmWicket(dismissal, selectedIncomingId)
+                    onConfirmWicket(dismissal, selectedIncomingId, isWideDelivery)
                 },
                 modifier = Modifier
                     .fillMaxWidth()

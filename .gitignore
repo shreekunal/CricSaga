@@ -32,6 +32,8 @@ buildOutputCleanup/
 
 # Local configuration file (sdk path, secrets)
 local.properties
+*.jks
+*.keystore
 
 # OS files
 .DS_Store

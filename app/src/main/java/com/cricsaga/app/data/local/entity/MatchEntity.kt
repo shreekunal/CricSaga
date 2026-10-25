@@ -43,6 +43,7 @@ data class MatchEntity(
     val winnerTeamId: String? = null,
     val resultSummary: String? = null,
     val playerOfTheMatchId: String? = null,
+    val isStatsRecorded: Boolean = false,
     val createdAt: Long = System.currentTimeMillis()
 )
 

@@ -6,8 +6,11 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ShowChart
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -21,6 +24,7 @@ import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cricsaga.app.domain.model.DeliveryRecord
@@ -57,20 +61,7 @@ fun WormGraph(
             )
         }
     } else {
-        // Fallback realistic progression for Innings 1 preview
-        listOf(
-            CumulativePoint(6, "1.0", 8),
-            CumulativePoint(12, "2.0", 17, isWicket = true),
-            CumulativePoint(18, "3.0", 29),
-            CumulativePoint(24, "4.0", 38),
-            CumulativePoint(30, "5.0", 52),
-            CumulativePoint(36, "6.0", 64, isWicket = true),
-            CumulativePoint(48, "8.0", 82),
-            CumulativePoint(60, "10.0", 101),
-            CumulativePoint(72, "12.0", 119, isWicket = true),
-            CumulativePoint(90, "15.0", 146),
-            CumulativePoint(120, "20.0", 182)
-        )
+        emptyList()
     }
 
     // Generate cumulative curve for Innings 2
@@ -86,19 +77,7 @@ fun WormGraph(
             )
         }
     } else {
-        // Fallback realistic chase curve for Innings 2 preview
-        listOf(
-            CumulativePoint(6, "1.0", 10),
-            CumulativePoint(12, "2.0", 22),
-            CumulativePoint(18, "3.0", 31, isWicket = true),
-            CumulativePoint(24, "4.0", 45),
-            CumulativePoint(30, "5.0", 61),
-            CumulativePoint(36, "6.0", 70),
-            CumulativePoint(48, "8.0", 89, isWicket = true),
-            CumulativePoint(60, "10.0", 112),
-            CumulativePoint(72, "12.0", 135),
-            CumulativePoint(90, "15.0", 168)
-        )
+        emptyList()
     }
 
     val maxBalls = totalOvers * 6
@@ -155,16 +134,49 @@ fun WormGraph(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Graph Canvas
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(200.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(ElevatedSurfaceDark)
-                    .border(1.dp, CardBorderDark, RoundedCornerShape(8.dp))
-                    .padding(horizontal = 12.dp, vertical = 10.dp)
-            ) {
+            if (curve1.isEmpty() && curve2.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(160.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(ElevatedSurfaceDark)
+                        .border(1.dp, CardBorderDark, RoundedCornerShape(8.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.ShowChart,
+                            contentDescription = null,
+                            tint = TextTertiary.copy(alpha = 0.5f),
+                            modifier = Modifier.size(36.dp)
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "No deliveries bowled yet",
+                            style = BodyCaption,
+                            color = TextSecondary
+                        )
+                        Text(
+                            text = "Cumulative run progression curves will plot as match scoring begins.",
+                            style = MicroTag,
+                            color = TextTertiary,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.padding(horizontal = 24.dp, vertical = 2.dp)
+                        )
+                    }
+                }
+            } else {
+                // Graph Canvas
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(200.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(ElevatedSurfaceDark)
+                        .border(1.dp, CardBorderDark, RoundedCornerShape(8.dp))
+                        .padding(horizontal = 12.dp, vertical = 10.dp)
+                ) {
                 Canvas(modifier = Modifier.fillMaxSize()) {
                     val w = size.width
                     val h = size.height
@@ -287,7 +299,11 @@ fun WormGraph(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     LegendItem(color = Color(0xFF60A5FA), label = "$teamAName (Inn 1)")
-                    LegendItem(color = crimsonColor, label = "$teamBName (Inn 2)")
+                    if (innings2Deliveries.isNotEmpty()) {
+                        LegendItem(color = crimsonColor, label = "$teamBName (Inn 2)")
+                    } else {
+                        LegendItem(color = crimsonColor.copy(alpha = 0.5f), label = "$teamBName (Upcoming)")
+                    }
                 }
 
                 Row(
@@ -300,6 +316,7 @@ fun WormGraph(
             }
         }
     }
+}
 }
 
 @Composable

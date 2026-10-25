@@ -64,12 +64,18 @@ class AuthManager(context: Context) {
     }
 
     fun verifyPin(phoneNumber: String, pin: String): Boolean {
-        val stored = prefs.getString("pin_$phoneNumber", null)
-        return stored == pin || pin == "1234" // 1234 master test PIN fallback
+        val stored = prefs.getString("pin_$phoneNumber", null) ?: return false
+        val matches = com.cricsaga.app.ui.utils.SecurityUtils.verifyPassword(pin, stored)
+        if (matches && stored.length != 64) {
+            // Automatically upgrade legacy plaintext PIN to SHA-256 hash
+            setPin(phoneNumber, pin)
+        }
+        return matches
     }
 
     fun setPin(phoneNumber: String, pin: String) {
-        prefs.edit().putString("pin_$phoneNumber", pin).apply()
+        val hashed = com.cricsaga.app.ui.utils.SecurityUtils.hashPassword(pin)
+        prefs.edit().putString("pin_$phoneNumber", hashed).apply()
     }
 
     fun isGuest(): Boolean = _authState.value is AuthState.Guest
@@ -89,9 +95,30 @@ class AuthManager(context: Context) {
         }
     }
 
+    fun getAdminEmails(): Set<String> {
+        val extra = prefs.getStringSet("extra_admin_emails", emptySet()) ?: emptySet()
+        return ADMIN_EMAILS + extra.map { it.trim().lowercase() }.toSet()
+    }
+
     fun isAdmin(emailToCheck: String? = null): Boolean {
         val email = (emailToCheck ?: getCurrentUserEmail())?.trim()?.lowercase()
-        return email != null && ADMIN_EMAILS.contains(email)
+        return email != null && getAdminEmails().contains(email)
+    }
+
+    fun addAdminEmail(email: String) {
+        val clean = email.trim().lowercase()
+        if (clean.isBlank()) return
+        val current = prefs.getStringSet("extra_admin_emails", emptySet())?.toMutableSet() ?: mutableSetOf()
+        current.add(clean)
+        prefs.edit().putStringSet("extra_admin_emails", current).apply()
+    }
+
+    fun removeAdminEmail(email: String) {
+        val clean = email.trim().lowercase()
+        if (clean == PRIMARY_ADMIN_EMAIL) return // Protect primary admin root
+        val current = prefs.getStringSet("extra_admin_emails", emptySet())?.toMutableSet() ?: mutableSetOf()
+        current.remove(clean)
+        prefs.edit().putStringSet("extra_admin_emails", current).apply()
     }
 
     companion object {
@@ -104,8 +131,12 @@ class AuthManager(context: Context) {
         const val GUEST_USER_ID = "user_guest_scorer"
         const val DEFAULT_SEEDED_USER_ID = ""
 
+        const val PRIMARY_ADMIN_EMAIL = "kun.altf4@gmail.com"
+        const val PRIMARY_ADMIN_PHONE = "9999999999"
+        const val PRIMARY_ADMIN_USER_ID = "admin_root_kun"
+
         val ADMIN_EMAILS = setOf(
-            "kun.altf4@gmail.com"
+            PRIMARY_ADMIN_EMAIL
         )
     }
 }

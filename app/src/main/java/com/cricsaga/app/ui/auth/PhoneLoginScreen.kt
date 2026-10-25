@@ -56,8 +56,7 @@ fun PhoneLoginScreen(
         phoneNumber: String,
         city: String,
         role: PlayingRole
-    ) -> Unit,
-    onReviewerDemoSignIn: suspend () -> Unit
+    ) -> Unit
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -77,10 +76,6 @@ fun PhoneLoginScreen(
     var busyTitle by remember { mutableStateOf("Signing In") }
     var busySubtitle by remember { mutableStateOf("Connecting to Google...") }
     var authErrorMessage by remember { mutableStateOf<String?>(null) }
-
-    // Easter Egg: Tap logo 5 times to reveal Indus Store Reviewer Access
-    var logoTapCount by remember { mutableIntStateOf(0) }
-    var showReviewerCard by remember { mutableStateOf(false) }
 
     // First-time Profile Completion Dialog States
     var showProfileCompletionDialog by remember { mutableStateOf(false) }
@@ -175,22 +170,13 @@ fun PhoneLoginScreen(
             ) {
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Brand Emblem (Secret Easter Egg: 5 taps reveals Reviewer bypass)
+                // Brand Emblem
                 Image(
                     painter = painterResource(id = R.drawable.logo_round),
                     contentDescription = "CricSaga",
                     modifier = Modifier
                         .size(76.dp)
                         .clip(CircleShape)
-                        .clickable {
-                            logoTapCount++
-                            if (logoTapCount >= 5) {
-                                hapticManager?.tapBoundaryFour()
-                                showReviewerCard = true
-                            } else {
-                                hapticManager?.tapUiClick()
-                            }
-                        }
                 )
 
                 Spacer(modifier = Modifier.height(14.dp))
@@ -338,74 +324,6 @@ fun PhoneLoginScreen(
                 }
 
                 Spacer(modifier = Modifier.height(18.dp))
-
-                // Indus Appstore Reviewer Bypass Card (Secret Easter Egg - Revealed after 5 taps on logo)
-                if (showReviewerCard) {
-                    Spacer(modifier = Modifier.height(18.dp))
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)),
-                        shape = RoundedCornerShape(12.dp),
-                        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(14.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                Icon(Icons.Default.Storefront, contentDescription = null, tint = BoundaryAmber, modifier = Modifier.size(16.dp))
-                                Text(
-                                    text = "INDUS STORE REVIEWER ACCESS",
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = BoundaryAmber,
-                                    letterSpacing = 0.5.sp
-                                )
-                            }
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = "For store review engineers testing on emulator environments without active Google Play accounts.",
-                                fontSize = 11.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                textAlign = TextAlign.Center,
-                                lineHeight = 15.sp
-                            )
-                            Spacer(modifier = Modifier.height(10.dp))
-                            OutlinedButton(
-                                onClick = {
-                                    hapticManager?.tapUiClick()
-                                    isBusy = true
-                                    busyTitle = "Loading Reviewer Demo"
-                                    busySubtitle = "Preparing Indus testing environment..."
-                                    coroutineScope.launch {
-                                        try {
-                                            onReviewerDemoSignIn()
-                                        } catch (e: Exception) {
-                                            isBusy = false
-                                            authErrorMessage = "Reviewer sign in error: ${e.localizedMessage}"
-                                        }
-                                    }
-                                },
-                                enabled = !isBusy,
-                                shape = RoundedCornerShape(8.dp),
-                                border = BorderStroke(1.dp, BoundaryAmber.copy(alpha = 0.6f)),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Icon(Icons.Default.VerifiedUser, contentDescription = null, tint = BoundaryAmber, modifier = Modifier.size(14.dp))
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(
-                                    text = "Sign In as Indus Reviewer (9988776655)",
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = BoundaryAmber
-                                )
-                            }
-                        }
-                    }
-                }
             }
 
             Spacer(modifier = Modifier.height(20.dp))

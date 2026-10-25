@@ -1,12 +1,17 @@
 package com.cricsaga.app.data.repository
 
+import androidx.room.withTransaction
 import com.cricsaga.app.data.local.CricSagaDatabase
 import com.cricsaga.app.data.local.entity.*
 import com.cricsaga.app.data.remote.SupabaseClient
 import com.cricsaga.app.domain.model.*
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.UUID
 
@@ -19,6 +24,11 @@ data class MatchCreationResult(
 
 class MatchRepository(private val database: CricSagaDatabase) {
 
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private val cloudSyncScope = CoroutineScope(
+        Dispatchers.IO.limitedParallelism(1) + SupervisorJob()
+    )
+
     private val userDao = database.userDao()
     private val teamDao = database.teamDao()
     private val matchDao = database.matchDao()
@@ -30,8 +40,30 @@ class MatchRepository(private val database: CricSagaDatabase) {
     private val chatMessageDao = database.chatMessageDao()
     private val playerStatsDao = database.playerStatsDao()
     private val commentDao = database.commentDao()
+    private val redeemCodeDao = database.redeemCodeDao()
 
     fun getAllMatches(): Flow<List<MatchEntity>> = matchDao.getAllMatches()
+    fun getLiveMatchCountFlow(): Flow<Int> = matchDao.getLiveMatchCountFlow()
+    fun getCompletedMatchCountFlow(): Flow<Int> = matchDao.getCompletedMatchCountFlow()
+    fun getUserCountFlow(): Flow<Int> = userDao.getUserCountFlow()
+    fun getProUserCountFlow(): Flow<Int> = userDao.getProUserCountFlow()
+    fun getTeamCountFlow(): Flow<Int> = teamDao.getTeamCountFlow()
+    fun getDeliveryCountFlow(): Flow<Int> = deliveryDao.getDeliveryCountFlow()
+    fun getTotalRunsFlow(): Flow<Int> = deliveryDao.getTotalRunsFlow()
+    fun getFourCountFlow(): Flow<Int> = deliveryDao.getFourCountFlow()
+    fun getSixCountFlow(): Flow<Int> = deliveryDao.getSixCountFlow()
+    fun getWicketCountFlow(): Flow<Int> = deliveryDao.getWicketCountFlow()
+
+    suspend fun deleteMatch(matchId: String): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            SupabaseClient.deleteMatch(matchId)
+            matchDao.deleteMatch(matchId)
+            Result.success(Unit)
+        } catch (e: Exception) {
+            matchDao.deleteMatch(matchId)
+            Result.failure(e)
+        }
+    }
 
     fun getMatchesForUser(userId: String): Flow<List<MatchEntity>> = matchDao.getMatchesForUser(userId)
 
@@ -222,7 +254,7 @@ class MatchRepository(private val database: CricSagaDatabase) {
                 val played = teamMatches.size
                 val wins = teamMatches.count { it.winnerTeamId == team.teamId }
                 val losses = teamMatches.count { it.winnerTeamId != null && it.winnerTeamId != team.teamId }
-                val ties = teamMatches.count { it.winnerTeamId == null }
+                val ties = teamMatches.count { it.winnerTeamId == null && it.resultSummary?.contains("tied", ignoreCase = true) == true }
                 val winPct = if (played > 0) (wins.toDouble() / played.toDouble()) * 100.0 else 0.0
                 val points = (wins * 2) + (ties * 1)
                 val form = teamMatches.take(5).map { m ->
@@ -430,6 +462,11 @@ class MatchRepository(private val database: CricSagaDatabase) {
             timestamp = System.currentTimeMillis()
         )
         chatMessageDao.insertMessage(message)
+        cloudSyncScope.launch {
+            try {
+                SupabaseClient.sendChatMessage(message)
+            } catch (_: Exception) {}
+        }
         messageId
     }
 
@@ -570,7 +607,7 @@ class MatchRepository(private val database: CricSagaDatabase) {
                 userId = newUserId,
                 phoneNumber = cleanPhone,
                 fullName = name.trim().ifBlank { "Player $cleanPhone" },
-                password = password.ifBlank { "123456" },
+                password = com.cricsaga.app.ui.utils.SecurityUtils.hashPassword(password.ifBlank { "123456" }),
                 playingRole = role,
                 battingStyle = battingStyle,
                 bowlingStyle = bowlingStyle,
@@ -611,7 +648,8 @@ class MatchRepository(private val database: CricSagaDatabase) {
         totalOvers: Int,
         ballType: BallType,
         tossWinnerTeamId: String,
-        tossDecision: TossDecision
+        tossDecision: TossDecision,
+        createdByUserId: String? = null
     ): MatchCreationResult = withContext(Dispatchers.IO) {
         val matchId = UUID.randomUUID().toString()
         val inningsId = UUID.randomUUID().toString()
@@ -650,7 +688,7 @@ class MatchRepository(private val database: CricSagaDatabase) {
         )
         inningsDao.insertInnings(innings)
         try {
-            SupabaseClient.createMatch(match, innings)
+            SupabaseClient.createMatch(match, innings, createdByUserId)
         } catch (_: Exception) {}
 
         MatchCreationResult(
@@ -667,20 +705,24 @@ class MatchRepository(private val database: CricSagaDatabase) {
         newTotalWickets: Int,
         newTotalBalls: Int
     ) = withContext(Dispatchers.IO) {
-        deliveryDao.insertDelivery(delivery)
-        val innings = inningsDao.getInningsById(delivery.inningsId)
-        if (innings != null) {
-            inningsDao.updateInnings(
-                innings.copy(
-                    totalRuns = newTotalRuns,
-                    totalWickets = newTotalWickets,
-                    totalLegalDeliveries = newTotalBalls
+        database.withTransaction {
+            deliveryDao.insertDelivery(delivery)
+            val innings = inningsDao.getInningsById(delivery.inningsId)
+            if (innings != null) {
+                inningsDao.updateInnings(
+                    innings.copy(
+                        totalRuns = newTotalRuns,
+                        totalWickets = newTotalWickets,
+                        totalLegalDeliveries = newTotalBalls
+                    )
                 )
-            )
+            }
         }
-        try {
-            SupabaseClient.recordDelivery(delivery, newTotalRuns, newTotalWickets, newTotalBalls)
-        } catch (_: Exception) {}
+        cloudSyncScope.launch {
+            try {
+                SupabaseClient.recordDelivery(delivery, newTotalRuns, newTotalWickets, newTotalBalls)
+            } catch (_: Exception) {}
+        }
     }
 
     suspend fun undoLastDelivery(
@@ -689,17 +731,34 @@ class MatchRepository(private val database: CricSagaDatabase) {
         revertedWickets: Int,
         revertedBalls: Int
     ): Boolean = withContext(Dispatchers.IO) {
-        val deletedCount = deliveryDao.deleteLastDelivery(inningsId)
+        val (deletedCount, lastDeliv) = database.withTransaction {
+            val lastDeliv = deliveryDao.getLastDelivery(inningsId)
+            val deletedCount = deliveryDao.deleteLastDelivery(inningsId)
+            if (deletedCount > 0) {
+                val innings = inningsDao.getInningsById(inningsId)
+                if (innings != null) {
+                    inningsDao.updateInnings(
+                        innings.copy(
+                            totalRuns = revertedRuns,
+                            totalWickets = revertedWickets,
+                            totalLegalDeliveries = revertedBalls
+                        )
+                    )
+                }
+            }
+            Pair(deletedCount, lastDeliv)
+        }
         if (deletedCount > 0) {
-            val innings = inningsDao.getInningsById(inningsId)
-            if (innings != null) {
-                inningsDao.updateInnings(
-                    innings.copy(
+            cloudSyncScope.launch {
+                try {
+                    SupabaseClient.undoDelivery(
+                        deliveryId = lastDeliv?.deliveryId,
+                        inningsId = inningsId,
                         totalRuns = revertedRuns,
                         totalWickets = revertedWickets,
-                        totalLegalDeliveries = revertedBalls
+                        legalDeliveries = revertedBalls
                     )
-                )
+                } catch (_: Exception) {}
             }
             true
         } else {
@@ -727,6 +786,11 @@ class MatchRepository(private val database: CricSagaDatabase) {
             isCompleted = false
         )
         inningsDao.insertInnings(innings)
+        cloudSyncScope.launch {
+            try {
+                SupabaseClient.createInnings(innings)
+            } catch (_: Exception) {}
+        }
         inningsId
     }
 
@@ -746,6 +810,17 @@ class MatchRepository(private val database: CricSagaDatabase) {
             resultSummary = resultSummary,
             playerOfTheMatchId = playerOfTheMatchId
         )
+        cloudSyncScope.launch {
+            try {
+                SupabaseClient.updateMatchCompletion(
+                    matchId = matchId,
+                    matchStatus = MatchStatus.COMPLETED.name,
+                    winnerTeamId = winnerTeamId,
+                    resultSummary = resultSummary,
+                    playerOfTheMatchId = playerOfTheMatchId
+                )
+            } catch (_: Exception) {}
+        }
     }
 
     fun getInningsForMatch(matchId: String): Flow<List<InningsEntity>> = inningsDao.getInningsForMatch(matchId)
@@ -765,23 +840,40 @@ class MatchRepository(private val database: CricSagaDatabase) {
         } catch (_: Exception) {}
     }
 
+    suspend fun insertUsers(users: List<UserEntity>) = withContext(Dispatchers.IO) {
+        userDao.insertUsers(users)
+    }
+
     suspend fun updateUser(user: UserEntity) = withContext(Dispatchers.IO) {
         userDao.updateUser(user)
+        try {
+            SupabaseClient.updateUser(user)
+        } catch (_: Exception) {}
     }
 
     suspend fun updateUserProStatus(userId: String, isPro: Boolean) = withContext(Dispatchers.IO) {
         userDao.updateUserProStatus(userId, isPro)
+        try {
+            SupabaseClient.updateUserProStatus(userId, isPro)
+        } catch (_: Exception) {}
     }
 
     suspend fun updateUserPassword(userId: String, newPassword: String) = withContext(Dispatchers.IO) {
-        userDao.updateUserPassword(userId, newPassword)
+        val hashedPassword = com.cricsaga.app.ui.utils.SecurityUtils.hashPassword(newPassword)
+        userDao.updateUserPassword(userId, hashedPassword)
+        try {
+            SupabaseClient.updateUserPassword(userId, newPassword)
+        } catch (_: Exception) {}
     }
 
-    suspend fun deleteUserById(userId: String) = withContext(Dispatchers.IO) {
-        userDao.deleteUserById(userId)
+    suspend fun deleteUserById(userId: String): Result<Unit> = withContext(Dispatchers.IO) {
         try {
-            SupabaseClient.deleteUser(userId)
-        } catch (_: Exception) {}
+            val remoteResult = SupabaseClient.deleteUser(userId)
+            userDao.deleteUserById(userId)
+            remoteResult
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
     }
 
     suspend fun clearLocalCache() = withContext(Dispatchers.IO) {
@@ -792,33 +884,38 @@ class MatchRepository(private val database: CricSagaDatabase) {
 
     suspend fun syncRemoteToLocal(currentUserId: String? = null) = withContext(Dispatchers.IO) {
         try {
-            // 1. Sync Users from cloud
+            // 1. Sync Users from cloud (Additive Upsert)
             val usersResult = SupabaseClient.getAllUsers()
             if (usersResult.isSuccess) {
                 val remoteUsers = usersResult.getOrNull() ?: emptyList()
                 if (remoteUsers.isNotEmpty()) {
                     userDao.insertUsers(remoteUsers)
                 }
-            }
-
-            // 2. Sync Teams from cloud
-            val teamsResult = SupabaseClient.getAllTeams()
-            if (teamsResult.isSuccess) {
-                val remoteTeams = teamsResult.getOrNull() ?: emptyList()
-                val remoteTeamIds = remoteTeams.map { it.teamId }
-                if (remoteTeams.isNotEmpty()) {
-                    teamDao.insertTeams(remoteTeams)
-                    teamDao.deleteTeamsNotIn(remoteTeamIds)
-                } else {
-                    teamDao.deleteTeamsNotIn(listOf("__none__"))
+                // Upload any unsynced local users to cloud
+                val remoteUserIds = remoteUsers.map { it.userId }.toSet()
+                val localUsers = userDao.getAllUsersList()
+                for (localUser in localUsers) {
+                    if (!remoteUserIds.contains(localUser.userId) && localUser.userId != "user_guest_scorer") {
+                        try {
+                            SupabaseClient.signUpUser(localUser)
+                        } catch (_: Exception) {}
+                    }
                 }
             }
 
-            // 3. Sync Team Members from cloud
+            // 2. Sync Teams from cloud (Additive Upsert - Preserve local offline teams)
+            val teamsResult = SupabaseClient.getAllTeams()
+            if (teamsResult.isSuccess) {
+                val remoteTeams = teamsResult.getOrNull() ?: emptyList()
+                if (remoteTeams.isNotEmpty()) {
+                    teamDao.insertTeams(remoteTeams)
+                }
+            }
+
+            // 3. Sync Team Members from cloud (Additive Upsert - Preserve local offline squads)
             val membersResult = SupabaseClient.getAllTeamMembers()
             if (membersResult.isSuccess) {
                 val remoteMembers = membersResult.getOrNull() ?: emptyList()
-                teamDao.clearAllTeamMembers()
                 if (remoteMembers.isNotEmpty()) {
                     val memberEntities = remoteMembers.map { (teamId, userId) ->
                         TeamMemberEntity(teamId = teamId, userId = userId)
@@ -827,16 +924,64 @@ class MatchRepository(private val database: CricSagaDatabase) {
                 }
             }
 
-            // 4. Sync Matches from cloud
+            // 4. Sync Matches from cloud (Additive Upsert - Preserve local offline matches)
             val matchesResult = SupabaseClient.getAllMatches()
             if (matchesResult.isSuccess) {
                 val remoteMatches = matchesResult.getOrNull() ?: emptyList()
-                val remoteMatchIds = remoteMatches.map { it.matchId }
                 if (remoteMatches.isNotEmpty()) {
                     matchDao.insertMatches(remoteMatches)
-                    matchDao.deleteMatchesNotIn(remoteMatchIds)
-                } else {
-                    matchDao.deleteMatchesNotIn(listOf("__none__"))
+                }
+            }
+
+            // 5. Sync Innings from cloud (Additive Upsert - Preserve local offline innings)
+            val inningsResult = SupabaseClient.getAllInnings()
+            if (inningsResult.isSuccess) {
+                val remoteInnings = inningsResult.getOrNull() ?: emptyList()
+                if (remoteInnings.isNotEmpty()) {
+                    inningsDao.insertInningsList(remoteInnings)
+                }
+            }
+
+            // 6. Sync Chat Messages for user if signed in
+            if (!currentUserId.isNullOrBlank()) {
+                val chatResult = SupabaseClient.fetchChatMessagesForUser(currentUserId)
+                if (chatResult.isSuccess) {
+                    val remoteMessages = chatResult.getOrNull() ?: emptyList()
+                    remoteMessages.forEach { remoteMsg ->
+                        chatMessageDao.insertMessage(remoteMsg)
+                    }
+                }
+            }
+
+            // 7. Sync Promo Codes from cloud
+            val codesResult = SupabaseClient.getAllRemoteRedeemCodes()
+            if (codesResult.isSuccess) {
+                val remoteCodes = codesResult.getOrNull() ?: emptyList()
+                if (remoteCodes.isNotEmpty()) {
+                    redeemCodeDao.insertCodes(remoteCodes)
+                }
+            }
+        } catch (_: Exception) {
+            // Offline-resilient: retain local SQLite cache if network is unreachable
+        }
+    }
+
+    suspend fun syncScorecardForMatch(matchId: String) = withContext(Dispatchers.IO) {
+        try {
+            val inningsResult = SupabaseClient.getInningsByMatchId(matchId)
+            if (inningsResult.isSuccess) {
+                val remoteInnings = inningsResult.getOrNull() ?: emptyList()
+                if (remoteInnings.isNotEmpty()) {
+                    inningsDao.insertInningsList(remoteInnings)
+                    for (inn in remoteInnings) {
+                        val delivResult = SupabaseClient.getDeliveriesByInningsId(inn.inningsId)
+                        if (delivResult.isSuccess) {
+                            val remoteDeliveries = delivResult.getOrNull() ?: emptyList()
+                            if (remoteDeliveries.isNotEmpty()) {
+                                deliveryDao.insertDeliveries(remoteDeliveries)
+                            }
+                        }
+                    }
                 }
             }
         } catch (_: Exception) {
@@ -870,7 +1015,7 @@ class MatchRepository(private val database: CricSagaDatabase) {
         val cleanPhone = phoneNumber.filter { it.isDigit() }.takeLast(10)
         val user = userDao.getUserByPhone(cleanPhone) ?: userDao.getUserByPhone(phoneNumber)
         if (user != null) {
-            if (user.password.isNotBlank() && user.password == password) {
+            if (user.password.isNotBlank() && com.cricsaga.app.ui.utils.SecurityUtils.verifyPassword(password, user.password)) {
                 return@withContext user
             }
         }
@@ -880,14 +1025,29 @@ class MatchRepository(private val database: CricSagaDatabase) {
     fun getAllUsers(): Flow<List<UserEntity>> = userDao.getAllUsers()
 
     suspend fun recordMatchPlayerStats(
+        matchId: String? = null,
         innings1: InningsScoreState?,
-        innings2: InningsScoreState
+        innings2: InningsScoreState,
+        squadPlayerIds: Collection<String> = emptySet()
     ) = withContext(Dispatchers.IO) {
+        if (matchId != null) {
+            val match = matchDao.getMatchById(matchId)
+            if (match?.isStatsRecorded == true) {
+                // Idempotent guard: career stats have already been calculated and committed for this match
+                return@withContext
+            }
+        }
+
         val playerStatsDao = database.playerStatsDao()
         val allPlayerIds = mutableSetOf<String>()
+        allPlayerIds.addAll(squadPlayerIds)
         listOfNotNull(innings1, innings2).forEach { inn ->
             allPlayerIds.addAll(inn.batsmen.keys)
             allPlayerIds.addAll(inn.bowlers.keys)
+            inn.batsmen.values.forEach { b ->
+                b.dismissal?.primaryFielderId?.let { if (it.isNotBlank()) allPlayerIds.add(it) }
+                b.dismissal?.secondaryFielderId?.let { if (it.isNotBlank()) allPlayerIds.add(it) }
+            }
         }
 
         allPlayerIds.forEach { playerId ->
@@ -898,11 +1058,18 @@ class MatchRepository(private val database: CricSagaDatabase) {
             var addedFours = 0
             var addedSixes = 0
             var battedInMatch = false
+            var wasDismissed = false
 
             var addedBallsBowled = 0
             var addedRunsConceded = 0
             var addedWickets = 0
             var addedMaidens = 0
+            var addedThreeWickets = 0
+            var addedFiveWickets = 0
+
+            var addedCatches = 0
+            var addedRunOuts = 0
+            var addedStumpings = 0
 
             listOfNotNull(innings1, innings2).forEach { inn ->
                 inn.batsmen[playerId]?.let { b ->
@@ -912,6 +1079,9 @@ class MatchRepository(private val database: CricSagaDatabase) {
                         addedBalls += b.ballsFaced
                         addedFours += b.fours
                         addedSixes += b.sixes
+                        if (b.isOut) {
+                            wasDismissed = true
+                        }
                     }
                 }
                 inn.bowlers[playerId]?.let { bow ->
@@ -920,6 +1090,41 @@ class MatchRepository(private val database: CricSagaDatabase) {
                         addedRunsConceded += bow.runsConceded
                         addedWickets += bow.wickets
                         addedMaidens += bow.maidens
+                        if (bow.wickets >= 5) {
+                            addedFiveWickets += 1
+                        } else if (bow.wickets >= 3) {
+                            addedThreeWickets += 1
+                        }
+                    }
+                }
+
+                // Check fielding contributions across all dismissals in this innings
+                inn.batsmen.values.forEach { b ->
+                    val d = b.dismissal
+                    if (d != null) {
+                        when (d.dismissalType) {
+                            DismissalType.CAUGHT, DismissalType.CAUGHT_BEHIND -> {
+                                if (d.primaryFielderId == playerId || d.secondaryFielderId == playerId) {
+                                    addedCatches += 1
+                                }
+                            }
+                            DismissalType.CAUGHT_AND_BOWLED -> {
+                                if (d.primaryFielderId == playerId) {
+                                    addedCatches += 1
+                                }
+                            }
+                            DismissalType.STUMPED -> {
+                                if (d.primaryFielderId == playerId) {
+                                    addedStumpings += 1
+                                }
+                            }
+                            DismissalType.RUN_OUT -> {
+                                if (d.primaryFielderId == playerId || d.secondaryFielderId == playerId) {
+                                    addedRunOuts += 1
+                                }
+                            }
+                            else -> {}
+                        }
                     }
                 }
             }
@@ -927,10 +1132,12 @@ class MatchRepository(private val database: CricSagaDatabase) {
             val highest = maxOf(existing.highestScore, addedRuns)
             val fifties = existing.fifties + (if (addedRuns in 50..99) 1 else 0)
             val hundreds = existing.hundreds + (if (addedRuns >= 100) 1 else 0)
+            val addedNotOut = if (battedInMatch && !wasDismissed) 1 else 0
 
             val updated = existing.copy(
                 matches = existing.matches + 1,
                 innings = existing.innings + (if (battedInMatch) 1 else 0),
+                notOuts = existing.notOuts + addedNotOut,
                 runsScored = existing.runsScored + addedRuns,
                 ballsFaced = existing.ballsFaced + addedBalls,
                 highestScore = highest,
@@ -941,9 +1148,18 @@ class MatchRepository(private val database: CricSagaDatabase) {
                 legalBallsBowled = existing.legalBallsBowled + addedBallsBowled,
                 runsConceded = existing.runsConceded + addedRunsConceded,
                 wicketsTaken = existing.wicketsTaken + addedWickets,
-                maidens = existing.maidens + addedMaidens
+                maidens = existing.maidens + addedMaidens,
+                catches = existing.catches + addedCatches,
+                runOuts = existing.runOuts + addedRunOuts,
+                stumpings = existing.stumpings + addedStumpings,
+                threeWicketHauls = existing.threeWicketHauls + addedThreeWickets,
+                fiveWicketHauls = existing.fiveWicketHauls + addedFiveWickets
             )
             playerStatsDao.insertOrUpdate(updated)
+        }
+
+        if (matchId != null) {
+            matchDao.markStatsRecorded(matchId)
         }
     }
 }

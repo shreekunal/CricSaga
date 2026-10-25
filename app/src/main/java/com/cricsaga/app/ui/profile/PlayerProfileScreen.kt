@@ -104,7 +104,7 @@ fun PlayerProfileScreen(
     val totalFours = playerStats?.fours ?: 0
     val totalSixes = playerStats?.sixes ?: 0
 
-    val batAvg = if (totalInnings > 0) String.format(java.util.Locale.US, "%.1f", totalRuns.toDouble() / totalInnings.toDouble()) else "0.0"
+    val batAvg = String.format(java.util.Locale.US, "%.1f", playerStats?.battingAverage ?: 0.0)
     val batSr = if (totalBalls > 0) String.format(java.util.Locale.US, "%.1f", (totalRuns.toDouble() / totalBalls.toDouble()) * 100.0) else "0.0"
     val bowlEcon = if (totalBallsBowled > 0) String.format(java.util.Locale.US, "%.2f", (totalRunsConceded.toDouble() / (totalBallsBowled.toDouble() / 6.0))) else "0.0"
     val bowlAvg = if (totalWickets > 0) String.format(java.util.Locale.US, "%.2f", totalRunsConceded.toDouble() / totalWickets.toDouble()) else "0.0"
@@ -113,15 +113,17 @@ fun PlayerProfileScreen(
     val fiftyCount = playerStats?.fifties ?: 0
     val potmCount = userMatches.count { it.playerOfTheMatchId == currentUser?.userId }
     val totalWicketsCount = playerStats?.wicketsTaken ?: 0
-    val fiveWicketsCount = if (totalWicketsCount >= 5) totalWicketsCount / 5 else 0
-    val threeWicketsCount = if (totalWicketsCount >= 3) totalWicketsCount / 3 else 0
+    val fiveWicketsCount = playerStats?.fiveWicketHauls ?: 0
+    val threeWicketsCount = playerStats?.threeWicketHauls ?: 0
     val sixesCount = playerStats?.sixes ?: 0
-    val superSixerCount = if (sixesCount >= 3) sixesCount / 3 else 0
+    val superSixerCount = sixesCount
     val foursCount = playerStats?.fours ?: 0
-    val boundaryKingCount = if (foursCount >= 5) foursCount / 5 else 0
+    val boundaryKingCount = foursCount
     val strikeAcceleratorCount = if ((batSr.toDoubleOrNull() ?: 0.0) >= 150.0 && totalRuns >= 20) 1 else 0
     val economyMaestroCount = if (totalBallsBowled >= 12 && (bowlEcon.toDoubleOrNull() ?: 99.0) <= 5.0) 1 else 0
     val safeHandsCount = playerStats?.catches ?: 0
+    val runOutsCount = playerStats?.runOuts ?: 0
+    val stumpingsCount = playerStats?.stumpings ?: 0
 
     val amberColor = BoundaryAmber
     val greenColor = ForestSixPrimary
@@ -178,7 +180,7 @@ fun PlayerProfileScreen(
             MatchBadgeItem(
                 title = "SUPER SIXER",
                 category = "POWER HITTING",
-                description = "Smash 3 or more sixes in a single match innings.",
+                description = "Maximum sixes launched into the stands across grassroots tournaments.",
                 count = superSixerCount,
                 icon = Icons.Default.RocketLaunch,
                 accentColor = greenColor
@@ -186,7 +188,7 @@ fun PlayerProfileScreen(
             MatchBadgeItem(
                 title = "BOUNDARY KING",
                 category = "BALL STRIKING",
-                description = "Hit 5 or more fours in a single match innings.",
+                description = "Total fours hammered to the boundary rope across career matches.",
                 count = boundaryKingCount,
                 icon = Icons.Default.LocalFireDepartment,
                 accentColor = amberColor
@@ -589,8 +591,8 @@ fun PlayerProfileScreen(
                                         HonourBadgeCard(
                                             icon = Icons.Default.Shield,
                                             title = "SAFE HANDS",
-                                            subtitle = "0 Catches",
-                                            isUnlocked = false,
+                                            subtitle = if (safeHandsCount > 0) "$safeHandsCount Catches" else "0 Catches",
+                                            isUnlocked = safeHandsCount > 0,
                                             modifier = Modifier.weight(1f)
                                         )
                                     }
@@ -610,7 +612,7 @@ fun PlayerProfileScreen(
                                     TableStatRow("Bowling Economy", if (totalBallsBowled > 0) bowlEcon else "-")
                                     TableStatRow("Best Bowling", "-")
                                     TableStatRow("Fifties / Hundreds", "$totalFifties / $totalHundreds")
-                                    TableStatRow("Catches / Run Outs", "0 / 0")
+                                    TableStatRow("Catches / Run Outs", "$safeHandsCount / $runOutsCount")
                                 }
                             }
                         }
@@ -900,9 +902,8 @@ fun PlayerProfileScreen(
                                     }
                                     Spacer(modifier = Modifier.height(10.dp))
                                     TableStatRow("Catches", "$safeHandsCount")
-                                    TableStatRow("Direct Run Outs", "0")
-                                    TableStatRow("Assisted Run Outs", "0")
-                                    TableStatRow("Stumpings", "0")
+                                    TableStatRow("Run Outs", "$runOutsCount")
+                                    TableStatRow("Stumpings", "$stumpingsCount")
                                 }
                             }
                         }

@@ -12,7 +12,7 @@ data class UserEntity(
     val userId: String,
     val phoneNumber: String,
     val fullName: String,
-    val password: String = "123456",
+    val password: String = "",
     val email: String? = null,
     val googleId: String? = null,
     val profilePhotoUrl: String? = null,
@@ -22,5 +22,7 @@ data class UserEntity(
     val city: String = "",
     val jerseyNumber: String = "18",
     val isPro: Boolean = false,
+    val proPlan: String? = null,
+    val proExpiresAt: Long? = null,
     val createdAt: Long = System.currentTimeMillis()
 )

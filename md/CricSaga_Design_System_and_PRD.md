@@ -201,7 +201,7 @@ erDiagram
 
 * **Pro Activation:** Users can activate/redeem Pro membership using **Redeem Codes** directly provided to them, cutting 3rd-party payment gateway fees in initial days.
 * **Three Plan Types:**
-  1. **₹99 for 3 Months** (Seasonal League Pass)
+  1. **₹99 for 1 Month** (Monthly League Pass)
   2. **₹199 for 1 Year** (Annual Pass - Most Popular)
   3. **₹2,000 for Lifetime** (VIP Founder Pass)
 * **Free User Policy:**
@@ -209,7 +209,7 @@ erDiagram
   - **Minimal Ads:** Non-intrusive banner ads only (local sports sponsors, turfs). Strictly **NO** annoying interstitial popups before balls, **NO** unskippable video ads, and **NO** betting/gambling app ads (unlike CricHeroes' heavy barrage of betting sponsors).
 * **Architecture Cleanliness:** Historical scorecard migration/extraction from CricHeroes is decoupled into a **separate companion app / utility**, keeping this core scoring APK 100% lightweight and clean.
 
-| Feature | **Free Tier (Minimal Ads)** | **Pro Tier (₹99 / 3mo, ₹199 / 1yr, ₹2000 / Life)** |
+| Feature | **Free Tier (Minimal Ads)** | **Pro Tier (₹99 / 1mo, ₹199 / 1yr, ₹1,999 / Life)** |
 | :--- | :---: | :---: |
 | **User Registration & Profile** | Full | Full |
 | **Team Creation & Rosters** | Unlimited | Unlimited |

@@ -1,7 +1,12 @@
 {
   "latest_version_code": 5,
+  "version_code": 5,
   "latest_version_name": "1.0.4",
+  "version_name": "1.0.4",
   "apk_url": "https://wyycmghdkcgdmoaaleki.supabase.co/storage/v1/object/public/app-updates/app-release.apk",
-  "changelog": "• Google Account Switching: Seamlessly switch between multiple Gmail accounts\n• Bidirectional Cloud Sync: Real-time synchronization between Room SQLite & Supabase PostgreSQL\n• Cache Isolation: Automatic cache purge on logout preventing cross-account data leaks\n• Squad & Roster Optimization: Zero mock data in player profiles & leaderboards\n• 5-Over Match Verification: End-to-end verified match lifecycle & POTM calculation",
-  "is_force_update": false
+  "download_url": "https://wyycmghdkcgdmoaaleki.supabase.co/storage/v1/object/public/app-updates/app-release.apk",
+  "changelog": "• Google Account Switching: Seamlessly switch between multiple Gmail accounts\n• Bidirectional Cloud Sync: Real-time synchronization between Room SQLite & Supabase PostgreSQL\n• Squad & Roster Optimization: Zero mock data in player profiles & leaderboards\n• 5-Over Match Verification: End-to-end verified match lifecycle & POTM calculation",
+  "release_notes": "• Google Account Switching: Seamlessly switch between multiple Gmail accounts\n• Bidirectional Cloud Sync: Real-time synchronization between Room SQLite & Supabase PostgreSQL\n• Squad & Roster Optimization: Zero mock data in player profiles & leaderboards\n• 5-Over Match Verification: End-to-end verified match lifecycle & POTM calculation",
+  "is_force_update": false,
+  "sha256": "1fe28a4fdbfd035dbef83e58eff9e2163d1911cf50a343e92c6f9d8c8a9b80b2"
 }

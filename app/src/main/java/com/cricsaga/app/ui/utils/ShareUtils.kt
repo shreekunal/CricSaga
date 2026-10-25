@@ -8,6 +8,7 @@ import com.cricsaga.app.domain.model.InningsScoreState
 import com.cricsaga.app.domain.model.MatchResult
 import java.io.File
 import java.io.FileOutputStream
+import java.util.Locale
 
 object ShareUtils {
 
@@ -112,7 +113,7 @@ object ShareUtils {
             textSize = 34f
             isAntiAlias = true
         }
-        canvas.drawText("${inn1Score.oversFormatted} ov • CRR: ${String.format("%.2f", inn1Score.currentRunRate)}", 120f, 620f, oversPaint)
+        canvas.drawText("${inn1Score.oversFormatted} ov • CRR: ${String.format(Locale.US, "%.2f", inn1Score.currentRunRate)}", 120f, 620f, oversPaint)
 
         // Innings 2 Section (if available)
         if (firstInningsScore != null) {
@@ -120,7 +121,7 @@ object ShareUtils {
 
             canvas.drawText(battingTeamName.uppercase(), 120f, 780f, teamNamePaint)
             canvas.drawText("${scoreState.totalRuns}/${scoreState.totalWickets}", 120f, 870f, scorePaint)
-            canvas.drawText("${scoreState.oversFormatted} ov • CRR: ${String.format("%.2f", scoreState.currentRunRate)}", 120f, 930f, oversPaint)
+            canvas.drawText("${scoreState.oversFormatted} ov • CRR: ${String.format(Locale.US, "%.2f", scoreState.currentRunRate)}", 120f, 930f, oversPaint)
         }
 
         // Top Performers section

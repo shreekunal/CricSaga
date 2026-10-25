@@ -6,8 +6,11 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -20,6 +23,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cricsaga.app.domain.model.DeliveryRecord
@@ -41,31 +45,17 @@ fun ManhattanChart(
 ) {
     val overStats = if (deliveries.isNotEmpty()) {
         val grouped = deliveries.groupBy { it.overNumber }
-        val maxOver = deliveries.maxOfOrNull { it.overNumber } ?: 1
-        (1..maxOver).map { over ->
-            val list = grouped[over] ?: emptyList()
+        val maxOver = deliveries.maxOfOrNull { it.overNumber } ?: 0
+        (0..maxOver).map { overIdx ->
+            val list = grouped[overIdx] ?: emptyList()
             OverBarData(
-                overNumber = over,
+                overNumber = overIdx + 1,
                 runs = list.sumOf { it.totalRunsThisBall },
                 wickets = list.count { it.dismissal != null }
             )
         }
     } else {
-        // Fallback realistic progression for demo preview
-        listOf(
-            OverBarData(1, 6, 0),
-            OverBarData(2, 4, 1),
-            OverBarData(3, 12, 0),
-            OverBarData(4, 8, 0),
-            OverBarData(5, 15, 0),
-            OverBarData(6, 11, 1),
-            OverBarData(7, 5, 0),
-            OverBarData(8, 7, 0),
-            OverBarData(9, 14, 0),
-            OverBarData(10, 9, 1),
-            OverBarData(11, 18, 0),
-            OverBarData(12, 6, 0)
-        )
+        emptyList()
     }
 
     val maxRuns = max(overStats.maxOfOrNull { it.runs } ?: 10, 16)
@@ -119,16 +109,49 @@ fun ManhattanChart(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Graph Canvas
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(190.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(ElevatedSurfaceDark)
-                    .border(1.dp, CardBorderDark, RoundedCornerShape(8.dp))
-                    .padding(horizontal = 12.dp, vertical = 10.dp)
-            ) {
+            if (overStats.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(160.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(ElevatedSurfaceDark)
+                        .border(1.dp, CardBorderDark, RoundedCornerShape(8.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(
+                            Icons.Default.BarChart,
+                            contentDescription = null,
+                            tint = TextTertiary.copy(alpha = 0.5f),
+                            modifier = Modifier.size(36.dp)
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "No overs bowled yet",
+                            style = BodyCaption,
+                            color = TextSecondary
+                        )
+                        Text(
+                            text = "Over-by-over Manhattan runs and wickets will appear once live scoring begins.",
+                            style = MicroTag,
+                            color = TextTertiary,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.padding(horizontal = 24.dp, vertical = 2.dp)
+                        )
+                    }
+                }
+            } else {
+                // Graph Canvas
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(190.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(ElevatedSurfaceDark)
+                        .border(1.dp, CardBorderDark, RoundedCornerShape(8.dp))
+                        .padding(horizontal = 12.dp, vertical = 10.dp)
+                ) {
                 Canvas(modifier = Modifier.fillMaxSize()) {
                     val w = size.width
                     val h = size.height
@@ -230,6 +253,7 @@ fun ManhattanChart(
             }
         }
     }
+}
 }
 
 @Composable

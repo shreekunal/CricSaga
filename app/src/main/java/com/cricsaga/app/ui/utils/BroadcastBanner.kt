@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.sp
 import com.cricsaga.app.ui.theme.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import java.util.Locale
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
@@ -52,7 +53,7 @@ object BroadcastNotifier {
         _currentEvent.value = BroadcastEvent(
             tag = "INNINGS BREAK",
             title = "Target Set: $target Runs",
-            detail = "Required Run Rate: ${String.format("%.2f", rrr)} per over",
+            detail = "Required Run Rate: ${String.format(Locale.US, "%.2f", rrr)} per over",
             icon = Icons.Default.Info,
             accentColor = DarkBrandPrimary
         )

@@ -78,10 +78,6 @@ fun SettingsScreen(
     var cacheClearedMessage by remember { mutableStateOf(false) }
     var cacheSizeText by remember { mutableStateOf(getCacheDirectorySize(context)) }
 
-    // Admin PIN prompt
-    var showAdminPinDialog by remember { mutableStateOf(false) }
-    var adminPinInput by remember { mutableStateOf("") }
-    var adminPinError by remember { mutableStateOf<String?>(null) }
 
     // OTA In-App Updater
     var isCheckingUpdate by remember { mutableStateOf(false) }
@@ -533,9 +529,7 @@ fun SettingsScreen(
                             },
                             onClick = {
                                 hapticManager.tapUiClick()
-                                adminPinInput = ""
-                                adminPinError = null
-                                showAdminPinDialog = true
+                                onNavigateToAdmin()
                             }
                         )
                     }
@@ -726,81 +720,6 @@ fun SettingsScreen(
             )
         }
 
-        // Admin Master PIN Dialog
-        if (showAdminPinDialog) {
-            AlertDialog(
-                onDismissRequest = { showAdminPinDialog = false },
-                containerColor = SlateSurfaceDark,
-                shape = RoundedCornerShape(18.dp),
-                title = {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Security,
-                            contentDescription = null,
-                            tint = BoundaryAmber,
-                            modifier = Modifier.size(22.dp)
-                        )
-                        Text("Admin Verification", style = PlayerNamePrimary, color = TextPrimary)
-                    }
-                },
-                text = {
-                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Text(
-                            text = "Enter master admin PIN (123456) to access direct database controls and store reviewer utilities.",
-                            style = BodyCaption,
-                            color = TextSecondary
-                        )
-                        OutlinedTextField(
-                            value = adminPinInput,
-                            onValueChange = {
-                                if (it.length <= 6) {
-                                    adminPinInput = it
-                                    adminPinError = null
-                                }
-                            },
-                            label = { Text("Master PIN", fontSize = 12.sp) },
-                            placeholder = { Text("123456", fontSize = 12.sp) },
-                            visualTransformation = PasswordVisualTransformation(),
-                            keyboardOptions = KeyboardOptions(
-                                keyboardType = KeyboardType.NumberPassword
-                            ),
-                            singleLine = true,
-                            shape = RoundedCornerShape(10.dp),
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        if (adminPinError != null) {
-                            Text(adminPinError ?: "", color = DismissalRed, style = BodyCaption)
-                        }
-                    }
-                },
-                confirmButton = {
-                    Button(
-                        onClick = {
-                            if (adminPinInput == "123456" || adminPinInput == "2026") {
-                                showAdminPinDialog = false
-                                hapticManager.tapBoundaryFour()
-                                onNavigateToAdmin()
-                            } else {
-                                hapticManager.tapWicket()
-                                adminPinError = "Invalid PIN. Default admin PIN is 123456."
-                            }
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = CrimsonPrimaryDark),
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
-                        Text("Unlock Console", color = Color.White, fontWeight = FontWeight.Bold)
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = { showAdminPinDialog = false }) {
-                        Text("Cancel", color = TextSecondary)
-                    }
-                }
-            )
-        }
 
         // OTA Update Dialog
         if (showUpdateDialog && updateInfo != null) {
@@ -846,7 +765,8 @@ fun SettingsScreen(
                             UpdateManager.downloadAndInstallApk(
                                 context = context,
                                 apkUrl = info.downloadUrl,
-                                versionName = info.latestVersionName
+                                versionName = info.latestVersionName,
+                                expectedSha256 = info.sha256Checksum
                             )
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = ForestSixPrimary),

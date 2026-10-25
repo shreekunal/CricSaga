@@ -39,11 +39,20 @@ interface MatchDao {
         playerOfTheMatchId: String?
     )
 
+    @Query("UPDATE matches SET isStatsRecorded = 1 WHERE matchId = :matchId")
+    suspend fun markStatsRecorded(matchId: String)
+
     @Query("SELECT * FROM matches WHERE matchId = :matchId")
     suspend fun getMatchById(matchId: String): MatchEntity?
 
     @Query("SELECT * FROM matches ORDER BY createdAt DESC")
     fun getAllMatches(): Flow<List<MatchEntity>>
+
+    @Query("SELECT COUNT(*) FROM matches WHERE matchStatus = 'LIVE'")
+    fun getLiveMatchCountFlow(): Flow<Int>
+
+    @Query("SELECT COUNT(*) FROM matches WHERE matchStatus = 'COMPLETED'")
+    fun getCompletedMatchCountFlow(): Flow<Int>
 
     @Query("SELECT * FROM matches ORDER BY createdAt DESC")
     suspend fun getAllMatchesList(): List<MatchEntity>
@@ -67,6 +76,9 @@ interface MatchDao {
 interface InningsDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertInnings(innings: InningsEntity)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertInningsList(inningsList: List<InningsEntity>)
 
     @Update
     suspend fun updateInnings(innings: InningsEntity)

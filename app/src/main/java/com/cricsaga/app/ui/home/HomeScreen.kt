@@ -103,6 +103,22 @@ fun HomeScreen(
     val hapticManager = com.cricsaga.app.ui.utils.LocalHapticManager.current
     val context = LocalContext.current
 
+    // Android 13+ Notification Permission Request
+    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+        val permissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+            contract = androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
+        ) {}
+        LaunchedEffect(Unit) {
+            val hasPermission = androidx.core.content.ContextCompat.checkSelfPermission(
+                context,
+                android.Manifest.permission.POST_NOTIFICATIONS
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+            if (!hasPermission) {
+                permissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+            }
+        }
+    }
+
     // In-App OTA Update Check
     var availableUpdate by remember { mutableStateOf<AppUpdateInfo?>(null) }
     var showHomeUpdateDialog by remember { mutableStateOf(false) }
@@ -131,9 +147,9 @@ fun HomeScreen(
     val activeRadarMatches = remember(matches) {
         val liveOrRecent = matches.filter { it.matchStatus == MatchStatus.LIVE || it.matchStatus == MatchStatus.COMPLETED }
         liveOrRecent.map { m ->
-            val parts = m.matchTitle.split(" vs ")
-            val teamA = parts.getOrNull(0) ?: "Team A"
-            val teamB = parts.getOrNull(1) ?: "Team B"
+            val parts = m.matchTitle.split(Regex("(?i)\\s+(?:vs|v)\\.?\\s+"))
+            val teamA = parts.getOrNull(0)?.trim()?.ifEmpty { "Team A" } ?: "Team A"
+            val teamB = parts.getOrNull(1)?.trim()?.ifEmpty { "Team B" } ?: "Team B"
             val ballTypeStr = m.ballType.name.replace("_", " ").lowercase().replaceFirstChar { it.uppercase() }
             LiveRadarItem(
                 matchId = m.matchId,
@@ -521,7 +537,8 @@ fun HomeScreen(
                         UpdateManager.downloadAndInstallApk(
                             context = context,
                             apkUrl = info.downloadUrl,
-                            versionName = info.latestVersionName
+                            versionName = info.latestVersionName,
+                            expectedSha256 = info.sha256Checksum
                         )
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = ForestSixPrimary),

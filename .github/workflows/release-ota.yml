@@ -49,8 +49,12 @@ jobs:
             echo "$KEYSTORE_BASE64" | base64 --decode > app/cricsaga-release.jks
           fi
           echo "sdk.dir=$ANDROID_HOME" > local.properties
-          echo "KEYSTORE_PASSWORD=${KEYSTORE_PASSWORD:-cricsaga2026}" >> local.properties
-          echo "KEY_PASSWORD=${KEY_PASSWORD:-cricsaga2026}" >> local.properties
+          if [ -n "$KEYSTORE_PASSWORD" ]; then
+            echo "KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD" >> local.properties
+          fi
+          if [ -n "$KEY_PASSWORD" ]; then
+            echo "KEY_PASSWORD=$KEY_PASSWORD" >> local.properties
+          fi
 
       - name: Grant Execute Permission to Gradlew
         run: chmod +x gradlew
@@ -79,11 +83,18 @@ jobs:
           # Clean up multi-line commit messages into a single clean changelog line
           CHANGELOG=$(echo "${RAW_CHANGELOG:-Continuous improvements and updates.}" | head -n 1 | tr -d '"\r\n')
           IS_FORCE="${INPUT_FORCE:-false}"
+          APK_FILE="app/build/outputs/apk/release/app-release.apk"
+          if [ -f "$APK_FILE" ]; then
+            SHA256_CHECKSUM=$(sha256sum "$APK_FILE" | awk '{print $1}')
+          else
+            SHA256_CHECKSUM=""
+          fi
           cat <<EOF > version.json
           {
             "latest_version_code": $VERSION_CODE,
             "latest_version_name": "$VERSION_NAME",
             "apk_url": "https://wyycmghdkcgdmoaaleki.supabase.co/storage/v1/object/public/app-updates/app-release.apk",
+            "sha256": "$SHA256_CHECKSUM",
             "changelog": "$CHANGELOG",
             "is_force_update": $IS_FORCE
           }

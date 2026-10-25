@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cricsaga.app.domain.model.ExtraType
 import com.cricsaga.app.ui.theme.*
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -114,7 +115,9 @@ fun ScoringScreen(
                         ballsRemaining = ballsRemaining,
                         rrr = rrr,
                         isTargetAchieved = runsNeeded <= 0,
-                        isAllOut = state.scoreState.totalWickets >= 10 || (ballsRemaining <= 0 && runsNeeded > 0)
+                        isAllOut = state.scoreState.completionReason == com.cricsaga.app.domain.model.InningsCompletionReason.ALL_OUT ||
+                            (state.scoreState.isCompleted && runsNeeded > 0) ||
+                            (ballsRemaining <= 0 && runsNeeded > 0)
                     )
                 }
 
@@ -165,7 +168,7 @@ fun ScoringScreen(
                                 fontSize = 12.sp
                             )
                             Text(
-                                text = "CRR: ${String.format("%.2f", state.scoreState.currentRunRate)}",
+                                text = "CRR: ${String.format(Locale.US, "%.2f", state.scoreState.currentRunRate)}",
                                 style = BodyCaption,
                                 color = BoundaryAmber,
                                 fontWeight = FontWeight.SemiBold
@@ -241,7 +244,7 @@ fun ScoringScreen(
                                 color = TextPrimary
                             )
                             Text(
-                                text = "${bowler?.oversFormatted ?: "0.0"}-${bowler?.maidens ?: 0}-${bowler?.runsConceded ?: 0}-${bowler?.wickets ?: 0}  (Econ: ${String.format("%.2f", bowler?.economyRate ?: 0.0)})",
+                                text = "${bowler?.oversFormatted ?: "0.0"}-${bowler?.maidens ?: 0}-${bowler?.runsConceded ?: 0}-${bowler?.wickets ?: 0}  (Econ: ${String.format(Locale.US, "%.2f", bowler?.economyRate ?: 0.0)})",
                                 style = BodyCaption,
                                 color = BoundaryAmber,
                                 fontWeight = FontWeight.SemiBold
@@ -540,7 +543,7 @@ fun ChasePressureBarCard(
                     color = TextPrimary
                 )
                 Text(
-                    text = "RRR: ${String.format("%.2f", rrr)}",
+                    text = "RRR: ${String.format(Locale.US, "%.2f", rrr)}",
                     style = BodyCaption,
                     color = animatedBarColor,
                     fontWeight = FontWeight.Bold
@@ -615,7 +618,7 @@ fun BatsmanRow(
                 textAlign = TextAlign.End
             )
             Text(
-                text = String.format("%.1f", sr),
+                text = String.format(Locale.US, "%.1f", sr),
                 style = BodyCaption,
                 color = BoundaryAmber,
                 fontWeight = FontWeight.SemiBold,

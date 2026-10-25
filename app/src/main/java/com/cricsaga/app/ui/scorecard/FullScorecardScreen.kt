@@ -26,12 +26,14 @@ import com.cricsaga.app.R
 import com.cricsaga.app.domain.model.BatsmanScore
 import com.cricsaga.app.domain.model.BowlerFigures
 import com.cricsaga.app.domain.model.DeliveryRecord
+import com.cricsaga.app.domain.model.DismissalType
 import com.cricsaga.app.domain.model.InningsScoreState
 import com.cricsaga.app.ui.analytics.ManhattanChart
 import com.cricsaga.app.ui.analytics.WormGraph
 import com.cricsaga.app.ui.utils.LocalHapticManager
 import com.cricsaga.app.ui.theme.*
 import com.cricsaga.app.ui.utils.PdfExportUtils
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -135,6 +137,20 @@ fun FullScorecardScreen(
                     .verticalScroll(scrollState),
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
+                val isSecondInnings = innings1Score != null || innings1Deliveries.isNotEmpty()
+                val effectiveTeam1Name = if (isSecondInnings) {
+                    if (innings1BattingTeamName.isNotBlank()) innings1BattingTeamName else bowlingTeamName
+                } else {
+                    battingTeamName
+                }
+                val effectiveTeam2Name = if (isSecondInnings) {
+                    battingTeamName
+                } else {
+                    bowlingTeamName
+                }
+                val effInnings1Deliveries = if (isSecondInnings) innings1Deliveries else currentInningsDeliveries
+                val effInnings2Deliveries = if (isSecondInnings) currentInningsDeliveries else emptyList()
+
                 when (selectedTab) {
                     0 -> ScorecardTab(battingTeamName, bowlingTeamName, scoreState, innings1Score)
                     1 -> ManhattanChart(
@@ -143,10 +159,10 @@ fun FullScorecardScreen(
                         totalOvers = scoreState.totalOversAllotted
                     )
                     2 -> WormGraph(
-                        teamAName = if (innings1BattingTeamName.isNotBlank()) innings1BattingTeamName else bowlingTeamName,
-                        teamBName = battingTeamName,
-                        innings1Deliveries = innings1Deliveries,
-                        innings2Deliveries = currentInningsDeliveries,
+                        teamAName = effectiveTeam1Name,
+                        teamBName = effectiveTeam2Name,
+                        innings1Deliveries = effInnings1Deliveries,
+                        innings2Deliveries = effInnings2Deliveries,
                         targetRuns = scoreState.targetRuns,
                         totalOvers = scoreState.totalOversAllotted
                     )
@@ -239,7 +255,7 @@ fun ScorecardTab(
                 color = TextPrimary
             )
             Text(
-                text = "Overs: ${scoreState.oversFormatted} / ${scoreState.totalOversAllotted}.0  •  CRR: ${String.format("%.2f", scoreState.currentRunRate)}",
+                text = "Overs: ${scoreState.oversFormatted} / ${scoreState.totalOversAllotted}.0  •  CRR: ${String.format(Locale.US, "%.2f", scoreState.currentRunRate)}",
                 color = MutedGrey,
                 fontSize = 13.sp
             )
@@ -349,8 +365,23 @@ fun ScorecardTab(
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text(b.playerName, color = TextPrimary, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                            val dismissalText = if (b.isOut) {
+                                when (b.dismissal?.dismissalType) {
+                                    DismissalType.BOWLED -> "bowled"
+                                    DismissalType.CAUGHT -> "caught"
+                                    DismissalType.CAUGHT_BEHIND -> "caught behind"
+                                    DismissalType.CAUGHT_AND_BOWLED -> "c & b"
+                                    DismissalType.RUN_OUT -> "run out"
+                                    DismissalType.STUMPED -> "stumped"
+                                    DismissalType.LBW -> "lbw"
+                                    DismissalType.HIT_WICKET -> "hit wicket"
+                                    DismissalType.RETIRED_HURT -> "retired hurt"
+                                    DismissalType.RETIRED_OUT -> "retired out"
+                                    null -> "out"
+                                }
+                            } else "not out *"
                             Text(
-                                text = if (b.isOut) "c & b (${b.dismissal?.dismissalType?.name ?: "Out"})" else "not out *",
+                                text = dismissalText,
                                 color = if (b.isOut) DismissalRed else BoundaryGreen,
                                 fontSize = 10.sp
                             )
@@ -360,7 +391,7 @@ fun ScorecardTab(
                             Text("${b.ballsFaced}", color = MutedGrey, fontSize = 13.sp, modifier = Modifier.width(22.dp), textAlign = TextAlign.End)
                             Text("${b.fours}", color = MutedGrey, fontSize = 13.sp, modifier = Modifier.width(22.dp), textAlign = TextAlign.End)
                             Text("${b.sixes}", color = MutedGrey, fontSize = 13.sp, modifier = Modifier.width(22.dp), textAlign = TextAlign.End)
-                            Text(String.format("%.1f", b.strikeRate), color = BoundaryAmber, fontSize = 12.sp, modifier = Modifier.width(42.dp), textAlign = TextAlign.End)
+                            Text(String.format(Locale.US, "%.1f", b.strikeRate), color = BoundaryAmber, fontSize = 12.sp, modifier = Modifier.width(42.dp), textAlign = TextAlign.End)
                         }
                     }
                 }
@@ -403,7 +434,7 @@ fun ScorecardTab(
                         Text("${bow.maidens}", color = MutedGrey, fontSize = 13.sp, modifier = Modifier.width(22.dp), textAlign = TextAlign.End)
                         Text("${bow.runsConceded}", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 13.sp, modifier = Modifier.width(24.dp), textAlign = TextAlign.End)
                         Text("${bow.wickets}", color = DismissalRed, fontWeight = FontWeight.Bold, fontSize = 13.sp, modifier = Modifier.width(22.dp), textAlign = TextAlign.End)
-                        Text(String.format("%.1f", bow.economyRate), color = BoundaryAmber, fontSize = 12.sp, modifier = Modifier.width(42.dp), textAlign = TextAlign.End)
+                        Text(String.format(Locale.US, "%.1f", bow.economyRate), color = BoundaryAmber, fontSize = 12.sp, modifier = Modifier.width(42.dp), textAlign = TextAlign.End)
                     }
                 }
             }
@@ -422,11 +453,8 @@ fun FallOfWicketsTab(scoreState: InningsScoreState) {
             Text("FALL OF WICKETS", color = DismissalRed, fontWeight = FontWeight.Bold, fontSize = 13.sp)
             Spacer(modifier = Modifier.height(10.dp))
 
-            val dismissedBatsmen = scoreState.batsmen.values.filter { it.isOut }
-            if (dismissedBatsmen.isEmpty()) {
-                Text("No wickets have fallen yet.", color = MutedGrey, fontSize = 13.sp)
-            } else {
-                dismissedBatsmen.forEachIndexed { index, b ->
+            if (scoreState.fallOfWickets.isNotEmpty()) {
+                scoreState.fallOfWickets.forEachIndexed { index, fow ->
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -434,19 +462,48 @@ fun FallOfWicketsTab(scoreState: InningsScoreState) {
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text(
-                            text = "${index + 1}-${b.runs} (${b.playerName})",
+                            text = "${fow.scoreAtDismissal}-${fow.wicketNumber} (${fow.batsmanName}, ${fow.oversAtDismissal} ov)",
                             color = TextPrimary,
                             fontWeight = FontWeight.SemiBold,
                             fontSize = 13.sp
                         )
                         Text(
-                            text = "${b.dismissal?.dismissalType?.name ?: "OUT"}",
+                            text = fow.dismissalType.name,
                             color = BoundaryAmber,
                             fontSize = 12.sp
                         )
                     }
-                    if (index < dismissedBatsmen.size - 1) {
+                    if (index < scoreState.fallOfWickets.size - 1) {
                         HorizontalDivider(color = DividerDark)
+                    }
+                }
+            } else {
+                val dismissedBatsmen = scoreState.batsmen.values.filter { it.isOut }
+                if (dismissedBatsmen.isEmpty()) {
+                    Text("No wickets have fallen yet.", color = MutedGrey, fontSize = 13.sp)
+                } else {
+                    dismissedBatsmen.forEachIndexed { index, b ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 6.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = "Wkt #${index + 1}: ${b.playerName} (${b.runs} runs)",
+                                color = TextPrimary,
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 13.sp
+                            )
+                            Text(
+                                text = "${b.dismissal?.dismissalType?.name ?: "OUT"}",
+                                color = BoundaryAmber,
+                                fontSize = 12.sp
+                            )
+                        }
+                        if (index < dismissedBatsmen.size - 1) {
+                            HorizontalDivider(color = DividerDark)
+                        }
                     }
                 }
             }
@@ -509,7 +566,7 @@ fun WhatsAppMatchPosterTab(
                         color = TextPrimary
                     )
                     Text(
-                        text = "${scoreState.oversFormatted} ov • CRR ${String.format("%.2f", scoreState.currentRunRate)}",
+                        text = "${scoreState.oversFormatted} ov • CRR ${String.format(Locale.US, "%.2f", scoreState.currentRunRate)}",
                         fontSize = 12.sp,
                         color = TextSecondary
                     )
@@ -523,9 +580,10 @@ fun WhatsAppMatchPosterTab(
             val topBowler = scoreState.bowlers.values.maxByOrNull { it.wickets }
 
             if (topBatter != null) {
+                val notOutSuffix = if (!topBatter.isOut) "*" else ""
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Text("Top Batter:", color = TextTertiary, fontSize = 12.sp)
-                    Text("${topBatter.playerName} ${topBatter.runs}* (${topBatter.ballsFaced})", color = TextPrimary, fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
+                    Text("${topBatter.playerName} ${topBatter.runs}$notOutSuffix (${topBatter.ballsFaced})", color = TextPrimary, fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
                 }
             }
             if (topBowler != null) {

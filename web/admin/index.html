@@ -52,6 +52,9 @@
                 <span class="w-2 h-2 rounded-full bg-pitch-green animate-pulse"></span>
                 Connected: wyycmghdkcgdmoaaleki
             </span>
+            <button onclick="changeAdminKey()" class="bg-[#2A3650] hover:bg-[#374563] text-sm text-gray-300 hover:text-white px-3 py-1.5 rounded-lg transition font-medium">
+                Key Config
+            </button>
             <button onclick="refreshAllData()" class="bg-[#2A3650] hover:bg-[#374563] text-sm text-white px-3 py-1.5 rounded-lg transition font-medium">
                 Refresh
             </button>
@@ -187,19 +190,46 @@
     <!-- Client Script -->
     <script>
         const SUPABASE_URL = "https://wyycmghdkcgdmoaaleki.supabase.co/rest/v1";
-        const SUPABASE_KEY = "sb_secret_NbYbuHhvgmyKi9Vgt1A9PA_TfNI04-K";
+        
+        function getAdminKey() {
+            let key = sessionStorage.getItem('cricsaga_admin_key');
+            if (!key) {
+                key = prompt("Enter CricSaga Supabase Admin Key:");
+                if (key && key.trim()) {
+                    sessionStorage.setItem('cricsaga_admin_key', key.trim());
+                }
+            }
+            return key ? key.trim() : "";
+        }
+
+        function changeAdminKey() {
+            const current = sessionStorage.getItem('cricsaga_admin_key') || '';
+            const key = prompt("Update CricSaga Supabase Admin Key:", current);
+            if (key !== null) {
+                if (key.trim()) {
+                    sessionStorage.setItem('cricsaga_admin_key', key.trim());
+                } else {
+                    sessionStorage.removeItem('cricsaga_admin_key');
+                }
+                refreshAllData();
+            }
+        }
 
         let allUsers = [];
         let selectedUserId = null;
 
-        const headers = {
-            "apikey": SUPABASE_KEY,
-            "Authorization": "Bearer " + SUPABASE_KEY,
-            "Content-Type": "application/json",
-            "Prefer": "return=representation"
-        };
+        function getHeaders() {
+            const key = getAdminKey();
+            return {
+                "apikey": key,
+                "Authorization": "Bearer " + key,
+                "Content-Type": "application/json",
+                "Prefer": "return=representation"
+            };
+        }
 
         async function fetchJson(endpoint, options = {}) {
+            const headers = getHeaders();
             const res = await fetch(`${SUPABASE_URL}/${endpoint}`, {
                 ...options,
                 headers: { ...headers, ...(options.headers || {}) }
